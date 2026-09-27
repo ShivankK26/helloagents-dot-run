@@ -8,7 +8,10 @@
     "build": "astro build",
     "preview": "astro preview",
     "typecheck": "astro check",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prebuild": "pnpm --filter @helloagents/schema build",
+    "predev": "pnpm --filter @helloagents/schema build",
+    "pretypecheck": "pnpm --filter @helloagents/schema build"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.4",
