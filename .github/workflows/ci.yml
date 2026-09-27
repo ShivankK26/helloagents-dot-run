@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint, test, validate, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate registry
+        run: pnpm registry:validate
+
+      - name: Lint and format check
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build site and CLI
+        run: pnpm build
+
+      - name: Build raw registry for the CLI smoke test
+        run: pnpm registry:build
+
+      - name: Upload site build
+        uses: actions/upload-artifact@v7
+        with:
+          name: site
+          path: apps/web/dist
+          retention-days: 7
+
+      # The CLI promises Node 18+, so exercise the built bundle on it.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 18
+
+      - name: CLI smoke test on Node 18
+        run: |
+          set -euo pipefail
+          export HELLOAGENTS_REGISTRY_URL="$GITHUB_WORKSPACE/.registry-out"
+          cli="$GITHUB_WORKSPACE/packages/cli/dist/index.js"
+          cd "$(mktemp -d)"
+          node "$cli" --version
+          node "$cli" list
+          node "$cli" search review
+          node "$cli" add code-reviewer changelog
+          test -f .claude/agents/code-reviewer.md
+          test -f .claude/skills/changelog/SKILL.md
+          node "$cli" remove code-reviewer changelog --yes
+          test ! -e .claude/agents/code-reviewer.md

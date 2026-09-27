@@ -1,0 +1,54 @@
+name: Publish CLI
+
+# Push a tag like cli-v0.1.0 to publish packages/cli to npm as @helloagents/cli.
+on:
+  push:
+    tags: ["cli-v*"]
+
+permissions:
+  contents: read
+  id-token: write # npm trusted publishing and provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check the tag matches packages/cli/package.json
+        run: |
+          tag="${GITHUB_REF_NAME#cli-v}"
+          version="$(node -p "require('./packages/cli/package.json').version")"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match packages/cli version $version"
+            exit 1
+          fi
+
+      - name: Test and build
+        run: |
+          pnpm --filter @helloagents/cli typecheck
+          pnpm --filter @helloagents/cli test
+          pnpm --filter @helloagents/cli build
+
+      # pnpm pack rewrites workspace: ranges; trusted publishing needs npm 11.5.1+.
+      - name: Publish
+        working-directory: packages/cli
+        env:
+          # Only needed until trusted publishing is configured on npmjs.com.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm install -g npm@latest
+          pnpm pack --pack-destination "$RUNNER_TEMP"
+          npm publish "$RUNNER_TEMP"/helloagents-cli-*.tgz --access public --provenance

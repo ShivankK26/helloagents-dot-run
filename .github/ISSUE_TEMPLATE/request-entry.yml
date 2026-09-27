@@ -1,0 +1,45 @@
+name: Request a sub-agent or skill
+description: Suggest an entry you'd like to see in the directory.
+title: "Request: "
+labels: ["entry request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the job you want done. Someone may pick it up, or you can [submit it yourself](https://helloagents.run/submit/).
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      description: Not sure? A sub-agent does a whole job in its own context. A skill is instructions Claude follows in your conversation.
+      options:
+        - Sub-agent
+        - Skill
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Suggested name
+      placeholder: e.g. api-designer
+  - type: textarea
+    id: job
+    attributes:
+      label: What should it do?
+      description: The task, what good output looks like, and anything it should avoid.
+    validations:
+      required: true
+  - type: textarea
+    id: when
+    attributes:
+      label: When would you use it?
+      description: A concrete situation or two.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched https://helloagents.run and nothing similar exists.
+          required: true
+        - label: I'd be willing to write or review the prompt.
