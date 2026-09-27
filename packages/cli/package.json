@@ -37,6 +37,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@helloagents/schema": "workspace:*",
     "tsup": "^8.5.1"
   }
 }
