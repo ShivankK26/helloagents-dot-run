@@ -1,0 +1,16 @@
+---
+import type { GetStaticPaths } from "astro";
+import EntryPage from "../../components/EntryPage.astro";
+import { getEntries, type LoadedEntry } from "../../lib/registry";
+
+export const getStaticPaths = (async () => {
+  const entries = await getEntries();
+  return entries
+    .filter((entry) => entry.type === "agent")
+    .map((entry) => ({ params: { name: entry.name }, props: { entry } }));
+}) satisfies GetStaticPaths;
+
+const { entry } = Astro.props as { entry: LoadedEntry };
+---
+
+<EntryPage entry={entry} />

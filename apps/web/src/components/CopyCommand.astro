@@ -1,0 +1,29 @@
+---
+import Icon from "./Icon.astro";
+
+interface Props {
+  command: string;
+  /** Part of the command to highlight, e.g. the entry name. */
+  highlight?: string;
+  label?: string;
+  class?: string;
+}
+const { command, highlight, label = "Copy command", class: className } = Astro.props;
+const at = highlight ? command.lastIndexOf(highlight) : -1;
+const before = at >= 0 ? command.slice(0, at) : command;
+const hl = at >= 0 && highlight ? highlight : "";
+const after = at >= 0 && highlight ? command.slice(at + highlight.length) : "";
+---
+
+<div class:list={["cmd", className]}>
+  <span class="cmd-prompt">$</span>
+  <code class="cmd-text">
+    {before}
+    {hl && <span class="hl">{hl}</span>}
+    {after}
+  </code>
+  <button type="button" class="copy" data-copy={command} aria-label={label}>
+    <Icon name="copy" />
+    <span data-copy-label>Copy</span>
+  </button>
+</div>

@@ -7,11 +7,14 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "typecheck": "astro check"
+    "typecheck": "astro check",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
     "@helloagents/schema": "workspace:*",
-    "astro": "^7.3.5"
+    "astro": "^7.3.5",
+    "geist": "^1.7.2"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10"

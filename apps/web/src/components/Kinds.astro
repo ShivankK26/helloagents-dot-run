@@ -1,0 +1,83 @@
+---
+import Icon from "./Icon.astro";
+---
+
+<section class="section" aria-labelledby="kinds-title">
+  <div class="section-head">
+    <p class="eyebrow">// what you're installing</p>
+    <h2 id="kinds-title">Two kinds of files</h2>
+    <p>
+      Both are plain markdown with YAML frontmatter. Claude Code picks them up from your project's
+      <code>.claude/</code> folder, or from <code>~/.claude/</code> for every project.
+    </p>
+  </div>
+  <div class="kinds">
+    <article class="kind kind-agent">
+      <div class="kind-head">
+        <span class="badge badge-agent">sub-agent</span>
+        <h3>A specialist Claude can hand work to</h3>
+        <p>
+          A sub-agent runs in its own context window with its own system prompt and tool allowlist.
+          Claude delegates to it when a task matches its description, or when you ask for it by
+          name. The result comes back without cluttering your main conversation.
+        </p>
+      </div>
+      <dl class="meta">
+        <dt>runs in</dt>
+        <dd>A separate context window</dd>
+        <dt>triggered</dt>
+        <dd>Claude delegates, or you ask: "use the code-reviewer"</dd>
+        <dt>best for</dt>
+        <dd>Reviews, audits, research, test writing: focused jobs</dd>
+      </dl>
+      <div class="kind-file">
+        <div class="kind-file-path">
+          <Icon name="file" />
+          .claude/agents/code-reviewer.md
+        </div>
+        <pre><span class="d">---</span>
+<span class="k">name</span>: code-reviewer
+<span class="k">description</span>: Reviews code changes for bugs…
+<span class="k">tools</span>: Read, Grep, Glob, Bash
+<span class="d">---</span>
+
+You are a senior engineer doing a careful review…</pre>
+      </div>
+    </article>
+    <article class="kind kind-skill">
+      <div class="kind-head">
+        <span class="badge badge-skill">skill</span>
+        <h3>Know-how Claude loads when it's needed</h3>
+        <p>
+          A skill is a folder of instructions, plus optional scripts and references. Only its
+          description sits in context until a task calls for it, then Claude reads the rest and
+          follows it in your main conversation. You can also run it directly as <code>/name</code>.
+        </p>
+      </div>
+      <dl class="meta">
+        <dt>runs in</dt>
+        <dd>Your main conversation, loaded on demand</dd>
+        <dt>triggered</dt>
+        <dd>
+          Automatically when relevant, or with <code>/changelog</code>
+        </dd>
+        <dt>best for</dt>
+        <dd>Repeatable workflows, formats and house rules</dd>
+      </dl>
+      <div class="kind-file">
+        <div class="kind-file-path">
+          <Icon name="file" />
+          .claude/skills/changelog/SKILL.md
+        </div>
+        <pre><span class="d">---</span>
+<span class="k">name</span>: changelog
+<span class="k">description</span>: Writes a CHANGELOG.md entry from git…
+<span class="k">allowed-tools</span>: Bash(git log:*) Read
+<span class="d">---</span>
+
+# Changelog
+1. Find the range since the last release…</pre>
+      </div>
+    </article>
+  </div>
+</section>

@@ -1,0 +1,30 @@
+---
+import Icon from "./Icon.astro";
+import { REPO_URL } from "../lib/site";
+---
+
+<section class="section" aria-labelledby="cta-title">
+  <div class="cta">
+    <div>
+      <p class="eyebrow">// contribute</p>
+      <h2 id="cta-title">Built one that works? Share it.</h2>
+      <p>
+        Every entry is a single file in the repo. Open a pull request and CI checks the frontmatter
+        for you. Once it's merged, anyone can install it.
+      </p>
+      <ol class="cta-steps">
+        <li>Fork the repo</li>
+        <li>Add one file</li>
+        <li>Open a PR</li>
+      </ol>
+    </div>
+    <div class="cta-actions">
+      <a class="button button-primary" href="/submit/">
+        How to submit <Icon name="arrow" />
+      </a>
+      <a class="button" href={`${REPO_URL}/blob/main/CONTRIBUTING.md`} rel="noopener">
+        <Icon name="github" /> CONTRIBUTING.md
+      </a>
+    </div>
+  </div>
+</section>

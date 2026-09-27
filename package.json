@@ -1,7 +1,7 @@
 {
   "name": "helloagents-monorepo",
   "private": true,
-  "description": "helloagents.run — a free, open-source directory of Claude Code skills and sub-agents",
+  "description": "helloagents.run \u2014 a free, open-source directory of Claude Code skills and sub-agents",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@11.5.1",
@@ -16,7 +16,8 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint . && prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "design:reference": "pnpm --filter web build && node scripts/design-reference.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

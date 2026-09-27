@@ -1,0 +1,202 @@
+---
+import { Code } from "astro:components";
+import CopyCommand from "./CopyCommand.astro";
+import Icon from "./Icon.astro";
+import Layout from "../layouts/Layout.astro";
+import {
+  curlCommand,
+  formatBytes,
+  installCommand,
+  languageFor,
+  rawPath,
+  shortPath,
+  sourceUrl,
+  toolsList,
+  typeDir,
+  typeLabel,
+  type LoadedEntry,
+} from "../lib/registry";
+
+interface Props {
+  entry: LoadedEntry;
+}
+const { entry } = Astro.props;
+const tools = toolsList(entry);
+const location =
+  entry.type === "agent" ? `.claude/agents/${entry.name}.md` : `.claude/skills/${entry.name}/`;
+/** Split the main file so frontmatter is highlighted as YAML and the rest as markdown. */
+function segments(path: string, text: string): { code: string; lang: string }[] {
+  const lang = languageFor(path);
+  const match = path === entry.mainPath ? /^---\r?\n[\s\S]*?\r?\n---[ \t]*\r?\n/.exec(text) : null;
+  if (!match) return [{ code: text, lang }];
+  return [
+    { code: match[0].replace(/\r?\n$/, ""), lang: "yaml" },
+    { code: text.slice(match[0].length), lang },
+  ];
+}
+const title = `${entry.name}: Claude Code ${entry.type === "agent" ? "sub-agent" : "skill"}`;
+---
+
+<Layout title={title} description={entry.description} type="article">
+  <div class="container">
+    <ol class="crumbs">
+      <li>
+        <a href="/">Directory</a>
+      </li>
+      <li>
+        <a href={`/?type=${entry.type}#browse`}>{typeDir(entry.type)}</a>
+      </li>
+      <li aria-current="page">{entry.name}</li>
+    </ol>
+
+    <header class="entry-head">
+      <div>
+        <span class:list={["badge", `badge-${entry.type}`]}>
+          {typeLabel(entry.type).toLowerCase()}
+        </span>
+      </div>
+      <h1>{entry.name}</h1>
+      <p>{entry.description}</p>
+      {entry.tags.length > 0 && (
+        <ul class="tags" aria-label="Tags">
+          {entry.tags.map((t) => (
+            <li>
+              <a class="tag" href={`/?q=${encodeURIComponent(t)}#browse`}>
+                {t}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </header>
+
+    <div class="entry-layout">
+      <div>
+        {entry.files.map((file, i) => {
+          const id = `file-${i}`;
+          return (
+            <section class="file" aria-label={shortPath(entry, file)}>
+              <div class="file-head">
+                <span class="file-path">
+                  <b>{shortPath(entry, file)}</b>
+                </span>
+                <span class="file-size">{formatBytes(file.size)}</span>
+                {file.text !== undefined && (
+                  <button
+                    type="button"
+                    class="copy"
+                    data-copy-from={id}
+                    aria-label={`Copy ${shortPath(entry, file)}`}
+                  >
+                    <Icon name="copy" />
+                    <span data-copy-label>Copy</span>
+                  </button>
+                )}
+                <a class="copy" href={rawPath(file)}>
+                  Raw
+                </a>
+              </div>
+              {file.text !== undefined && <template id={id}>{file.text}</template>}
+              <div class="file-body">
+                {file.text !== undefined ? (
+                  segments(file.path, file.text).map((part) => (
+                    <Code
+                      code={part.code}
+                      lang={part.lang as "markdown"}
+                      themes={{ light: "github-light", dark: "github-dark-dimmed" }}
+                      defaultColor={false}
+                      wrap
+                    />
+                  ))
+                ) : (
+                  <p class="file-binary">
+                    Binary file. <a href={rawPath(file)}>Download it</a>.
+                  </p>
+                )}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+
+      <aside class="entry-side">
+        <section class="panel">
+          <h2>Install</h2>
+          <CopyCommand
+            command={installCommand(entry.name)}
+            highlight={entry.name}
+            label="Copy install command"
+          />
+          <p class="hint">
+            Adds it to <code>{location}</code> in the current project.
+          </p>
+          <p class="hint">For all your projects:</p>
+          <CopyCommand
+            command={installCommand(entry.name, true)}
+            highlight={entry.name}
+            label="Copy global install command"
+          />
+          <p class="hint">
+            Without Node:
+            <button
+              type="button"
+              class="copy"
+              data-copy={curlCommand(entry)}
+              style="height:24px;padding:0 6px"
+            >
+              <span data-copy-label>copy curl command</span>
+            </button>
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2>Details</h2>
+          <dl class="meta">
+            <dt>type</dt>
+            <dd>{typeLabel(entry.type)}</dd>
+            {entry.category && (
+              <>
+                <dt>category</dt>
+                <dd>{entry.category}</dd>
+              </>
+            )}
+            {tools && (
+              <>
+                <dt>{entry.type === "agent" ? "tools" : "allowed"}</dt>
+                <dd>
+                  <code>{tools}</code>
+                </dd>
+              </>
+            )}
+            {entry.type === "agent" && (
+              <>
+                <dt>model</dt>
+                <dd>{entry.model ?? "inherits from session"}</dd>
+              </>
+            )}
+            <dt>files</dt>
+            <dd>
+              {entry.files.length} · {formatBytes(entry.files.reduce((n, f) => n + f.size, 0))}
+            </dd>
+            {entry.author && (
+              <>
+                <dt>author</dt>
+                <dd>
+                  <a href={`https://github.com/${entry.author}`} rel="noopener">
+                    @{entry.author}
+                  </a>
+                </dd>
+              </>
+            )}
+            <dt>source</dt>
+            <dd>
+              <a href={sourceUrl(entry.files[0]!)} rel="noopener">
+                View on GitHub
+              </a>
+            </dd>
+          </dl>
+        </section>
+      </aside>
+    </div>
+  </div>
+</Layout>
