@@ -1,0 +1,1 @@
+export const REGISTRY_FORMAT_VERSION = 1;

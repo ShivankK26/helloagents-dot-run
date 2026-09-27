@@ -1,0 +1,42 @@
+{
+  "name": "@helloagents/cli",
+  "version": "0.1.0",
+  "description": "Install Claude Code sub-agents and skills from helloagents.run",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "helloagents": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18.18"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "sub-agents",
+    "skills",
+    "agents",
+    "cli"
+  ],
+  "homepage": "https://helloagents.run",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShivankK26/helloagents-dot-run.git",
+    "directory": "packages/cli"
+  },
+  "bugs": "https://github.com/ShivankK26/helloagents-dot-run/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1"
+  }
+}
