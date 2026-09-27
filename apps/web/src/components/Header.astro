@@ -1,5 +1,6 @@
 ---
 import Icon from "./Icon.astro";
+import Logo from "./Logo.astro";
 import { REPO_URL } from "../lib/site";
 
 const path = Astro.url.pathname;
@@ -8,9 +9,7 @@ const path = Astro.url.pathname;
 <header class="site-header">
   <div class="container">
     <a href="/" class="logo" aria-label="helloagents.run home">
-      <span class="logo-mark" aria-hidden="true">
-        h
-      </span>
+      <Logo class="logo-mark" />
       <span>
         helloagents<span class="logo-tld">.run</span>
       </span>

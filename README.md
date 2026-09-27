@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/brand/app-icon.svg" width="88" height="88" alt="helloagents.run logo" />
+</p>
+
 # helloagents.run
 
 A free, open-source directory of [Claude Code](https://code.claude.com) **sub-agents** and **skills**. Browse and search them, read the exact file, and install one with a single command.
