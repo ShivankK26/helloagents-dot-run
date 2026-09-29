@@ -63,6 +63,8 @@
 }
 
 html {
+  /* Keep anchor targets (#browse) clear of the sticky header. */
+  scroll-padding-top: 72px;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -511,9 +513,15 @@ kbd {
   color: var(--text);
 }
 .filter[aria-pressed="true"] {
-  background: var(--bg-hover);
+  background: var(--border);
   color: var(--text);
-  box-shadow: 0 0 0 1px var(--border-strong);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+}
+:root[data-theme="light"] .filter[aria-pressed="true"] {
+  background: var(--bg-elev);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 1px 2px rgb(0 0 0 / 6%);
 }
 .filter .count {
   color: var(--text-faint);
@@ -538,7 +546,7 @@ kbd {
 }
 .row > details > summary {
   display: grid;
-  grid-template-columns: 84px minmax(120px, 190px) 1fr auto 16px;
+  grid-template-columns: max-content minmax(120px, 190px) 1fr auto 16px;
   align-items: center;
   gap: 14px;
   min-height: 42px;
@@ -560,6 +568,9 @@ kbd {
 .row details[open] {
   background: var(--bg-hover);
   border-radius: var(--radius-sm);
+}
+.row .badge {
+  justify-self: start;
 }
 .row-name {
   overflow: hidden;
@@ -592,7 +603,7 @@ details[open] .chevron {
   display: grid;
   grid-template-columns: 1fr 300px;
   gap: 20px 28px;
-  padding: 6px 12px 16px 110px;
+  padding: 6px 12px 16px 92px;
 }
 .row-body p {
   margin: 0 0 12px;
@@ -1104,7 +1115,7 @@ details[open] .chevron {
 
 @media (max-width: 860px) {
   .row > details > summary {
-    grid-template-columns: 76px minmax(0, 1fr) 16px;
+    grid-template-columns: max-content minmax(0, 1fr) 16px;
     gap: 10px;
     padding: 8px 10px;
   }
