@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <style>.b{fill:#0b0b0c}.c{stroke:#fafafa}@media (prefers-color-scheme:dark){.b{fill:#ededef}.c{stroke:#09090b}}</style>
-  <path d="M9 4h14a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H13.5L8 28.2V24H9a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6Z" class="b"/>
-  <path d="m10 10.2 4.3 3.8-4.3 3.8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none" class="c"/>
-  <rect x="16.6" y="16.4" width="6.4" height="2.8" rx="1.4" fill="#ff7a3d"/>
-</svg>

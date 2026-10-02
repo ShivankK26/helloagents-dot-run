@@ -1,8 +1,0 @@
-dist
-.astro
-node_modules
-pnpm-lock.yaml
-.registry-out
-apps/web/public/r
-registry
-docs/design-reference.html
