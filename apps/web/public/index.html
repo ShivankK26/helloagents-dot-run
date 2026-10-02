@@ -1,0 +1,1248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>helloagents: one change you can trust, from many coding agents</title>
+    <meta
+      name="description"
+      content="helloagents is an open-source desktop app that splits a coding task across several AI agents, sends failing tests back to the agent that wrote the code, and hands you one reviewed change to merge. With traces, logs and evals built in."
+    />
+    <link rel="canonical" href="https://www.helloagents.run/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1012" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="helloagents" />
+    <meta
+      property="og:title"
+      content="helloagents: one change you can trust, from many coding agents"
+    />
+    <meta
+      property="og:description"
+      content="An open-source desktop app that orchestrates coding agents, checks their work with your tests, and shows you every step."
+    />
+    <meta property="og:url" content="https://www.helloagents.run/" />
+    <meta property="og:image" content="https://www.helloagents.run/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+    />
+    <style>
+      :root {
+        --bg: #f3f4f6;
+        --surface: #ffffff;
+        --sunk: #f7f8f9;
+        --line: #e2e4e8;
+        --line-2: #cfd3d9;
+        --ink: #111316;
+        --muted: #59606a;
+        --faint: #8d939c;
+        --accent: #e4572a;
+        --accent-soft: #fdece5;
+        --ok: #1d8a4c;
+        --ok-soft: #e4f4ea;
+        --bad: #cf3b2b;
+        --bad-soft: #fbe7e4;
+        --idle: #d6d9de;
+        --shadow: 0 30px 80px -40px rgb(17 19 22 / 35%), 0 2px 6px rgb(17 19 22 / 6%);
+        --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1012;
+          --surface: #17191c;
+          --sunk: #131417;
+          --line: #26292e;
+          --line-2: #363a41;
+          --ink: #ecedef;
+          --muted: #a2a7af;
+          --faint: #6f747c;
+          --accent: #ff7a3d;
+          --accent-soft: #3a2117;
+          --ok: #4bd486;
+          --ok-soft: #15301f;
+          --bad: #ff7b6b;
+          --bad-soft: #3a1c19;
+          --idle: #33363c;
+          --shadow: 0 30px 80px -40px rgb(0 0 0 / 80%), 0 2px 6px rgb(0 0 0 / 30%);
+          color-scheme: dark;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-padding-top: 80px;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.6 var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: inherit;
+      }
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        border-radius: 6px;
+      }
+      code {
+        font-family: var(--mono);
+        font-size: 0.9em;
+      }
+      .wrap {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding-inline: 24px;
+      }
+
+      /* Nav */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: color-mix(in srgb, var(--bg) 85%, transparent);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--line);
+      }
+      .nav .wrap {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        height: 60px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 600;
+        font-size: 16px;
+        text-decoration: none;
+      }
+      .brand svg {
+        width: 26px;
+        height: 26px;
+        color: var(--ink);
+      }
+      .nav-links {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .nav-links a {
+        font-size: 14.5px;
+        color: var(--muted);
+        text-decoration: none;
+        padding: 6px 10px;
+        border-radius: 8px;
+      }
+      .nav-links a:hover {
+        color: var(--ink);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 42px;
+        padding: 0 18px;
+        border-radius: 10px;
+        border: 1px solid var(--line-2);
+        background: var(--surface);
+        font: 500 15px var(--sans);
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .btn:hover {
+        background: var(--sunk);
+      }
+      .btn-ink {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: var(--bg);
+      }
+      .btn-ink:hover {
+        background: color-mix(in srgb, var(--ink) 86%, var(--bg));
+      }
+      .btn svg {
+        width: 17px;
+        height: 17px;
+      }
+      .nav .btn {
+        height: 36px;
+        padding: 0 14px;
+        font-size: 14px;
+      }
+
+      /* Hero */
+      .hero {
+        padding-block: 72px 40px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 44px;
+      }
+      .hero-copy {
+        max-width: 760px;
+      }
+      .tagline {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 18px;
+        font: 500 13px var(--mono);
+        color: var(--muted);
+      }
+      .tagline .strip {
+        gap: 3px;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(38px, 6.4vw, 66px);
+        line-height: 1.02;
+        letter-spacing: -0.035em;
+        font-weight: 700;
+        text-wrap: balance;
+      }
+      h1 .soft {
+        color: var(--faint);
+      }
+      .lede {
+        margin: 22px 0 0;
+        font-size: clamp(17px, 2vw, 20px);
+        line-height: 1.5;
+        color: var(--muted);
+        max-width: 40em;
+      }
+      .ctas {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-top: 30px;
+      }
+      .soon {
+        font: 13px var(--mono);
+        color: var(--faint);
+      }
+
+      /* The signature: one segment per agent */
+      .strip {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .strip i {
+        width: 18px;
+        height: 7px;
+        border-radius: 2px;
+        background: var(--idle);
+        transition: background 0.4s;
+      }
+      .strip i.working {
+        background: var(--accent);
+      }
+      .strip i.fixing {
+        background: var(--bad);
+        animation: pulse 1.3s infinite;
+      }
+      .strip i.done {
+        background: var(--ok);
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      /* App mockup */
+      .window {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .window-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 44px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--sunk);
+      }
+      .lights {
+        display: flex;
+        gap: 7px;
+      }
+      .lights i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--idle);
+      }
+      .window-title {
+        font: 500 13px var(--mono);
+        color: var(--faint);
+        margin-left: 8px;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        min-height: 400px;
+      }
+      .runs {
+        list-style: none;
+        margin: 0;
+        padding: 8px;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .runs li {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 4px 10px;
+        padding: 11px 12px;
+        border-radius: 10px;
+        font-size: 14px;
+      }
+      .runs li.sel {
+        background: var(--sunk);
+        box-shadow: inset 0 0 0 1px var(--line);
+      }
+      .runs .t {
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .runs .w {
+        font: 12px var(--mono);
+        color: var(--faint);
+        text-align: right;
+      }
+      .runs .s {
+        font-size: 12.5px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .runs .strip i {
+        width: 14px;
+        height: 5px;
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--idle);
+      }
+      .dot.live {
+        background: var(--accent);
+        animation: pulse 1.3s infinite;
+      }
+      .dot.ok {
+        background: var(--ok);
+      }
+      .detail {
+        padding: 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+      }
+      .detail h3 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: -0.01em;
+      }
+      .meta {
+        font: 12.5px var(--mono);
+        color: var(--faint);
+        margin-top: 4px;
+      }
+      .progress .track {
+        height: 6px;
+        border-radius: 6px;
+        background: var(--idle);
+        overflow: hidden;
+      }
+      .progress .track i {
+        display: block;
+        height: 100%;
+        width: 55%;
+        border-radius: 6px;
+        background: var(--accent);
+        transition:
+          width 0.8s,
+          background 0.4s;
+      }
+      .progress.done .track i {
+        background: var(--ok);
+      }
+      .phases {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12.5px;
+        color: var(--faint);
+        margin-top: 7px;
+      }
+      .phases .on {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .agents {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .agents li {
+        display: grid;
+        grid-template-columns: 32px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        padding: 11px 14px;
+      }
+      .agents li + li {
+        border-top: 1px solid var(--line);
+      }
+      .badge {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font: 500 11.5px var(--mono);
+        background: var(--sunk);
+        border: 1px solid var(--line);
+        color: var(--muted);
+      }
+      .job {
+        font-weight: 500;
+        font-size: 14px;
+      }
+      .note {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .note .bad {
+        color: var(--bad);
+      }
+      .tag {
+        font-size: 12px;
+        font-weight: 500;
+        padding: 3px 9px;
+        border-radius: 999px;
+        white-space: nowrap;
+        background: var(--sunk);
+        color: var(--muted);
+      }
+      .tag.working {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .tag.fixing {
+        background: var(--bad-soft);
+        color: var(--bad);
+      }
+      .tag.done {
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+      .result {
+        border-radius: 12px;
+        padding: 14px 16px;
+        background: var(--sunk);
+        border: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        font-size: 14px;
+        transition: background 0.4s;
+      }
+      .result b {
+        font-weight: 600;
+      }
+      .result span {
+        color: var(--muted);
+      }
+      .result.ready {
+        background: var(--accent-soft);
+        border-color: transparent;
+      }
+      .fake-btn {
+        font: 500 13px var(--sans);
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: var(--ink);
+        color: var(--bg);
+        opacity: 0.35;
+        transition: opacity 0.4s;
+      }
+      .result.ready .fake-btn {
+        opacity: 1;
+      }
+
+      /* Sections */
+      section {
+        padding-block: 72px;
+      }
+      .eyebrow {
+        margin: 0 0 12px;
+        font: 500 12.5px var(--mono);
+        color: var(--faint);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      h2 {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 40px);
+        line-height: 1.12;
+        letter-spacing: -0.03em;
+        font-weight: 700;
+        max-width: 22em;
+        text-wrap: balance;
+      }
+      .section-lede {
+        margin: 14px 0 0;
+        color: var(--muted);
+        font-size: 17.5px;
+        max-width: 40em;
+      }
+
+      .steps {
+        list-style: none;
+        margin: 40px 0 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        counter-reset: step;
+      }
+      .steps li {
+        counter-increment: step;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .steps li::before {
+        content: counter(step);
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font: 500 13px var(--mono);
+        background: var(--sunk);
+        border: 1px solid var(--line);
+        color: var(--muted);
+      }
+      .steps h3 {
+        margin: 6px 0 0;
+        font-size: 17px;
+      }
+      .steps p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14.5px;
+      }
+
+      .features {
+        margin-top: 40px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .feature {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .feature-copy {
+        padding: 20px 22px 18px;
+      }
+      .feature h3 {
+        margin: 0;
+        font-size: 17px;
+      }
+      .feature p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14.5px;
+      }
+      .feature pre {
+        margin: auto 0 0;
+        padding: 14px 18px;
+        border-top: 1px solid var(--line);
+        background: var(--sunk);
+        font: 12.5px/1.75 var(--mono);
+        color: var(--muted);
+        overflow-x: auto;
+        white-space: pre;
+      }
+      .add {
+        color: var(--ok);
+      }
+      .del {
+        color: var(--bad);
+      }
+      .hi {
+        color: var(--ink);
+      }
+      .acc {
+        color: var(--accent);
+      }
+
+      .evals {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 40px;
+        align-items: center;
+      }
+      .report {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 22px;
+      }
+      .report-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        font: 12.5px var(--mono);
+        color: var(--faint);
+        margin-bottom: 18px;
+      }
+      .report-head b {
+        color: var(--accent);
+        font-weight: 500;
+      }
+      .bars {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .bar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 6px 12px;
+        font-size: 14px;
+      }
+      .bar .v {
+        font: 500 14px var(--mono);
+      }
+      .bar .t {
+        grid-column: 1 / -1;
+        height: 9px;
+        border-radius: 9px;
+        background: var(--idle);
+        overflow: hidden;
+      }
+      .bar .t i {
+        display: block;
+        height: 100%;
+        border-radius: 9px;
+        background: var(--line-2);
+      }
+      .bar.best .t i {
+        background: var(--accent);
+      }
+      .checks {
+        list-style: none;
+        margin: 22px 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        color: var(--muted);
+      }
+      .checks li {
+        display: grid;
+        grid-template-columns: 22px 1fr;
+        gap: 10px;
+      }
+      .checks li::before {
+        content: "✓";
+        color: var(--ok);
+        font-weight: 600;
+      }
+
+      .pillars {
+        margin-top: 40px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .pillar {
+        border-top: 2px solid var(--ink);
+        padding-top: 16px;
+      }
+      .pillar h3 {
+        margin: 0;
+        font-size: 17px;
+      }
+      .pillar p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .final {
+        text-align: left;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 48px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px 40px;
+        align-items: center;
+      }
+      .final h2 {
+        font-size: clamp(26px, 3.6vw, 36px);
+      }
+      .final p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        max-width: 36em;
+      }
+      .final .ctas {
+        margin: 0;
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      footer {
+        border-top: 1px solid var(--line);
+        padding-block: 28px 40px;
+        color: var(--faint);
+        font-size: 14px;
+      }
+      footer .wrap {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px 24px;
+      }
+      footer nav {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+      footer a {
+        text-decoration: none;
+        color: var(--muted);
+      }
+      footer a:hover {
+        color: var(--ink);
+      }
+
+      @media (max-width: 960px) {
+        .steps {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .evals,
+        .final {
+          grid-template-columns: 1fr;
+        }
+        .app {
+          grid-template-columns: 1fr;
+        }
+        .runs {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .runs li:not(.sel) {
+          display: none;
+        }
+      }
+      @media (max-width: 640px) {
+        .wrap {
+          padding-inline: 16px;
+        }
+        .nav-links a:not(.btn) {
+          display: none;
+        }
+        .hero {
+          padding-top: 44px;
+        }
+        section {
+          padding-block: 52px;
+        }
+        .steps,
+        .features,
+        .pillars {
+          grid-template-columns: 1fr;
+        }
+        .agents li {
+          grid-template-columns: 30px minmax(0, 1fr);
+        }
+        .agents .tag {
+          grid-column: 2;
+          justify-self: start;
+        }
+        .detail {
+          padding: 18px 16px;
+        }
+        .final {
+          padding: 28px 22px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="wrap">
+        <a class="brand" href="/" aria-label="helloagents home">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path
+              d="M9 4h14a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H13.5L8 28.2V24H9a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6Z"
+              fill="currentColor"
+            />
+            <path
+              d="m10 10.2 4.3 3.8-4.3 3.8"
+              style="stroke: var(--bg)"
+              stroke-width="2.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              fill="none"
+            />
+            <rect x="16.6" y="16.4" width="6.4" height="2.8" rx="1.4" fill="#ff7a3d" />
+          </svg>
+          helloagents
+        </a>
+        <nav class="nav-links" aria-label="Main">
+          <a href="#how">How it works</a>
+          <a href="#see">What you see</a>
+          <a href="#evals">Evals</a>
+          <a class="btn" href="https://github.com/ShivankK26/helloagents-dot-run" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path
+                d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"
+              />
+            </svg>
+            GitHub
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <div class="wrap">
+        <div class="hero">
+          <div class="hero-copy">
+            <p class="tagline">
+              <span class="strip" aria-hidden="true"
+                ><i class="done"></i><i class="working"></i><i class="done"></i
+              ></span>
+              Open-source desktop app for coding agents
+            </p>
+            <h1>Many coding agents. <span class="soft">One change you can trust.</span></h1>
+            <p class="lede">
+              Give helloagents a task. It splits the work across several agents, each in its own
+              copy of your repo, sends failing tests back to the agent that wrote the code, and
+              hands you one reviewed change to merge.
+            </p>
+            <div class="ctas">
+              <a
+                class="btn btn-ink"
+                href="https://github.com/ShivankK26/helloagents-dot-run"
+                rel="noopener"
+                >Follow on GitHub</a
+              >
+              <a class="btn" href="#how">See how it works</a>
+              <span class="soon">macOS download coming soon</span>
+            </div>
+          </div>
+
+          <figure class="window" aria-label="The helloagents app running a task" style="margin: 0">
+            <div class="window-bar">
+              <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="window-title">helloagents · acme/api</span>
+            </div>
+            <div class="app">
+              <ul class="runs" aria-hidden="true">
+                <li class="sel">
+                  <span class="t">Add rate limiting to uploads</span
+                  ><span class="w" data-clock>1:39</span>
+                  <span class="s"
+                    ><span class="dot live" data-live-dot></span
+                    ><span data-run-state>Agents working</span></span
+                  >
+                  <span class="strip" data-mini-strip
+                    ><i class="done"></i><i class="fixing"></i><i class="done"></i
+                  ></span>
+                </li>
+                <li>
+                  <span class="t">Add CSV export to reports</span><span class="w">12m</span>
+                  <span class="s"><span class="dot ok"></span>Merged</span>
+                  <span class="strip"
+                    ><i class="done"></i><i class="done"></i><i class="done"></i
+                  ></span>
+                </li>
+                <li>
+                  <span class="t">Fix pagination off-by-one</span><span class="w">1h</span>
+                  <span class="s"><span class="dot ok"></span>Merged</span>
+                  <span class="strip"><i class="done"></i><i class="done"></i></span>
+                </li>
+              </ul>
+              <div class="detail">
+                <div>
+                  <h3>Add rate limiting to the upload endpoint</h3>
+                  <div class="meta">
+                    <span data-clock>1:39</span> elapsed · 3 agents · your Claude plan
+                  </div>
+                </div>
+                <div class="progress" data-progress>
+                  <div class="track"><i></i></div>
+                  <div class="phases">
+                    <span>Plan</span><span class="on" data-phase="build">Build</span
+                    ><span data-phase="check">Check</span><span data-phase="merge">Merge</span>
+                  </div>
+                </div>
+                <ul class="agents">
+                  <li>
+                    <span class="badge">H1</span
+                    ><span
+                      ><div class="job">Build the rate limiter</div>
+                      <div class="note">Tests passed (6 of 6)</div></span
+                    ><span class="tag done">Done</span>
+                  </li>
+                  <li>
+                    <span class="badge">CC</span>
+                    <span
+                      ><div class="job">Add it to the upload endpoint</div>
+                      <div class="note" data-cc-note>
+                        <span class="bad">2 tests failed</span>, sent back to fix
+                      </div></span
+                    >
+                    <span class="tag fixing" data-cc-tag>Fixing</span>
+                  </li>
+                  <li>
+                    <span class="badge">H2</span
+                    ><span
+                      ><div class="job">Write the tests</div>
+                      <div class="note">Tests passed (9 of 9)</div></span
+                    ><span class="tag done">Done</span>
+                  </li>
+                </ul>
+                <div class="result" data-result>
+                  <span data-result-text
+                    ><b>Not ready yet.</b> <span>Merge unlocks when every test passes.</span></span
+                  >
+                  <span class="fake-btn" aria-hidden="true">Merge</span>
+                </div>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </div>
+
+      <section id="how" aria-labelledby="how-title">
+        <div class="wrap">
+          <p class="eyebrow">How it works</p>
+          <h2 id="how-title">You describe the task. The agents do the work. You make the call.</h2>
+          <ol class="steps">
+            <li>
+              <h3>Plan</h3>
+              <p>
+                A planner reads your repo and splits the task into pieces that can run side by side.
+              </p>
+            </li>
+            <li>
+              <h3>Build</h3>
+              <p>
+                Each piece goes to its own agent in its own git worktree, so agents never overwrite
+                each other.
+              </p>
+            </li>
+            <li>
+              <h3>Check</h3>
+              <p>
+                Your tests run after every change. A failure goes back to the agent that caused it,
+                with the output.
+              </p>
+            </li>
+            <li>
+              <h3>Merge</h3>
+              <p>
+                A reviewer agent reads every diff. Nothing reaches <code>main</code> until you
+                approve it.
+              </p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="see" aria-labelledby="see-title">
+        <div class="wrap">
+          <p class="eyebrow">What you see</p>
+          <h2 id="see-title">Nothing the agents do is hidden from you.</h2>
+          <p class="section-lede">
+            Agents are hard to trust when you can't see inside them. Every run keeps a full record
+            you can open at any point.
+          </p>
+          <div class="features">
+            <article class="feature">
+              <div class="feature-copy">
+                <h3>The code</h3>
+                <p>
+                  Every change as a diff, file by file. Comment on a line and the agents work on
+                  your notes.
+                </p>
+              </div>
+              <pre><span class="hi">src/routes/upload.ts</span>
+<span class="del">- router.post('/api/upload', requireApiKey, async (req, res) =&gt; {</span>
+<span class="add">+ router.post('/api/upload', requireApiKey, rateLimit({ perMinute: 10 }), …</span></pre>
+            </article>
+            <article class="feature">
+              <div class="feature-copy">
+                <h3>How each agent is thinking</h3>
+                <p>
+                  Every model call and tool call, in order, with what went in and what came out,
+                  plus context and token use.
+                </p>
+              </div>
+              <pre><span class="acc">1:39</span>  ↳ Feedback: 2 tests fail. Fix them, don't edit the tests.
+<span class="acc">1:40</span>  AI  rateLimit() never sets Retry-After. Compute it.
+<span class="acc">1:58</span>  ⌘   edit_file src/middleware/rateLimit.ts
+<span class="acc">2:21</span>  <span class="add">✓   npm test: 14 passed</span></pre>
+            </article>
+            <article class="feature">
+              <div class="feature-copy">
+                <h3>Logs</h3>
+                <p>The raw stream from every agent, with warnings and errors one click away.</p>
+              </div>
+              <pre>0:31  WARN   claude-code-1  waiting for ao/t1-rate-limiter
+1:20  <span class="del">ERROR  claude-code-1  12 passed, 2 failed</span>
+1:36  WARN   orchestrator   attempt 1/3 failed · sending back</pre>
+            </article>
+            <article class="feature">
+              <div class="feature-copy">
+                <h3>Errors, explained</h3>
+                <p>
+                  What failed, the likely cause with file and line, every attempt, and a way to
+                  retry with a note or take over.
+                </p>
+              </div>
+              <pre><span class="del">Error: ENOENT: no such file, open '/tmp/u_83.bin'</span>
+    at readUpload (<span class="hi">src/lib/storage.ts:21</span>)
+<span class="acc">Likely cause:</span> saveUpload() isn't awaited on line 36.</pre>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="evals" aria-labelledby="evals-title">
+        <div class="wrap evals">
+          <div>
+            <p class="eyebrow">Evals built in</p>
+            <h2 id="evals-title">Measure whether splitting the work actually helps.</h2>
+            <p class="section-lede">
+              helloagents ships with an eval suite: real coding tasks graded by hidden tests, each
+              run several times because agents don't give the same answer twice. Compare setups on
+              pass rate, cost and time.
+            </p>
+            <ul class="checks">
+              <li>One agent alone vs. the orchestrator</li>
+              <li>With and without sending failures back</li>
+              <li>The built-in agent vs. Claude Code as workers</li>
+            </ul>
+          </div>
+          <figure class="report" style="margin: 0" aria-label="Example eval report">
+            <div class="report-head">
+              <span>coding tasks · 3 runs each</span><b>example report</b>
+            </div>
+            <div class="bars">
+              <div class="bar">
+                <span>One agent</span><span class="v">52%</span
+                ><span class="t"><i style="width: 52%"></i></span>
+              </div>
+              <div class="bar">
+                <span>Orchestrator</span><span class="v">61%</span
+                ><span class="t"><i style="width: 61%"></i></span>
+              </div>
+              <div class="bar best">
+                <span>Orchestrator, failures sent back</span><span class="v">70%</span
+                ><span class="t"><i style="width: 70%"></i></span>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      <section aria-labelledby="yours-title">
+        <div class="wrap">
+          <p class="eyebrow">Yours</p>
+          <h2 id="yours-title">Runs on your machine, with the Claude you already have.</h2>
+          <div class="pillars">
+            <div class="pillar">
+              <h3>Your Claude plan</h3>
+              <p>Claude Code workers run through your own Pro or Max plan. Nothing extra to pay.</p>
+            </div>
+            <div class="pillar">
+              <h3>Local-first</h3>
+              <p>
+                Your code stays on your machine. It's sent only to the model provider you choose.
+              </p>
+            </div>
+            <div class="pillar">
+              <h3>Open source</h3>
+              <p>MIT licensed. Read every line of the harness, the orchestrator and the evals.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="final-title">
+        <div class="wrap">
+          <div class="final">
+            <div>
+              <h2 id="final-title">Being built in public.</h2>
+              <p>
+                The agent harness is working now, and the orchestrator and desktop app are coming
+                together. Follow along on GitHub, or star the repo to hear when the macOS app is
+                ready.
+              </p>
+            </div>
+            <div class="ctas">
+              <a
+                class="btn btn-ink"
+                href="https://github.com/ShivankK26/helloagents-dot-run"
+                rel="noopener"
+                >Star on GitHub</a
+              >
+              <a
+                class="btn"
+                href="https://github.com/ShivankK26/helloagents-dot-run/commits/main"
+                rel="noopener"
+                >See recent progress</a
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <span>helloagents · MIT licensed</span>
+        <nav aria-label="Footer">
+          <a href="https://github.com/ShivankK26/helloagents-dot-run" rel="noopener">GitHub</a>
+          <a
+            href="https://github.com/ShivankK26/helloagents-dot-run/blob/main/LICENSE"
+            rel="noopener"
+            >License</a
+          >
+        </nav>
+      </div>
+    </footer>
+
+    <script>
+      // The hero mockup plays one run: claude-code-1 fixes its failing tests,
+      // a reviewer checks, and the run becomes ready to merge. Then it repeats.
+      (() => {
+        const $ = (s) => document.querySelector(s);
+        const all = (s) => document.querySelectorAll(s);
+        const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const clock = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+        const frames = [
+          {
+            t: 99,
+            cc: ["fixing", "Fixing", '<span class="bad">2 tests failed</span>, sent back to fix'],
+            progress: 55,
+            phase: "build",
+            state: "Agents working",
+            ready: false,
+          },
+          {
+            t: 118,
+            cc: ["fixing", "Fixing", "Adding the missing Retry-After header"],
+            progress: 62,
+            phase: "build",
+            state: "Agents working",
+            ready: false,
+          },
+          {
+            t: 141,
+            cc: ["done", "Done", "Tests passed (14 of 14) after one retry"],
+            progress: 78,
+            phase: "check",
+            state: "Reviewer checking",
+            ready: false,
+          },
+          {
+            t: 171,
+            cc: ["done", "Done", "Reviewer approved it"],
+            progress: 100,
+            phase: "merge",
+            state: "Ready to merge",
+            ready: true,
+          },
+        ];
+        let i = 0;
+        function show(f) {
+          all("[data-clock]").forEach((el) => (el.textContent = clock(f.t)));
+          const [cls, label, note] = f.cc;
+          const tag = $("[data-cc-tag]");
+          tag.className = `tag ${cls}`;
+          tag.textContent = label;
+          $("[data-cc-note]").innerHTML = note;
+          $("[data-mini-strip] i:nth-child(2)").className = cls;
+          $("[data-progress] .track i").style.width = `${f.progress}%`;
+          $("[data-progress]").classList.toggle("done", f.ready);
+          all("[data-phase]").forEach((el) =>
+            el.classList.toggle("on", el.dataset.phase === f.phase),
+          );
+          $("[data-run-state]").textContent = f.state;
+          $("[data-live-dot]").className = `dot ${f.ready ? "ok" : "live"}`;
+          $("[data-result]").classList.toggle("ready", f.ready);
+          $("[data-result-text]").innerHTML = f.ready
+            ? "<b>Ready to merge.</b> <span>29 of 29 tests pass · reviewed</span>"
+            : "<b>Not ready yet.</b> <span>Merge unlocks when every test passes.</span>";
+        }
+        if (reduce) return show(frames[frames.length - 1]);
+        show(frames[0]);
+        setInterval(() => {
+          i = (i + 1) % (frames.length + 1);
+          show(frames[Math.min(i, frames.length - 1)]);
+        }, 2200);
+      })();
+    </script>
+  </body>
+</html>

@@ -1,102 +1,15 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@600&family=Geist+Mono:wght@500&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      html,
-      body {
-        margin: 0;
-        width: 1200px;
-        height: 630px;
-        overflow: hidden;
-      }
-      body {
-        background: #09090b;
-        color: #ededef;
-        font-family: Geist, sans-serif;
-        position: relative;
-        background-image: radial-gradient(
-          90% 120% at 100% 0%,
-          rgba(255, 122, 61, 0.16),
-          transparent 55%
-        );
-      }
-      .wrap {
-        position: absolute;
-        inset: 72px 80px;
-        display: flex;
-        flex-direction: column;
-      }
-      .lock {
-        display: flex;
-        align-items: center;
-        gap: 18px;
-        font:
-          500 34px "Geist Mono",
-          monospace;
-        letter-spacing: -0.02em;
-      }
-      .lock i {
-        font-style: normal;
-        opacity: 0.45;
-      }
-      h1 {
-        margin: auto 0 0;
-        font-size: 76px;
-        line-height: 1.02;
-        letter-spacing: -0.04em;
-        font-weight: 600;
-        max-width: 15em;
-      }
-      h1 em {
-        font-style: normal;
-        color: #6e6e78;
-      }
-      .cmd {
-        margin-top: 40px;
-        display: inline-flex;
-        align-self: flex-start;
-        gap: 14px;
-        padding: 18px 24px;
-        border: 1px solid #35353b;
-        border-radius: 14px;
-        background: #0c0c0e;
-        font:
-          500 26px "Geist Mono",
-          monospace;
-        color: #a1a1aa;
-      }
-      .cmd b {
-        color: #ff7a3d;
-        font-weight: 500;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="wrap">
-      <div class="lock">
-        <svg width="60" height="60" viewBox="0 0 32 32">
-          <path
-            d="M9 4h14a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H13.5L8 28.2V24H9a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6Z"
-            fill="#ededef"
-          />
-          <path
-            d="m10 10.2 4.3 3.8-4.3 3.8"
-            stroke-width="2.6"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            fill="none"
-            stroke="#09090b"
-          />
-          <rect x="16.6" y="16.4" width="6.4" height="2.8" rx="1.4" fill="#ff7a3d" /></svg
-        ><span>helloagents<i>.run</i></span>
-      </div>
-      <h1>Sub-agents and skills for Claude&nbsp;Code. <em>Read the file, then install it.</em></h1>
-      <div class="cmd">$ npx @helloagents/cli add <b>code-reviewer</b></div>
-    </div>
-  </body>
-</html>
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#f3f4f6;color:#111316;font-family:"IBM Plex Sans",sans-serif}
+  .wrap{position:absolute;inset:70px 80px;display:flex;flex-direction:column}
+  .lock{display:flex;align-items:center;gap:16px;font-weight:700;font-size:34px;letter-spacing:-.01em}
+  h1{margin:auto 0 0;font-size:78px;line-height:1.02;letter-spacing:-.04em;font-weight:700;max-width:13em}
+  h1 span{color:#8d939c}
+  .row{margin-top:40px;display:flex;align-items:center;gap:22px;font:500 24px "IBM Plex Mono",monospace;color:#59606a}
+  .strip{display:flex;gap:6px}.strip i{width:34px;height:12px;border-radius:3px}
+</style></head><body><div class="wrap">
+  <div class="lock"><svg width="56" height="56" viewBox="0 0 32 32"><path d="M9 4h14a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H13.5L8 28.2V24H9a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6Z" fill="#111316"/><path d="m10 10.2 4.3 3.8-4.3 3.8" stroke="#f3f4f6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="16.6" y="16.4" width="6.4" height="2.8" rx="1.4" fill="#ff7a3d"/></svg>helloagents</div>
+  <h1>Many coding agents. <span>One change you can trust.</span></h1>
+  <div class="row"><span class="strip"><i style="background:#1d8a4c"></i><i style="background:#e4572a"></i><i style="background:#1d8a4c"></i></span>open-source desktop app · traces, logs and evals built in</div>
+</div></body></html>
