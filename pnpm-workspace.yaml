@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Packages whose install scripts may run.
+allowBuilds:
+  electron: set this to true or false
+  esbuild: true

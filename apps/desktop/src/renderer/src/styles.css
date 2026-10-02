@@ -1,0 +1,241 @@
+:root {
+  --bg: #f3f4f6;
+  --surface: #ffffff;
+  --sunk: #f7f8f9;
+  --line: #e2e4e8;
+  --line-2: #cfd3d9;
+  --ink: #111316;
+  --muted: #59606a;
+  --faint: #8d939c;
+  --accent: #e4572a;
+  --accent-soft: #fdece5;
+  --ok: #1d8a4c;
+  --ok-soft: #e4f4ea;
+  --bad: #cf3b2b;
+  --bad-soft: #fbe7e4;
+  --idle: #d6d9de;
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1012;
+    --surface: #17191c;
+    --sunk: #131417;
+    --line: #26292e;
+    --line-2: #363a41;
+    --ink: #ecedef;
+    --muted: #a2a7af;
+    --faint: #6f747c;
+    --accent: #ff7a3d;
+    --accent-soft: #3a2117;
+    --ok: #4bd486;
+    --ok-soft: #15301f;
+    --bad: #ff7b6b;
+    --bad-soft: #3a1c19;
+    --idle: #33363c;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+/* The bar doubles as the window's drag handle (traffic lights sit on the left on macOS). */
+.titlebar {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 18px 0 88px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.titlebar button {
+  -webkit-app-region: no-drag;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+}
+.logo {
+  color: var(--ink);
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 12.5px var(--mono);
+  color: var(--faint);
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--idle);
+}
+.dot.ok {
+  background: var(--ok);
+}
+
+.main {
+  flex: 1;
+  overflow: auto;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+.hero h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.hero p {
+  margin: 6px 0 4px;
+  color: var(--muted);
+  font-size: 17px;
+  max-width: 56ch;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.label {
+  margin: 0;
+  font: 500 12px var(--mono);
+  color: var(--faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.checks,
+.next {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.checks li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font: 600 12px var(--mono);
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  color: var(--faint);
+}
+.mark.ok {
+  background: var(--ok);
+  border-color: transparent;
+  color: var(--surface);
+}
+.mark.bad {
+  background: var(--bad);
+  border-color: transparent;
+  color: var(--surface);
+}
+.mark.pending {
+  animation: pulse 1.2s infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+.check-label {
+  display: block;
+  font-weight: 500;
+}
+.check-detail {
+  display: block;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.next li {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  font-size: 14px;
+}
+.next b {
+  font-weight: 500;
+}
+.next span {
+  color: var(--muted);
+}
+.btn {
+  align-self: flex-start;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  font-weight: 500;
+  font-size: 14px;
+}
+.btn:disabled {
+  opacity: 0.45;
+}
+.bad-text {
+  color: var(--bad);
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+  }
+}

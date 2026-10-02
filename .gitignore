@@ -1,0 +1,11 @@
+node_modules/
+out/
+dist/
+release/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+# Local run data (traces, worktrees) created while developing
+.helloagents/

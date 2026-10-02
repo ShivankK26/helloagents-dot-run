@@ -1,0 +1,15 @@
+{
+  "name": "@helloagents/engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The orchestrator engine: harness, workers, worktrees, traces",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}
