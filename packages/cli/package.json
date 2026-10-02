@@ -1,0 +1,21 @@
+{
+  "name": "@helloagents/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "helloagents from the terminal: run an agent or the orchestrator without the app",
+  "type": "module",
+  "bin": {
+    "helloagents": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@helloagents/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  }
+}

@@ -14,7 +14,8 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint . && prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "agent": "pnpm --silent --filter @helloagents/cli start agent"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
