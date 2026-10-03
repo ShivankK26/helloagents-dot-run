@@ -18,7 +18,14 @@ pnpm dev          # open the app with hot reload
 pnpm test         # unit tests (no model calls, no cost)
 pnpm typecheck
 pnpm lint
+
+pnpm helloagents demo          # watch a free, scripted agent fix examples/buggy-stats
+pnpm helloagents runs          # list runs
+pnpm helloagents trace <id>    # step-by-step log and errors for one run
+pnpm agent --dir examples/buggy-stats --copy "Fix the failing tests"   # a real run (needs ANTHROPIC_API_KEY)
 ```
+
+Runs and their traces are saved in `.helloagents/helloagents.db` (SQLite, git-ignored).
 
 | Path              | What it is                                                                             |
 | ----------------- | -------------------------------------------------------------------------------------- |

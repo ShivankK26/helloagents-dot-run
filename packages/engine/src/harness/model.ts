@@ -77,11 +77,13 @@ export class AnthropicModel implements ModelClient {
  * tests so the loop can be exercised without network access or cost.
  */
 export class ScriptedModel implements ModelClient {
-  readonly model = "claude-opus-5";
   readonly requests: ModelRequest[] = [];
   private index = 0;
 
-  constructor(private readonly script: Array<Message | ((req: ModelRequest) => Message)>) {}
+  constructor(
+    private readonly script: Array<Message | ((req: ModelRequest) => Message)>,
+    readonly model = "claude-opus-5",
+  ) {}
 
   async turn(request: ModelRequest): Promise<Message> {
     // Snapshot: the loop keeps appending to the same array.

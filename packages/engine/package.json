@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./views": "./src/trace/views.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

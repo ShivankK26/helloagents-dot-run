@@ -1,18 +1,27 @@
-import { cp, mkdir, writeFile, appendFile } from "node:fs/promises";
+import { cp } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
   AnthropicModel,
   DEFAULT_MODEL,
   runAgent,
+  toErrors,
+  toLogLines,
+  TraceStore,
   type AgentEvent,
   type Effort,
+  type ModelClient,
 } from "@helloagents/engine";
+import { DEMO_TASK, demoModel } from "./demo";
 
 const USAGE = `Usage:
-  helloagents agent "<task>" [options]
+  helloagents agent "<task>" [options]   Run one agent on a task
+  helloagents runs                       List recent runs
+  helloagents trace <run-id> [--errors]  Show what happened in a run
+  helloagents demo                       Watch a free, scripted run fix the sample project
 
-Options:
+Agent options:
   --dir <path>        Project to work in (default: current folder)
   --copy              Work on a copy of the project, leaving the original untouched
   --model <id>        Default ${DEFAULT_MODEL}
@@ -20,17 +29,26 @@ Options:
   --max-turns <n>     Default 40
   --max-cost <usd>    Default 5
 
-Needs ANTHROPIC_API_KEY (or an \`ant auth login\` profile).`;
+Running an agent needs ANTHROPIC_API_KEY (or an \`ant auth login\` profile).`;
 
 // pnpm runs scripts from the package folder; resolve paths from where the user typed the command.
 const cwd = process.env.INIT_CWD ?? process.cwd();
-const tty = process.stdout.isTTY && !process.env.NO_COLOR;
-const c = (code: number) => (s: string) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
-const dim = c(2),
-  green = c(32),
-  red = c(31),
-  yellow = c(33),
-  bold = c(1);
+const tty = Boolean(process.stdout.isTTY) && !process.env.NO_COLOR;
+const color = (code: number) => (s: string) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
+const dim = color(2);
+const green = color(32);
+const red = color(31);
+const yellow = color(33);
+const bold = color(1);
+
+interface AgentFlags {
+  dir?: string;
+  copy?: boolean;
+  model?: string;
+  effort?: string;
+  "max-turns"?: string;
+  "max-cost"?: string;
+}
 
 async function main(): Promise<number> {
   const { positionals, values } = parseArgs({
@@ -42,37 +60,70 @@ async function main(): Promise<number> {
       effort: { type: "string" },
       "max-turns": { type: "string" },
       "max-cost": { type: "string" },
+      errors: { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
   });
   const [command, ...rest] = positionals;
-  const task = rest.join(" ").trim();
-  if (values.help || command !== "agent" || !task) {
+  if (values.help || !command) {
     console.log(USAGE);
-    return command === "agent" || values.help ? 0 : 2;
+    return values.help ? 0 : 2;
   }
 
-  const source = path.resolve(cwd, values.dir ?? ".");
-  const runId = new Date().toISOString().replace(/[:.]/g, "-");
   const dataDir = path.join(cwd, ".helloagents");
+  const store = new TraceStore(path.join(dataDir, "helloagents.db"));
+  try {
+    switch (command) {
+      case "agent":
+        return await agent(store, dataDir, rest.join(" ").trim(), values);
+      case "runs":
+        return listRuns(store);
+      case "trace":
+        return showTrace(store, rest[0], Boolean(values.errors));
+      case "demo": {
+        const sample = fileURLToPath(new URL("../../../examples/buggy-stats", import.meta.url));
+        return await agent(store, dataDir, DEMO_TASK, { dir: sample, copy: true }, demoModel());
+      }
+      default:
+        console.error(`Unknown command "${command}".\n\n${USAGE}`);
+        return 2;
+    }
+  } finally {
+    store.close();
+  }
+}
+
+async function agent(
+  store: TraceStore,
+  dataDir: string,
+  task: string,
+  flags: AgentFlags,
+  scripted?: ModelClient,
+): Promise<number> {
+  if (!task) {
+    console.error(`Give the agent a task, e.g. pnpm agent "fix the failing tests"\n\n${USAGE}`);
+    return 2;
+  }
+  const source = path.resolve(cwd, flags.dir ?? ".");
   let workspace = source;
-  if (values.copy) {
-    workspace = path.join(dataDir, "scratch", runId);
+  if (flags.copy) {
+    workspace = path.join(dataDir, "scratch", new Date().toISOString().replace(/[:.]/g, "-"));
     await cp(source, workspace, {
       recursive: true,
       filter: (p) => !p.includes(`${path.sep}node_modules`) && !p.includes(`${path.sep}.git`),
     });
   }
 
-  // Every event is also saved as one JSON line: a first, simple trace.
-  const traceFile = path.join(dataDir, "runs", `${runId}.jsonl`);
-  await mkdir(path.dirname(traceFile), { recursive: true });
-  await writeFile(traceFile, "");
+  const model =
+    scripted ??
+    new AnthropicModel({
+      model: flags.model ?? DEFAULT_MODEL,
+      effort: (flags.effort as Effort | undefined) ?? "high",
+    });
+  const modelLabel = scripted ? "scripted demo (no API calls)" : model.model;
+  const runId = store.createRun({ title: task, workspace, model: modelLabel });
+  const record = store.recorder(runId);
 
-  const model = new AnthropicModel({
-    model: values.model ?? DEFAULT_MODEL,
-    effort: (values.effort as Effort) ?? "high",
-  });
   const controller = new AbortController();
   process.once("SIGINT", () => {
     console.log(yellow("\nStopping after the current step…"));
@@ -80,34 +131,32 @@ async function main(): Promise<number> {
   });
 
   console.log(
-    `${bold("helloagents agent")} ${dim(`· ${model.model} · ${workspace}${values.copy ? " (copy)" : ""}`)}\n`,
+    `${bold("helloagents agent")} ${dim(`· ${modelLabel} · ${workspace}${flags.copy ? " (copy)" : ""}`)}\n`,
   );
   const started = Date.now();
   const result = await runAgent({
     task,
     workspace,
     model,
-    maxTurns: Number(values["max-turns"] ?? 40),
-    maxCostUsd: Number(values["max-cost"] ?? 5),
+    maxTurns: Number(flags["max-turns"] ?? 40),
+    maxCostUsd: Number(flags["max-cost"] ?? 5),
     signal: controller.signal,
     onEvent: (event) => {
-      void appendFile(traceFile, `${JSON.stringify(event)}\n`);
-      print(event);
+      record(event);
+      printLive(event);
     },
   });
 
   const secs = Math.round((Date.now() - started) / 1000);
-  const tokens =
-    result.usage.inputTokens +
-    result.usage.outputTokens +
-    result.usage.cacheReadTokens +
-    result.usage.cacheWriteTokens;
-  const line = `${result.turns} turn${result.turns === 1 ? "" : "s"} · ${(tokens / 1000).toFixed(1)}k tokens · $${result.costUsd.toFixed(2)} · ${secs}s`;
+  const u = result.usage;
+  const tokens = u.inputTokens + u.outputTokens + u.cacheReadTokens + u.cacheWriteTokens;
+  const stats = `${result.turns} turn${result.turns === 1 ? "" : "s"} · ${(tokens / 1000).toFixed(1)}k tokens · $${result.costUsd.toFixed(2)} · ${secs}s`;
   console.log("");
-  if (result.status === "done") console.log(`${green("✔ done")} ${dim(line)}\n\n${result.summary}`);
-  else {
+  if (result.status === "done") {
+    console.log(`${green("✔ done")} ${dim(stats)}\n\n${result.summary}`);
+  } else {
     console.log(
-      `${red(`✖ ${result.status}`)} ${dim(line)}\n${result.summary}${result.error ? `\n${red(result.error)}` : ""}`,
+      `${red(`✖ ${result.status}`)} ${dim(stats)}\n${result.summary}${result.error ? `\n${red(result.error)}` : ""}`,
     );
     if (result.error && /auth|api key|credential/i.test(result.error)) {
       console.log(
@@ -117,15 +166,12 @@ async function main(): Promise<number> {
       );
     }
   }
-  console.log(
-    dim(
-      `\nTrace: ${path.relative(cwd, traceFile)}${values.copy ? `\nChanged copy: ${path.relative(cwd, workspace)}` : ""}`,
-    ),
-  );
+  console.log(dim(`\nFull trace: pnpm helloagents trace ${runId.slice(0, 8)}`));
+  if (flags.copy) console.log(dim(`Changed copy: ${path.relative(cwd, workspace)}`));
   return result.status === "done" ? 0 : 1;
 }
 
-function print(event: AgentEvent): void {
+function printLive(event: AgentEvent): void {
   if (event.type === "model.response" && event.text) {
     console.log(
       event.text
@@ -135,15 +181,86 @@ function print(event: AgentEvent): void {
     );
   }
   if (event.type === "tool.result") {
-    const input = event.input as Record<string, unknown>;
+    const input = (event.input ?? {}) as Record<string, unknown>;
     const detail =
       event.name === "run_command"
-        ? [input.command, ...((input.args as string[]) ?? [])].join(" ")
-        : String(input.path ?? (event.name === "finish" ? "" : "."));
+        ? [input.command, ...((input.args as string[] | undefined) ?? [])].join(" ")
+        : event.name === "finish"
+          ? ""
+          : String(input.path ?? ".");
     const firstLine = event.output.split("\n")[0] ?? "";
-    const mark = event.ok ? green("✓") : red("✗");
-    console.log(`  ${mark} ${event.name} ${dim(detail)}${event.ok ? "" : ` ${red(firstLine)}`}`);
+    console.log(
+      `  ${event.ok ? green("✓") : red("✗")} ${event.name} ${dim(detail)}${event.ok ? "" : ` ${red(firstLine)}`}`,
+    );
   }
+}
+
+const STATUS_COLOR: Record<string, (s: string) => string> = {
+  done: green,
+  running: yellow,
+  cancelled: yellow,
+  budget: yellow,
+};
+
+function ago(ms: number): string {
+  const minutes = Math.round((Date.now() - ms) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)}h ago`;
+  return `${Math.round(minutes / 1440)}d ago`;
+}
+
+function clock(ms: number): string {
+  return `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
+}
+
+function listRuns(store: TraceStore): number {
+  const runs = store.listRuns(20);
+  if (runs.length === 0) {
+    console.log('No runs yet. Start one with: pnpm agent "<task>"');
+    return 0;
+  }
+  for (const r of runs) {
+    const paint = STATUS_COLOR[r.status] ?? red;
+    console.log(
+      `${dim(r.id.slice(0, 8))}  ${paint(r.status.padEnd(9))} ${r.title.slice(0, 60).padEnd(60)} ${dim(`$${r.costUsd.toFixed(2)} · ${ago(r.startedAt)}`)}`,
+    );
+  }
+  return 0;
+}
+
+function showTrace(store: TraceStore, id: string | undefined, errorsOnly: boolean): number {
+  const run = id ? store.findRun(id) : undefined;
+  if (!run) {
+    console.error(
+      id
+        ? `No run matches "${id}". List runs with: pnpm helloagents runs`
+        : "Usage: helloagents trace <run-id>",
+    );
+    return 1;
+  }
+  const events = store.events(run.id);
+  console.log(
+    `${bold(run.title)}\n${dim(`${run.id} · ${run.model} · ${run.status} · $${run.costUsd.toFixed(2)}`)}\n`,
+  );
+  if (!errorsOnly) {
+    for (const line of toLogLines(events)) {
+      const level =
+        line.level === "ERROR"
+          ? red("ERROR")
+          : line.level === "WARN"
+            ? yellow("WARN ")
+            : dim("INFO ");
+      console.log(`${dim(clock(line.at - run.startedAt))}  ${level}  ${line.message}`);
+    }
+  }
+  const errors = toErrors(events);
+  if (errors.length)
+    console.log(`\n${bold(`${errors.length} error${errors.length === 1 ? "" : "s"}`)}`);
+  for (const e of errors)
+    console.log(`\n${red(e.title)} ${dim(`at ${clock(e.at - run.startedAt)}`)}\n${e.excerpt}`);
+  if (run.summary) console.log(`\n${bold("Summary")}\n${run.summary}`);
+  return 0;
 }
 
 process.exitCode = await main();

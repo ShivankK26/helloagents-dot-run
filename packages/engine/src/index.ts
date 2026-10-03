@@ -12,3 +12,8 @@ export type { Effort, ModelClient, ModelRequest } from "./harness/model";
 export { costOf, priceFor } from "./harness/pricing";
 export { DEFAULT_ALLOWED_COMMANDS, runTool, safeEnv, toolDefinitions } from "./harness/tools";
 export { resolveInside } from "./harness/workspace";
+
+export { TraceStore } from "./trace/store";
+export type { RunRecord, RunStatus, StoredEvent } from "./trace/store";
+export { describeToolCall, failureExcerpt, toErrors, toLogLines } from "./trace/views";
+export type { LogLevel, LogLine, RunError } from "./trace/views";

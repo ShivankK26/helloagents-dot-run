@@ -8,7 +8,7 @@
     "helloagents": "./src/index.ts"
   },
   "scripts": {
-    "start": "tsx src/index.ts",
+    "start": "tsx --disable-warning=ExperimentalWarning src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
