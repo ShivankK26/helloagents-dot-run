@@ -27,6 +27,7 @@ function createWindow(): BrowserWindow {
     minWidth: 940,
     minHeight: 600,
     title: "helloagents",
+    icon: APP_ICON,
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#0f1012" : "#f3f4f6",
     ...(isMac && { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 18 } }),
@@ -52,6 +53,9 @@ function createWindow(): BrowserWindow {
   else void w.loadFile(path.join(__dirname, "../renderer/index.html"));
   return w;
 }
+
+// The packaged app gets its icon from the bundle; dev and preview builds need it set here.
+const APP_ICON = path.join(__dirname, "../../resources/icon.png");
 
 /**
  * For development checks: HELLOAGENTS_CAPTURE=out.png saves a screenshot and
@@ -79,6 +83,7 @@ function captureAndQuit(w: BrowserWindow, file: string): void {
 }
 
 app.whenReady().then(async () => {
+  if (isMac) app.dock?.setIcon(APP_ICON);
   // Finder-launched apps get a minimal PATH; use the login shell's instead.
   const shellPath = await loadShellPath();
   if (shellPath) process.env.PATH = shellPath;
