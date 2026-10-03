@@ -97,12 +97,41 @@ export function claudeArgs(
   return args;
 }
 
+/** What Claude Code prints when it doesn't know a flag (e.g. an older version). */
+const REJECTED_FLAG = /unknown option|unknown argument|invalid option|error: option/i;
+
 /**
  * Runs Claude Code headless (`claude -p`) on the user's own Claude plan and
  * translates its stream into the same events as the built-in harness, so
  * traces, logs and errors work identically for both.
+ *
+ * If a lean start is rejected before anything happens (an older Claude Code
+ * that lacks one of the flags), it retries once with the normal setup.
  */
-export function runClaudeCode(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
+export async function runClaudeCode(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
+  if (opts.lean === false) return runOnce(opts);
+  let started = false;
+  let heldEnd: AgentEvent | undefined;
+  const result = await runOnce({
+    ...opts,
+    onEvent: (e) => {
+      // Hold back an end that arrives before any work, in case we retry.
+      if (!started && e.type === "agent.end") {
+        heldEnd = e;
+        return;
+      }
+      started = true;
+      opts.onEvent?.(e);
+    },
+  });
+  if (!started && result.status === "error" && REJECTED_FLAG.test(result.error ?? "")) {
+    return runOnce({ ...opts, lean: false });
+  }
+  if (heldEnd) opts.onEvent?.(heldEnd);
+  return result;
+}
+
+function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
   const now = opts.now ?? Date.now;
   const emit = opts.onEvent ?? (() => {});
   const pending = new Map<string, ToolCall>();

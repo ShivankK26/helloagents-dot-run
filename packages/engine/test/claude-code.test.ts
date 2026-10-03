@@ -9,6 +9,7 @@ const FAKE = fileURLToPath(new URL("./fixtures/fake-claude.mjs", import.meta.url
 afterEach(() => {
   delete process.env.FAKE_CLAUDE_MODE;
   delete process.env.FAKE_CLAUDE_ARGS_FILE;
+  delete process.env.FAKE_CLAUDE_REJECT_LEAN;
 });
 
 async function run(mode = "success", extra: Partial<Parameters<typeof runClaudeCode>[0]> = {}) {
@@ -143,5 +144,17 @@ describe("runClaudeCode", () => {
       expect.arrayContaining(["--resume", "resume-me"]),
     );
     expect(result.sessionId).toBe("resume-me");
+  });
+
+  test("retries without the lean flags when Claude Code doesn't know them", async () => {
+    const argsFile = path.join(await tempDir(), "args.json");
+    process.env.FAKE_CLAUDE_ARGS_FILE = argsFile;
+    process.env.FAKE_CLAUDE_REJECT_LEAN = "1";
+    const { result, events } = await run();
+    expect(result.status).toBe("done");
+    // The failed first attempt leaves no trace: one start, one end.
+    expect(events.filter((e) => e.type === "agent.end")).toHaveLength(1);
+    expect(events[0]?.type).toBe("agent.start");
+    expect(JSON.parse(await readFile(argsFile, "utf8"))).not.toContain("--strict-mcp-config");
   });
 });

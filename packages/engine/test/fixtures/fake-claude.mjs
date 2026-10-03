@@ -13,6 +13,11 @@ const session = args.includes("--resume")
   : "11111111-2222-3333-4444-555555555555";
 const out = (o) => process.stdout.write(JSON.stringify(o) + "\n");
 
+// Plays an older Claude Code that doesn't know the lean flags.
+if (process.env.FAKE_CLAUDE_REJECT_LEAN && args.includes("--strict-mcp-config")) {
+  process.stderr.write("error: unknown option '--strict-mcp-config'\n");
+  process.exit(1);
+}
 if (mode === "crash") {
   process.stderr.write("Error: Invalid API key · Please run /login\n");
   process.exit(1);
