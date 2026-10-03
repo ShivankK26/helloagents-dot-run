@@ -2,13 +2,23 @@ import type {
   AgentId,
   AgentProvider,
   ClaudeCodeStatus,
+  ProjectActions,
   ProjectRecord,
   RunRecord,
+  RunSettings,
   StoredEvent,
 } from "@helloagents/engine/types";
 import type { RunDigest, RunError } from "@helloagents/engine/views";
 
-export type { AgentId, AgentProvider, ProjectRecord, RunRecord, StoredEvent };
+export type {
+  AgentId,
+  AgentProvider,
+  ProjectActions,
+  ProjectRecord,
+  RunRecord,
+  RunSettings,
+  StoredEvent,
+};
 
 /** What the main process reports about this machine. */
 export interface AppInfo {
@@ -30,8 +40,33 @@ export interface FolderInfo {
   childRepos: Array<{ path: string; name: string }>;
 }
 
+/** What the project screen shows above the composer. */
+export interface ProjectInfo {
+  branch: string | null;
+  head: string;
+  branches: string[];
+  actions: ProjectActions;
+}
+
+export type ShipKind = "commit" | "push" | "pr" | "merge";
+
+export interface ShipResult {
+  message: string;
+  url?: string;
+}
+
+/** An app that can open a folder: an editor, Finder, a terminal. */
+export interface Opener {
+  id: string;
+  name: string;
+}
+
+export type ThemeMode = "light" | "dark" | "system";
+
 export interface RunListItem extends RunRecord {
   active: boolean;
+  /** A dev server is running on this run's branch. */
+  devRunning: boolean;
   /** Files read and changed, commands, the last test result and the current stage. */
   digest: RunDigest;
 }
@@ -72,7 +107,20 @@ export interface HelloagentsApi {
   /** Errors from recent runs, newest first. */
   listErrors(limit?: number): Promise<ErrorListItem[]>;
   getRun(runId: string): Promise<RunListItem | null>;
-  startRun(projectId: string, task: string): Promise<string>;
+  startRun(projectId: string, task: string, settings?: RunSettings): Promise<string>;
+  projectInfo(projectId: string): Promise<ProjectInfo>;
+  setProjectActions(projectId: string, actions: ProjectActions): Promise<void>;
+  /** Reads setup, checks and dev server from the project's files again. */
+  detectActions(projectId: string): Promise<ProjectActions>;
+  resumeRun(runId: string): Promise<void>;
+  runChecks(runId: string): Promise<void>;
+  ship(runId: string, kind: ShipKind): Promise<ShipResult>;
+  /** Starts the dev server on the run's branch and opens it in the browser. */
+  startDev(runId: string): Promise<string>;
+  stopDev(runId: string): Promise<void>;
+  listOpeners(): Promise<Opener[]>;
+  openIn(openerId: string, path: string): Promise<void>;
+  setTheme(mode: ThemeMode): Promise<void>;
   /** Continues a finished run on the same branch (and Claude Code session). */
   followUp(runId: string, message: string): Promise<void>;
   cancelRun(runId: string): Promise<void>;
@@ -84,6 +132,8 @@ export interface HelloagentsApi {
   openExternal(url: string): Promise<void>;
   /** Called with a run id whenever that run changes. Returns an unsubscribe function. */
   onRunChanged(listener: (runId: string) => void): () => void;
+  /** Called when a notification is clicked: show this run. */
+  onOpenRun(listener: (runId: string) => void): () => void;
 }
 
 /** IPC channel names, shared so main and preload can't drift apart. */
@@ -102,6 +152,17 @@ export const IPC = {
   listErrors: "runs:errors",
   getRun: "runs:get",
   startRun: "runs:start",
+  projectInfo: "projects:info",
+  setProjectActions: "projects:set-actions",
+  detectActions: "projects:detect-actions",
+  resumeRun: "runs:resume",
+  runChecks: "runs:checks",
+  ship: "runs:ship",
+  startDev: "runs:dev-start",
+  stopDev: "runs:dev-stop",
+  listOpeners: "openers:list",
+  openIn: "openers:open",
+  setTheme: "app:set-theme",
   followUp: "runs:follow-up",
   cancelRun: "runs:cancel",
   discardRun: "runs:discard",
@@ -110,4 +171,5 @@ export const IPC = {
   revealInFinder: "shell:reveal",
   openExternal: "shell:open-external",
   runChanged: "runs:changed",
+  openRun: "runs:open",
 } as const;

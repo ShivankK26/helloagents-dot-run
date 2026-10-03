@@ -81,6 +81,18 @@ export type AgentEvent =
 /** Which agent does the work: a connected CLI, or the built-in harness (needs an API key). */
 export type AgentId = "claude-code" | "codex" | "harness";
 
+/** Commands a project defines. Checks decide when a run is really done. */
+export interface ProjectActions {
+  /** Runs once on every new branch before the agent starts, e.g. "pnpm install". */
+  setup: string | null;
+  /** Run after the agent finishes; all must pass. */
+  checks: string[];
+  /** A long-running dev server and the URL it serves. */
+  dev: { command: string; url: string } | null;
+  /** Send failing checks back to the agent automatically (at most twice). */
+  sendBackFailures: boolean;
+}
+
 export interface ProjectRecord {
   id: string;
   name: string;
@@ -89,6 +101,27 @@ export interface ProjectRecord {
   workerAgent: AgentId;
   plannerAgent: AgentId;
   createdAt: number;
+  /** null until detected or set by the user. */
+  actions: ProjectActions | null;
+}
+
+export type RunEffort = "low" | "medium" | "high" | "xhigh" | "max";
+
+/** How much an agent may do without asking. */
+export type Access = "edits" | "full";
+
+/** Choices made in the composer for one run. */
+export interface RunSettings {
+  /** A Claude model id or alias; empty means the agent's default. */
+  model?: string;
+  effort?: RunEffort;
+  access?: Access;
+  /** "branch": its own worktree (default). "checkout": the user's working copy. */
+  workspace?: "branch" | "checkout";
+  /** The branch or commit a new branch starts from. Default: the current branch. */
+  base?: string;
+  /** Branch the work came from, for merging back. Set by the app. */
+  baseBranch?: string;
 }
 
 /** A coding-agent CLI the user can connect, detected on this machine. */
@@ -119,6 +152,7 @@ export interface RunRecord {
   projectId: string | null;
   agent: AgentId | null;
   worktree: { path: string; branch: string; base: string } | null;
+  settings: RunSettings;
 }
 
 export interface StoredEvent {

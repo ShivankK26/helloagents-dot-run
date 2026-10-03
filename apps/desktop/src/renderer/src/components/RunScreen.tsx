@@ -1,6 +1,12 @@
 import { firstParagraph, toErrors, toolKind, isCommandTool } from "@helloagents/engine/views";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ProjectRecord, RunListItem, StoredEvent } from "../../../shared/api";
+import type {
+  Opener,
+  ProjectRecord,
+  RunListItem,
+  ShipKind,
+  StoredEvent,
+} from "../../../shared/api";
 import { agentName } from "../agents";
 import { compact, ms, tokenParts } from "../format";
 import { outcomeOf, STAGES } from "../outcome";
@@ -9,6 +15,8 @@ import { ActivityFeed } from "./ActivityFeed";
 import { ChangesView } from "./ChangesView";
 import { Icon } from "./Icons";
 import { Markdown } from "./Markdown";
+import { errorText, showToast } from "../toast";
+import { Menu } from "./Menu";
 import { TraceView } from "./TraceView";
 
 export type RunTab = "activity" | "changes" | "trace";
@@ -18,11 +26,13 @@ export function RunScreen({
   runId,
   project,
   initialTab = "activity",
+  openers,
   onBack,
 }: {
   runId: string;
   project: ProjectRecord;
   initialTab?: RunTab;
+  openers: Opener[];
   onBack: () => void;
 }) {
   const api = window.helloagents;
@@ -88,11 +98,14 @@ export function RunScreen({
     <div className="run-screen">
       <header className="run-bar">
         <nav className="crumb" aria-label="Breadcrumb">
-          <button className="crumb-back" onClick={onBack}>
+          <button
+            className="icon-btn"
+            onClick={onBack}
+            title={`Back to ${project.name}`}
+            aria-label={`Back to ${project.name}`}
+          >
             <Icon name="back" size={14} />
-            {project.name}
           </button>
-          <span className="crumb-sep">/</span>
           <h1 title={run.title}>{run.title}</h1>
         </nav>
         <span className={`pill ${outcome.tone}`}>{outcome.label}</span>
@@ -105,37 +118,14 @@ export function RunScreen({
             </span>
           ) : null}
         </span>
-        <div className="run-actions">
-          {run.active ? (
-            <button className="btn" onClick={() => void api.cancelRun(runId)}>
-              <Icon name="stop" size={13} /> Stop
-            </button>
-          ) : worktree ? (
-            confirmDiscard ? (
-              <>
-                <span className="confirm">Delete this run's branch and files?</span>
-                <button className="btn btn-danger" onClick={() => void discard()}>
-                  Discard
-                </button>
-                <button className="btn btn-ghost" onClick={() => setConfirmDiscard(false)}>
-                  Keep
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => void api.revealInFinder(worktree.path)}
-                >
-                  <Icon name="reveal" size={13} /> Open folder
-                </button>
-                <button className="btn btn-ghost" onClick={() => setConfirmDiscard(true)}>
-                  Discard
-                </button>
-              </>
-            )
-          ) : null}
-        </div>
+        <RunActions
+          run={run}
+          project={project}
+          openers={openers}
+          confirmDiscard={confirmDiscard}
+          setConfirmDiscard={setConfirmDiscard}
+          onDiscard={() => void discard()}
+        />
       </header>
 
       {run.active ? (
@@ -241,10 +231,10 @@ function SummaryCard({
       ? "Stopped"
       : o.tone === "bad"
         ? d.tests && !d.tests.passed
-          ? `Tests still failing${d.tests.line === "failed" ? "" : ` · ${d.tests.line}`}`
+          ? `Checks failing${/\d/.test(d.tests.line) ? ` · ${d.tests.line}` : ""}`
           : "Didn't finish"
         : files
-          ? `Done in ${took}${d.tests ? ` · tests pass` : ""}`
+          ? `Done in ${took}${d.tests ? " · checks pass" : ""}`
           : `Answered in ${took}`;
   const gist = d.answer ? firstParagraph(d.answer) : (run.summary ?? "");
   const hasMore = Boolean(d.answer) && d.answer.trim() !== gist.trim();
@@ -258,26 +248,26 @@ function SummaryCard({
         <b>{title}</b>
       </div>
       <div className="facts">
-        <span className="chip">
+        <span className="fact">
           {files ? `${files} file${files === 1 ? "" : "s"} changed` : "No files changed"}
         </span>
         {d.filesRead ? (
-          <span className="chip">
+          <span className="fact">
             Read {d.filesRead} file{d.filesRead === 1 ? "" : "s"}
           </span>
         ) : null}
         {d.commands ? (
-          <span className="chip">
+          <span className="fact">
             {d.commands} command{d.commands === 1 ? "" : "s"}
           </span>
         ) : null}
         {d.tests ? (
-          <span className={`chip ${d.tests.passed ? "okc" : "badc"}`}>
-            {d.tests.line === "passed"
-              ? "Tests pass"
-              : d.tests.line === "failed"
-                ? "Tests fail"
-                : `Tests: ${d.tests.line}`}
+          <span className={`fact ${d.tests.passed ? "okc" : "badc"}`}>
+            {/\d/.test(d.tests.line)
+              ? `Tests: ${d.tests.line}`
+              : d.tests.passed
+                ? "Checks pass"
+                : "Checks fail"}
           </span>
         ) : null}
       </div>
@@ -497,5 +487,198 @@ function Dock({ runId, enabled, active }: { runId: string; enabled: boolean; act
         {error ?? "Follow-ups continue this conversation on the same branch · ⌘↵ to send"}
       </p>
     </form>
+  );
+}
+
+/** Stop, resume, checks, dev server, open in an editor, ship, discard: what you can do with a run now. */
+function RunActions({
+  run,
+  project,
+  openers,
+  confirmDiscard,
+  setConfirmDiscard,
+  onDiscard,
+}: {
+  run: RunListItem;
+  project: ProjectRecord;
+  openers: Opener[];
+  confirmDiscard: boolean;
+  setConfirmDiscard: (v: boolean) => void;
+  onDiscard: () => void;
+}) {
+  const api = window.helloagents;
+  const [busy, setBusy] = useState<string>();
+  const worktree = run.worktree;
+  const inPlace = run.settings.workspace === "checkout";
+  const actions = project.actions;
+  const o = outcomeOf(run);
+
+  const act = async (label: string, job: () => Promise<unknown>, done?: (r: unknown) => void) => {
+    setBusy(label);
+    try {
+      const r = await job();
+      done?.(r);
+    } catch (e) {
+      showToast(errorText(e), { tone: "bad" });
+    } finally {
+      setBusy(undefined);
+    }
+  };
+  const ship = (kind: ShipKind) =>
+    void act(
+      kind,
+      () => api.ship(run.id, kind),
+      (r) => {
+        const res = r as { message: string; url?: string };
+        showToast(res.message, { tone: "ok", ...(res.url && { url: res.url }) });
+      },
+    );
+
+  if (run.active) {
+    return (
+      <div className="run-actions">
+        <button className="btn" onClick={() => void api.cancelRun(run.id)}>
+          <Icon name="stop" size={13} /> Stop
+        </button>
+      </div>
+    );
+  }
+  if (!worktree) return <div className="run-actions" />;
+  if (confirmDiscard) {
+    return (
+      <div className="run-actions">
+        <span className="confirm">Delete this run's branch and files?</span>
+        <button className="btn btn-danger" onClick={onDiscard}>
+          Discard
+        </button>
+        <button className="btn btn-ghost" onClick={() => setConfirmDiscard(false)}>
+          Keep
+        </button>
+      </div>
+    );
+  }
+  const base = run.settings.baseBranch ?? "main";
+  return (
+    <div className="run-actions">
+      {run.status === "cancelled" || run.status === "error" || run.status === "budget" ? (
+        <button
+          className="btn btn-primary"
+          disabled={Boolean(busy)}
+          onClick={() => void act("resume", () => api.resumeRun(run.id))}
+        >
+          <Icon name="resume" size={13} /> Resume
+        </button>
+      ) : null}
+      {actions?.checks.length ? (
+        <button
+          className="btn btn-ghost"
+          disabled={Boolean(busy)}
+          title={actions.checks.join(" · ")}
+          onClick={() => void act("checks", () => api.runChecks(run.id))}
+        >
+          <Icon name="play" size={12} /> Run checks
+        </button>
+      ) : null}
+      {actions?.dev ? (
+        run.devRunning ? (
+          <button
+            className="btn btn-ghost"
+            onClick={() => void api.stopDev(run.id)}
+            title={actions.dev.url}
+          >
+            <Icon name="stop" size={12} /> Stop server
+          </button>
+        ) : (
+          <button
+            className="btn btn-ghost"
+            disabled={Boolean(busy)}
+            title={`${actions.dev.command} → ${actions.dev.url}`}
+            onClick={() =>
+              void act(
+                "dev",
+                () => api.startDev(run.id),
+                (url) => showToast(`Dev server starting at ${String(url)}`),
+              )
+            }
+          >
+            <Icon name="globe" size={13} /> Dev server
+          </button>
+        )
+      ) : null}
+      <Menu
+        className="btn"
+        align="right"
+        width={210}
+        trigger={
+          <>
+            <Icon name="open" size={13} /> Open <span className="caret">▾</span>
+          </>
+        }
+        items={openers.map((op) => ({
+          id: op.id,
+          label: op.name,
+          onSelect: () => void act("open", () => api.openIn(op.id, worktree.path)),
+        }))}
+      />
+      <Menu
+        className={`btn ${o.tone === "ok" ? "btn-primary" : ""}`}
+        align="right"
+        width={320}
+        trigger={
+          <>
+            {busy && ["commit", "push", "pr", "merge"].includes(busy) ? (
+              <span className="spinner" />
+            ) : (
+              <Icon name="ship" size={13} />
+            )}{" "}
+            Ship <span className="caret">▾</span>
+          </>
+        }
+        items={[
+          {
+            id: "commit",
+            label: "Commit",
+            hint: `On ${worktree.branch}`,
+            icon: <Icon name="check" size={13} />,
+            onSelect: () => ship("commit"),
+          },
+          {
+            id: "push",
+            label: "Push branch",
+            hint: `Commits, then pushes ${worktree.branch} to origin`,
+            icon: <Icon name="arrowUp" size={13} />,
+            onSelect: () => ship("push"),
+          },
+          ...(inPlace
+            ? []
+            : [
+                {
+                  id: "pr",
+                  label: "Open a pull request",
+                  hint: `Into ${base}, described from the summary and checks`,
+                  icon: <Icon name="pr" size={13} />,
+                  onSelect: () => ship("pr"),
+                },
+                {
+                  id: "merge",
+                  label: `Merge into ${base}`,
+                  hint: "In your own checkout, which must be clean",
+                  icon: <Icon name="branch" size={13} />,
+                  onSelect: () => ship("merge"),
+                },
+              ]),
+        ]}
+      />
+      {inPlace ? null : (
+        <button
+          className="icon-btn"
+          title="Discard this run's branch"
+          aria-label="Discard"
+          onClick={() => setConfirmDiscard(true)}
+        >
+          <Icon name="trash" size={14} />
+        </button>
+      )}
+    </div>
   );
 }

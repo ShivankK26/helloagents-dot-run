@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import type { AgentResult } from "../harness/agent";
 import { addUsage, EMPTY_USAGE } from "../harness/pricing";
-import type { AgentEvent, AgentStatus, TokenUsage, ToolCall } from "../types";
+import type { Access, AgentEvent, AgentStatus, RunEffort, TokenUsage, ToolCall } from "../types";
 
 export interface ClaudeCodeOptions {
   task: string;
@@ -18,6 +18,11 @@ export interface ClaudeCodeOptions {
    * thousands of tokens to every turn and a worker doesn't need them.
    */
   lean?: boolean;
+  /** Model alias or id; omitted means Claude Code's default. */
+  model?: string;
+  effort?: RunEffort;
+  /** "edits": edit freely, only listed commands. "full": no permission checks (still on its own branch). */
+  access?: Access;
   signal?: AbortSignal;
   onEvent?: (event: AgentEvent) => void;
   /** Path to the claude executable (tests point this at a fake). */
@@ -63,7 +68,17 @@ export const DEFAULT_CLAUDE_TOOLS = [
 export const LEAN_CLAUDE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "Bash"] as const;
 
 export function claudeArgs(
-  opts: Pick<ClaudeCodeOptions, "task" | "resumeSessionId" | "allowedTools" | "maxTurns" | "lean">,
+  opts: Pick<
+    ClaudeCodeOptions,
+    | "task"
+    | "resumeSessionId"
+    | "allowedTools"
+    | "maxTurns"
+    | "lean"
+    | "model"
+    | "effort"
+    | "access"
+  >,
 ): string[] {
   const args = [
     "-p",
@@ -73,7 +88,7 @@ export function claudeArgs(
     "--verbose",
     // File edits need no approval; everything else is limited to allowedTools.
     "--permission-mode",
-    "acceptEdits",
+    opts.access === "full" ? "bypassPermissions" : "acceptEdits",
     "--allowedTools",
     (opts.allowedTools ?? DEFAULT_CLAUDE_TOOLS).join(","),
     // Nobody is there to answer a prompt: deny instead of waiting forever.
@@ -92,6 +107,8 @@ export function claudeArgs(
       LEAN_CLAUDE_TOOLS.join(","),
     );
   }
+  if (opts.model) args.push("--model", opts.model);
+  if (opts.effort) args.push("--effort", opts.effort);
   if (opts.maxTurns) args.push("--max-turns", String(opts.maxTurns));
   if (opts.resumeSessionId) args.push("--resume", opts.resumeSessionId);
   return args;

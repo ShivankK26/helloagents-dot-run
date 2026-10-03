@@ -52,3 +52,20 @@ export {
 export type { Worktree } from "./git/worktree";
 export { RunManager } from "./runs/manager";
 export type { RunManagerOptions } from "./runs/manager";
+export {
+  detectActions,
+  openPullRequest,
+  runShell,
+  startBackground,
+  stopBackground,
+  type CommandResult,
+} from "./runs/actions";
+export {
+  commitAll,
+  currentBranch,
+  headCommit,
+  listBranches,
+  mergeInto,
+  pushBranch,
+} from "./git/worktree";
+export type { ProjectInfo, ShipResult } from "./runs/manager";

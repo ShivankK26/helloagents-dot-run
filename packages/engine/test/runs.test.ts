@@ -111,7 +111,7 @@ describe("RunManager", () => {
     await manager.settled(runId);
     expect(store.getRun(runId)).toMatchObject({
       status: "error",
-      summary: "Codex isn't supported yet.",
+      summary: expect.stringMatching(/^Codex isn't supported yet\./),
     });
   });
 

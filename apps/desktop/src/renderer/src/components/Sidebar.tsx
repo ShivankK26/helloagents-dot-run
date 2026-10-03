@@ -1,108 +1,270 @@
-import type { AgentProvider, ProjectRecord } from "../../../shared/api";
+import { useState } from "react";
+import type { AgentProvider, ProjectRecord, RunListItem } from "../../../shared/api";
+import { outcomeOf } from "../outcome";
+import { ago } from "../time";
 import { Icon } from "./Icons";
 
-export type View = "runs" | "traces" | "errors" | "evals";
+export type Section = "overview" | "traces" | "errors" | "evals";
+type Grouping = "status" | "project";
 
-const SECTIONS: Array<{ id: View; label: string; icon: "runs" | "trace" | "alert" | "gauge" }> = [
-  { id: "runs", label: "Runs", icon: "runs" },
-  { id: "traces", label: "Traces", icon: "trace" },
-  { id: "errors", label: "Errors", icon: "alert" },
-  { id: "evals", label: "Evals", icon: "gauge" },
-];
+const GROUPING_KEY = "helloagents.sidebarGrouping";
 
-/**
- * A slim rail of icons that opens over the content while you hover it (or
- * tab into it). "Keep open" pins it at full width.
- */
+function readGrouping(): Grouping {
+  try {
+    return localStorage.getItem(GROUPING_KEY) === "project" ? "project" : "status";
+  } catch {
+    return "status";
+  }
+}
+
+/** Runs from every project, grouped by what needs you or by project, plus the app's sections. */
 export function Sidebar({
+  runs,
+  projects,
+  agents,
+  errorCount,
+  section,
+  openRunId,
+  currentProjectId,
   pinned,
   onTogglePin,
-  view,
-  onView,
-  errorCount,
-  projects,
-  selected,
-  agents,
-  onSelect,
-  onAdd,
+  onSection,
+  onOpenRun,
+  onOpenProject,
+  onNewTask,
+  onAddProject,
 }: {
+  runs: RunListItem[];
+  projects: ProjectRecord[];
+  agents: AgentProvider[];
+  errorCount: number;
+  section?: Section;
+  openRunId?: string;
+  currentProjectId?: string;
   pinned: boolean;
   onTogglePin: () => void;
-  view: View;
-  onView: (view: View) => void;
-  errorCount: number;
-  projects: ProjectRecord[];
-  selected?: string;
-  agents: AgentProvider[];
-  onSelect: (id: string) => void;
-  onAdd: () => void;
+  onSection: (s: Section) => void;
+  onOpenRun: (runId: string) => void;
+  onOpenProject: (projectId: string) => void;
+  onNewTask: (projectId?: string) => void;
+  onAddProject: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [grouping, setGrouping] = useState<Grouping>(readGrouping);
+  const projectName = (id: string | null) => projects.find((p) => p.id === id)?.name ?? "";
+  const q = query.trim().toLowerCase();
+  const visible = runs.filter(
+    (r) =>
+      r.projectId &&
+      (!q ||
+        r.title.toLowerCase().includes(q) ||
+        projectName(r.projectId).toLowerCase().includes(q)),
+  );
+
+  const setGroup = (g: Grouping) => {
+    setGrouping(g);
+    try {
+      localStorage.setItem(GROUPING_KEY, g);
+    } catch {
+      // not remembered
+    }
+  };
+
+  const row = (r: RunListItem, showProject: boolean) => {
+    const o = outcomeOf(r);
+    return (
+      <button
+        key={r.id}
+        className="th"
+        aria-current={openRunId === r.id ? "true" : undefined}
+        onClick={() => onOpenRun(r.id)}
+      >
+        <i className={`dot ${o.tone}`} aria-hidden="true" />
+        <span className="th-main">
+          <b>{r.title}</b>
+          <small className={o.tone}>
+            {o.line}
+            {showProject ? ` · ${projectName(r.projectId)}` : ""}
+          </small>
+        </span>
+        <time>{r.active ? "now" : ago(r.startedAt).replace(" ago", "")}</time>
+      </button>
+    );
+  };
+
+  const needsYou = visible.filter((r) => !r.active && outcomeOf(r).tone === "bad");
+  const working = visible.filter((r) => r.active);
+  const done = visible.filter((r) => !r.active && outcomeOf(r).tone !== "bad");
+  const claude = agents.find((a) => a.id === "claude-code");
+
+  return (
+    <aside className={`sidebar ${pinned ? "pinned" : "floating"}`} aria-label="Sidebar">
+      <div className="sb-top">
+        <label className="sb-search">
+          <Icon name="search" size={14} />
+          <span className="sr">Search runs</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search runs"
+          />
+          <span className="kbd">⌘K</span>
+        </label>
+        <button
+          className="icon-btn"
+          onClick={() => onNewTask(currentProjectId)}
+          title="New task (⌘N)"
+          aria-label="New task"
+        >
+          <Icon name="edit" size={15} />
+        </button>
+      </div>
+
+      <nav className="sb-nav" aria-label="Sections">
+        {(
+          [
+            ["overview", "Overview", "layers", "⌘0"],
+            ["traces", "Traces", "trace", ""],
+            ["errors", "Errors", "alert", ""],
+            ["evals", "Evals", "gauge", ""],
+          ] as const
+        ).map(([id, label, icon, key]) => (
+          <button
+            key={id}
+            className="nv"
+            aria-current={section === id ? "page" : undefined}
+            onClick={() => onSection(id)}
+          >
+            <Icon name={icon} size={15} />
+            <span>{label}</span>
+            {id === "errors" && errorCount ? <span className="count bad">{errorCount}</span> : null}
+            {id === "evals" ? <span className="soon">soon</span> : null}
+            {key ? <span className="kbd">{key}</span> : null}
+          </button>
+        ))}
+      </nav>
+
+      <div className="segsm" role="group" aria-label="Group runs">
+        <button aria-pressed={grouping === "status"} onClick={() => setGroup("status")}>
+          By status
+        </button>
+        <button aria-pressed={grouping === "project"} onClick={() => setGroup("project")}>
+          By project
+        </button>
+      </div>
+
+      <div className="sb-body">
+        {grouping === "status" ? (
+          <>
+            {needsYou.length ? (
+              <Group label="Needs you" tone="warn" count={needsYou.length}>
+                {needsYou.map((r) => row(r, true))}
+              </Group>
+            ) : null}
+            {working.length ? (
+              <Group label="Working" count={working.length}>
+                {working.map((r) => row(r, true))}
+              </Group>
+            ) : null}
+            {done.length ? (
+              <Group label="Done" count={done.length}>
+                {done.slice(0, 30).map((r) => row(r, true))}
+              </Group>
+            ) : null}
+            {!visible.length ? (
+              <p className="sb-empty">{q ? "No runs match." : "No runs yet. Start a task."}</p>
+            ) : null}
+            <Group label="Projects">
+              {projects.map((p, i) => (
+                <button
+                  key={p.id}
+                  className="pj"
+                  aria-current={
+                    currentProjectId === p.id && !openRunId && !section ? "true" : undefined
+                  }
+                  onClick={() => onOpenProject(p.id)}
+                >
+                  <Icon name="folder" size={14} />
+                  <span>{p.name}</span>
+                  {i < 9 ? <span className="kbd">⌘{i + 1}</span> : null}
+                </button>
+              ))}
+              <button className="pj" onClick={onAddProject}>
+                <Icon name="plus" size={14} />
+                <span>Add a project</span>
+              </button>
+            </Group>
+          </>
+        ) : (
+          <>
+            {projects.map((p, i) => {
+              const mine = visible.filter((r) => r.projectId === p.id);
+              return (
+                <div key={p.id} className="pgrp">
+                  <div className="pgrp-head">
+                    <button className="pgrp-name" onClick={() => onOpenProject(p.id)}>
+                      <Icon name="folder" size={14} />
+                      <span>{p.name}</span>
+                    </button>
+                    {i < 9 ? <span className="kbd">⌘{i + 1}</span> : null}
+                    <button
+                      className="icon-btn sm"
+                      onClick={() => onNewTask(p.id)}
+                      title={`New task in ${p.name}`}
+                      aria-label={`New task in ${p.name}`}
+                    >
+                      <Icon name="plus" size={13} />
+                    </button>
+                  </div>
+                  {mine.slice(0, 8).map((r) => row(r, false))}
+                </div>
+              );
+            })}
+            <button className="pj" onClick={onAddProject}>
+              <Icon name="plus" size={14} />
+              <span>Add a project</span>
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="sb-foot">
+        <button
+          className="icon-btn"
+          onClick={onTogglePin}
+          title={`${pinned ? "Hide" : "Keep"} the sidebar (⌘B)`}
+          aria-pressed={pinned}
+          aria-label="Keep the sidebar open"
+        >
+          <Icon name="sidebar" size={15} />
+        </button>
+        <span className="agent" title={claude?.installed ? claude.billing : claude?.installHint}>
+          <i className={`dot ${claude?.installed ? "ok" : ""}`} /> Claude Code{" "}
+          {claude?.version ?? (claude ? "not installed" : "")}
+        </span>
+      </div>
+    </aside>
+  );
+}
+
+function Group({
+  label,
+  count,
+  tone,
+  children,
+}: {
+  label: string;
+  count?: number;
+  tone?: "warn";
+  children: React.ReactNode;
 }) {
   return (
-    <div className={`rail-slot ${pinned ? "pinned" : ""}`}>
-      <nav className="rail" aria-label="Sidebar">
-        {SECTIONS.map((s) => (
-          <button
-            key={s.id}
-            className="r-row"
-            aria-current={view === s.id ? "page" : undefined}
-            onClick={() => onView(s.id)}
-            title={s.label}
-          >
-            <Icon name={s.icon} />
-            {s.id === "errors" && errorCount ? <i className="r-badge" aria-hidden="true" /> : null}
-            <span className="r-text">{s.label}</span>
-            {s.id === "errors" && errorCount ? (
-              <small className="r-text">{errorCount}</small>
-            ) : null}
-            {s.id === "evals" ? <small className="r-text">soon</small> : null}
-          </button>
-        ))}
-
-        <div className="r-sep" />
-        <div className="r-label r-text">Projects</div>
-        {projects.map((p) => (
-          <button
-            key={p.id}
-            className="r-row"
-            aria-current={view === "runs" && selected === p.id ? "true" : undefined}
-            onClick={() => onSelect(p.id)}
-            title={p.name}
-          >
-            <Icon name="folder" />
-            <span className="r-text">{p.name}</span>
-          </button>
-        ))}
-        <button className="r-row" onClick={onAdd} title="Add a project">
-          <Icon name="plus" />
-          <span className="r-text">Add a project</span>
-        </button>
-
-        <div className="r-foot">
-          <button
-            className="r-row"
-            onClick={onTogglePin}
-            aria-pressed={pinned}
-            title={`${pinned ? "Let the sidebar close" : "Keep the sidebar open"} (⌘B)`}
-          >
-            <Icon name="pin" />
-            <span className="r-text">{pinned ? "Let it close" : "Keep open"}</span>
-            <small className="r-text">⌘B</small>
-          </button>
-          {agents.map((a) => (
-            <div
-              key={a.id}
-              className="r-row r-agent"
-              title={`${a.name}: ${a.installed ? a.billing : a.installHint}`}
-            >
-              <span className="r-dot">
-                <i className={`dot ${a.installed ? "ok" : ""}`} />
-              </span>
-              <span className="r-text">{a.name}</span>
-              <small className="r-text">{a.installed ? (a.version ?? "") : "not installed"}</small>
-            </div>
-          ))}
-        </div>
-      </nav>
-    </div>
+    <section className="grp">
+      <h2 className={`grp-h ${tone ?? ""}`}>
+        <span>{label}</span>
+        {count ? <span>{count}</span> : null}
+      </h2>
+      {children}
+    </section>
   );
 }

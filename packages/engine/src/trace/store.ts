@@ -5,8 +5,10 @@ import { randomUUID } from "node:crypto";
 import type {
   AgentEvent,
   AgentId,
+  ProjectActions,
   ProjectRecord,
   RunRecord,
+  RunSettings,
   RunStatus,
   StoredEvent,
 } from "../types";
@@ -56,6 +58,8 @@ const MIGRATIONS = [
    ALTER TABLE runs ADD COLUMN branch TEXT;
    ALTER TABLE runs ADD COLUMN base_commit TEXT;
    CREATE INDEX runs_by_project ON runs(project_id, started_at DESC);`,
+  `ALTER TABLE projects ADD COLUMN actions TEXT;
+   ALTER TABLE runs ADD COLUMN settings TEXT;`,
 ];
 
 /** Saves runs and their events to a local SQLite file. */
@@ -99,12 +103,13 @@ export class TraceStore {
     projectId?: string;
     agent?: AgentId;
     worktree?: { path: string; branch: string; base: string };
+    settings?: RunSettings;
   }): string {
     const id = input.id ?? randomUUID();
     this.db
       .prepare(
-        `INSERT INTO runs (id, title, workspace, model, started_at, project_id, agent, worktree_path, branch, base_commit)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO runs (id, title, workspace, model, started_at, project_id, agent, worktree_path, branch, base_commit, settings)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -117,6 +122,7 @@ export class TraceStore {
         input.worktree?.path ?? null,
         input.worktree?.branch ?? null,
         input.worktree?.base ?? null,
+        input.settings ? JSON.stringify(input.settings) : null,
       );
     return id;
   }
@@ -172,6 +178,12 @@ export class TraceStore {
     this.db
       .prepare("UPDATE projects SET worker_agent = ?, planner_agent = ? WHERE id = ?")
       .run(agents.workerAgent, agents.plannerAgent, id);
+  }
+
+  setProjectActions(id: string, actions: ProjectActions): void {
+    this.db
+      .prepare("UPDATE projects SET actions = ? WHERE id = ?")
+      .run(JSON.stringify(actions), id);
   }
 
   removeProject(id: string): void {
@@ -301,6 +313,7 @@ interface ProjectRow {
   worker_agent: AgentId;
   planner_agent: AgentId;
   created_at: number;
+  actions: string | null;
 }
 
 function toProject(r: ProjectRow): ProjectRecord {
@@ -311,6 +324,7 @@ function toProject(r: ProjectRow): ProjectRecord {
     workerAgent: r.worker_agent,
     plannerAgent: r.planner_agent,
     createdAt: r.created_at,
+    actions: r.actions ? (JSON.parse(r.actions) as ProjectActions) : null,
   };
 }
 
@@ -334,6 +348,7 @@ interface RunRow {
   worktree_path: string | null;
   branch: string | null;
   base_commit: string | null;
+  settings: string | null;
 }
 
 interface EventRow {
@@ -367,5 +382,6 @@ function toRun(r: RunRow): RunRecord {
       r.worktree_path && r.branch && r.base_commit
         ? { path: r.worktree_path, branch: r.branch, base: r.base_commit }
         : null,
+    settings: r.settings ? (JSON.parse(r.settings) as RunSettings) : {},
   };
 }

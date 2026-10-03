@@ -17,10 +17,21 @@ const api: HelloagentsApi = {
   removeProject: (id) => invoke(IPC.removeProject, id),
   listRuns: (projectId) => invoke(IPC.listRuns, projectId),
   followUp: (runId, message) => invoke(IPC.followUp, runId, message),
+  projectInfo: (projectId) => invoke(IPC.projectInfo, projectId),
+  setProjectActions: (projectId, actions) => invoke(IPC.setProjectActions, projectId, actions),
+  detectActions: (projectId) => invoke(IPC.detectActions, projectId),
+  resumeRun: (runId) => invoke(IPC.resumeRun, runId),
+  runChecks: (runId) => invoke(IPC.runChecks, runId),
+  ship: (runId, kind) => invoke(IPC.ship, runId, kind),
+  startDev: (runId) => invoke(IPC.startDev, runId),
+  stopDev: (runId) => invoke(IPC.stopDev, runId),
+  listOpeners: () => invoke(IPC.listOpeners),
+  openIn: (openerId, path) => invoke(IPC.openIn, openerId, path),
+  setTheme: (mode) => invoke(IPC.setTheme, mode),
   listAllRuns: (limit) => invoke(IPC.listAllRuns, limit),
   listErrors: (limit) => invoke(IPC.listErrors, limit),
   getRun: (runId) => invoke(IPC.getRun, runId),
-  startRun: (projectId, task) => invoke(IPC.startRun, projectId, task),
+  startRun: (projectId, task, settings) => invoke(IPC.startRun, projectId, task, settings),
   cancelRun: (runId) => invoke(IPC.cancelRun, runId),
   discardRun: (runId) => invoke(IPC.discardRun, runId),
   runEvents: (runId, afterSeq) => invoke(IPC.runEvents, runId, afterSeq),
@@ -31,6 +42,11 @@ const api: HelloagentsApi = {
     const handler = (_event: IpcRendererEvent, runId: string) => listener(runId);
     ipcRenderer.on(IPC.runChanged, handler);
     return () => ipcRenderer.removeListener(IPC.runChanged, handler);
+  },
+  onOpenRun: (listener) => {
+    const handler = (_event: IpcRendererEvent, runId: string) => listener(runId);
+    ipcRenderer.on(IPC.openRun, handler);
+    return () => ipcRenderer.removeListener(IPC.openRun, handler);
   },
 };
 

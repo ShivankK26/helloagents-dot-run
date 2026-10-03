@@ -1,97 +1,190 @@
-import { useCallback, useEffect, useState } from "react";
-import type { AgentId, AgentProvider, AppInfo, ProjectRecord } from "../../shared/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type {
+  AgentId,
+  AgentProvider,
+  AppInfo,
+  Opener,
+  ProjectInfo,
+  ProjectRecord,
+  RunListItem,
+  ShipKind,
+  ThemeMode,
+} from "../../shared/api";
 import { agentOptions } from "./agents";
+import { ActionsDialog } from "./components/ActionsDialog";
 import { AddProject } from "./components/AddProject";
 import { ErrorsPage } from "./components/ErrorsPage";
 import { EvalsPage } from "./components/EvalsPage";
-import { ProjectHome } from "./components/ProjectHome";
+import { Icon } from "./components/Icons";
+import { Menu } from "./components/Menu";
+import { NewTask } from "./components/NewTask";
+import { Overview } from "./components/Overview";
+import { Palette, type Command } from "./components/Palette";
 import { RunScreen, type RunTab } from "./components/RunScreen";
-import { Sidebar, type View } from "./components/Sidebar";
+import { Sidebar, type Section } from "./components/Sidebar";
+import { Toasts } from "./components/Toasts";
 import { TracesPage } from "./components/TracesPage";
 import { Welcome } from "./components/Welcome";
 import { Logo } from "./Logo";
+import { outcomeOf } from "./outcome";
+import { applyTheme, savedTheme, watchSystemTheme } from "./theme";
+import { errorText, showToast } from "./toast";
 
-const PINNED_KEY = "helloagents.sidebarPinned";
+type Screen =
+  | { kind: "home" }
+  | { kind: "run"; runId: string; tab: RunTab }
+  | { kind: "section"; section: Section };
 
-function readPinned(): boolean {
+const PIN_KEY = "helloagents.sidebarPinned";
+const readPinned = () => {
   try {
-    return localStorage.getItem(PINNED_KEY) === "1";
+    return localStorage.getItem(PIN_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
-}
+};
 
 export function App() {
   const api = window.helloagents;
   const [info, setInfo] = useState<AppInfo>();
   const [agents, setAgents] = useState<AgentProvider[]>([]);
+  const [openers, setOpeners] = useState<Opener[]>([]);
   const [projects, setProjects] = useState<ProjectRecord[]>();
-  const [selected, setSelected] = useState<string>();
-  const [openRun, setOpenRun] = useState<{ id: string; tab: RunTab }>();
-  const [adding, setAdding] = useState(false);
-  const [view, setView] = useState<View>("runs");
+  const [runs, setRuns] = useState<RunListItem[]>([]);
   const [errorCount, setErrorCount] = useState(0);
+  const [projectId, setProjectId] = useState<string>();
+  const [projectInfo, setProjectInfo] = useState<ProjectInfo>();
+  const [screen, setScreen] = useState<Screen>({ kind: "home" });
   const [pinned, setPinned] = useState(readPinned);
+  const [peek, setPeek] = useState(false);
+  const [palette, setPalette] = useState(false);
+  const [editingActions, setEditingActions] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(savedTheme);
+  const [resolved, setResolved] = useState<"light" | "dark">(() => applyTheme(savedTheme()));
 
-  const togglePin = useCallback(
-    () =>
-      setPinned((p) => {
-        try {
-          localStorage.setItem(PINNED_KEY, p ? "0" : "1");
-        } catch {
-          // Not remembered; it still toggles for this session.
-        }
-        return !p;
-      }),
-    [],
-  );
-
+  // ---- Data ----
   const loadProjects = useCallback(
     () =>
       api.listProjects().then((list) => {
         setProjects(list);
-        setSelected((s) => s ?? list[0]?.id);
+        setProjectId((id) => (id && list.some((p) => p.id === id) ? id : list[0]?.id));
+        return list;
       }),
     [api],
   );
+  const loadRuns = useCallback(() => {
+    void api.listAllRuns(200).then(setRuns);
+    void api.listErrors().then((l) => setErrorCount(l.length));
+  }, [api]);
 
   useEffect(() => {
     void api.getInfo().then(setInfo);
     void api.detectAgents().then(setAgents);
+    void api.listOpeners().then(setOpeners);
     void loadProjects();
-  }, [api, loadProjects]);
+    loadRuns();
+    const offChange = api.onRunChanged(() => loadRuns());
+    const offOpen = api.onOpenRun((id) => showRun(id));
+    return () => {
+      offChange();
+      offOpen();
+    };
+    // showRun is stable enough here: it only reads setters and api.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, loadProjects, loadRuns]);
 
-  // ⌘B / Ctrl+B keeps the sidebar open or lets it close again.
+  useEffect(() => {
+    if (!projectId) return;
+    let alive = true;
+    api.projectInfo(projectId).then(
+      (pi) => {
+        if (!alive) return;
+        setProjectInfo(pi);
+        // Actions may have just been detected for the first time.
+        void loadProjects();
+      },
+      () => alive && setProjectInfo(undefined),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [api, projectId, loadProjects]);
+
+  // ---- Theme ----
+  const setMode = useCallback((mode: ThemeMode) => {
+    setTheme(mode);
+    setResolved(applyTheme(mode));
+  }, []);
+  useEffect(
+    () => watchSystemTheme(() => theme === "system" && setResolved(applyTheme("system"))),
+    [theme],
+  );
+  const toggleTheme = useCallback(
+    () => setMode(resolved === "dark" ? "light" : "dark"),
+    [resolved, setMode],
+  );
+
+  // ---- Navigation ----
+  const project = projects?.find((p) => p.id === projectId);
+  const openProject = useCallback((id: string) => {
+    setProjectId(id);
+    setScreen({ kind: "home" });
+  }, []);
+  function showRun(runId: string, tab: RunTab = "activity") {
+    void api.getRun(runId).then((run) => {
+      if (run?.projectId) setProjectId(run.projectId);
+      setScreen({ kind: "run", runId, tab });
+    });
+  }
+  const togglePin = useCallback(() => {
+    setPinned((p) => {
+      try {
+        localStorage.setItem(PIN_KEY, p ? "0" : "1");
+      } catch {
+        // not remembered
+      }
+      return !p;
+    });
+    setPeek(false);
+  }, []);
+
+  // ---- Keyboard ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "b") {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "k") {
+        e.preventDefault();
+        setPalette((p) => !p);
+      } else if (k === "b" && !e.shiftKey) {
         e.preventDefault();
         togglePin();
+      } else if (k === "l" && e.shiftKey) {
+        e.preventDefault();
+        toggleTheme();
+      } else if (k === "0") {
+        e.preventDefault();
+        setScreen({ kind: "section", section: "overview" });
+      } else if (k === "n" && !e.shiftKey) {
+        e.preventDefault();
+        setScreen({ kind: "home" });
+      } else if (/^[1-9]$/.test(k) && projects) {
+        const p = projects[Number(k) - 1];
+        if (p) {
+          e.preventDefault();
+          openProject(p.id);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [togglePin]);
-
-  useEffect(() => {
-    const count = () => void api.listErrors().then((list) => setErrorCount(list.length));
-    count();
-    return api.onRunChanged(count);
-  }, [api]);
+  }, [togglePin, toggleTheme, projects, openProject]);
 
   const options = agentOptions(agents, info);
-  const project = projects?.find((p) => p.id === selected);
-
-  /** Opens a run's own screen, from anywhere in the app. */
-  const showRun = useCallback(
-    (runId: string, tab: RunTab = "activity") =>
-      void api.getRun(runId).then((run) => {
-        if (run?.projectId) setSelected(run.projectId);
-        setOpenRun({ id: runId, tab });
-        setView("runs");
-      }),
-    [api],
-  );
+  const projectRuns = runs.filter((r) => r.projectId);
+  const currentRun = screen.kind === "run" ? runs.find((r) => r.id === screen.runId) : undefined;
 
   async function changeAgent(agent: AgentId) {
     if (!project) return;
@@ -102,68 +195,328 @@ export function App() {
     await loadProjects();
   }
 
+  // ---- ⌘K commands ----
+  const commands = useMemo<Command[]>(() => {
+    const list: Command[] = [];
+    const ship = (runId: string, kind: ShipKind) =>
+      void api.ship(runId, kind).then(
+        (r) => showToast(r.message, { tone: "ok", ...(r.url && { url: r.url }) }),
+        (e: unknown) => showToast(errorText(e), { tone: "bad" }),
+      );
+    if (currentRun?.worktree && !currentRun.active) {
+      const id = currentRun.id;
+      const acts = projects?.find((p) => p.id === currentRun.projectId)?.actions;
+      const g = "This run";
+      if (acts?.checks.length)
+        list.push({
+          id: "checks",
+          group: g,
+          label: "Run checks",
+          hint: acts.checks.join(" · "),
+          icon: <Icon name="play" size={14} />,
+          run: () =>
+            void api.runChecks(id).catch((e: unknown) => showToast(errorText(e), { tone: "bad" })),
+        });
+      if (acts?.dev)
+        list.push({
+          id: "dev",
+          group: g,
+          label: "Start the dev server",
+          hint: acts.dev.url,
+          icon: <Icon name="globe" size={14} />,
+          run: () =>
+            void api.startDev(id).catch((e: unknown) => showToast(errorText(e), { tone: "bad" })),
+        });
+      if (currentRun.status !== "done")
+        list.push({
+          id: "resume",
+          group: g,
+          label: "Resume",
+          icon: <Icon name="resume" size={14} />,
+          run: () => void api.resumeRun(id),
+        });
+      list.push({
+        id: "commit",
+        group: g,
+        label: "Commit",
+        icon: <Icon name="check" size={14} />,
+        run: () => ship(id, "commit"),
+      });
+      list.push({
+        id: "push",
+        group: g,
+        label: "Push branch",
+        icon: <Icon name="arrowUp" size={14} />,
+        run: () => ship(id, "push"),
+      });
+      if (currentRun.settings.workspace !== "checkout") {
+        list.push({
+          id: "pr",
+          group: g,
+          label: "Open a pull request",
+          icon: <Icon name="pr" size={14} />,
+          run: () => ship(id, "pr"),
+        });
+        list.push({
+          id: "merge",
+          group: g,
+          label: `Merge into ${currentRun.settings.baseBranch ?? "main"}`,
+          icon: <Icon name="branch" size={14} />,
+          run: () => ship(id, "merge"),
+        });
+      }
+      for (const op of openers)
+        list.push({
+          id: `open-${op.id}`,
+          group: g,
+          label: `Open in ${op.name}`,
+          icon: <Icon name="open" size={14} />,
+          run: () => void api.openIn(op.id, currentRun.worktree?.path ?? ""),
+        });
+    }
+    projects?.forEach((p, i) =>
+      list.push({
+        id: `new-${p.id}`,
+        group: "Start",
+        label: `New task in ${p.name}`,
+        icon: <Icon name="edit" size={14} />,
+        shortcut: i < 9 ? `⌘${i + 1}` : undefined,
+        run: () => openProject(p.id),
+      }),
+    );
+    const go: Array<[Section, string, Parameters<typeof Icon>[0]["name"], string?]> = [
+      ["overview", "Overview", "layers", "⌘0"],
+      ["traces", "Traces", "trace"],
+      ["errors", "Errors", "alert"],
+      ["evals", "Evals", "gauge"],
+    ];
+    for (const [s, label, icon, key] of go)
+      list.push({
+        id: `go-${s}`,
+        group: "Go to",
+        label,
+        icon: <Icon name={icon} size={14} />,
+        shortcut: key,
+        run: () => setScreen({ kind: "section", section: s }),
+      });
+    for (const r of projectRuns.slice(0, 60)) {
+      const o = outcomeOf(r);
+      list.push({
+        id: `run-${r.id}`,
+        group: "Runs",
+        label: r.title,
+        hint: `${projects?.find((p) => p.id === r.projectId)?.name ?? ""} · ${o.line}`,
+        icon: <i className={`dot ${o.tone}`} />,
+        run: () => showRun(r.id),
+      });
+    }
+    if (project)
+      list.push({
+        id: "actions",
+        group: "Settings",
+        label: `Edit actions for ${project.name}`,
+        hint: "Setup, checks, dev server",
+        icon: <Icon name="play" size={14} />,
+        run: () => setEditingActions(true),
+      });
+    list.push({
+      id: "add",
+      group: "Settings",
+      label: "Add a project",
+      icon: <Icon name="plus" size={14} />,
+      run: () => setAdding(true),
+    });
+    list.push({
+      id: "theme",
+      group: "Settings",
+      label: resolved === "dark" ? "Switch to light" : "Switch to dark",
+      icon: <Icon name={resolved === "dark" ? "sun" : "moon"} size={14} />,
+      shortcut: "⌘⇧L",
+      run: toggleTheme,
+    });
+    list.push({
+      id: "pin",
+      group: "Settings",
+      label: pinned ? "Hide the sidebar" : "Keep the sidebar open",
+      icon: <Icon name="sidebar" size={14} />,
+      shortcut: "⌘B",
+      run: togglePin,
+    });
+    return list;
+    // showRun reads only stable setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    api,
+    currentRun,
+    projects,
+    project,
+    projectRuns,
+    openers,
+    resolved,
+    pinned,
+    toggleTheme,
+    togglePin,
+    openProject,
+  ]);
+
+  // ---- Render ----
+  const pageLabel =
+    screen.kind === "section"
+      ? { overview: "Overview", traces: "Traces", errors: "Errors", evals: "Evals" }[screen.section]
+      : screen.kind === "run"
+        ? (currentRun?.title ?? "Run")
+        : "New task";
+
+  const sidebar =
+    projects && projects.length > 0 ? (
+      <Sidebar
+        runs={projectRuns}
+        projects={projects}
+        agents={agents}
+        errorCount={errorCount}
+        section={screen.kind === "section" ? screen.section : undefined}
+        openRunId={screen.kind === "run" ? screen.runId : undefined}
+        currentProjectId={projectId}
+        pinned={pinned}
+        onTogglePin={togglePin}
+        onSection={(s) => setScreen({ kind: "section", section: s })}
+        onOpenRun={(id) => showRun(id)}
+        onOpenProject={openProject}
+        onNewTask={(id) => (id ? openProject(id) : setScreen({ kind: "home" }))}
+        onAddProject={() => setAdding(true)}
+      />
+    ) : null;
+
   return (
     <div className="app">
       <header className="titlebar">
         <div className="brand">
           <Logo size={18} /> helloagents
         </div>
-      </header>
-      <div className="body">
-        {projects && projects.length > 0 ? (
-          <>
-            <Sidebar
-              pinned={pinned}
-              onTogglePin={togglePin}
-              view={view}
-              onView={(v) => {
-                setView(v);
-                if (v === "runs") setOpenRun(undefined);
-              }}
-              errorCount={errorCount}
-              projects={projects}
-              selected={selected}
-              agents={agents}
-              onSelect={(id) => {
-                setSelected(id);
-                setOpenRun(undefined);
-                setView("runs");
-              }}
-              onAdd={() => setAdding(true)}
+        {project && projects ? (
+          <nav className="tb-crumb" aria-label="Location">
+            <Menu
+              className="crumb-btn"
+              width={260}
+              trigger={
+                <>
+                  {project.name} <span className="caret">▾</span>
+                </>
+              }
+              items={[
+                { header: "Projects" },
+                ...projects.map((p, i) => ({
+                  id: p.id,
+                  label: p.name,
+                  checked: p.id === project.id,
+                  right: i < 9 ? `⌘${i + 1}` : undefined,
+                  onSelect: () => openProject(p.id),
+                })),
+                {
+                  id: "add",
+                  label: "Add a project…",
+                  icon: <Icon name="plus" size={13} />,
+                  onSelect: () => setAdding(true),
+                },
+              ]}
             />
-            <main className="main">
-              {view === "runs" && project ? (
-                openRun ? (
-                  <RunScreen
-                    key={openRun.id}
-                    runId={openRun.id}
-                    project={project}
-                    initialTab={openRun.tab}
-                    onBack={() => setOpenRun(undefined)}
-                  />
-                ) : (
-                  <ProjectHome
-                    key={project.id}
-                    project={project}
-                    options={options}
-                    onOpenRun={(id) => setOpenRun({ id, tab: "activity" })}
-                    onAgentChange={(a) => void changeAgent(a)}
-                  />
-                )
-              ) : null}
-              {view === "traces" ? <TracesPage projects={projects} /> : null}
-              {view === "errors" ? (
-                <ErrorsPage projects={projects} onOpenTrace={(runId) => showRun(runId, "trace")} />
-              ) : null}
-              {view === "evals" ? <EvalsPage /> : null}
-            </main>
-          </>
-        ) : projects ? (
-          <main className="main">
-            <Welcome agents={agents} info={info} onAdd={() => setAdding(true)} />
-          </main>
+            <span className="crumb-sep">/</span>
+            <span className="crumb-page">{pageLabel}</span>
+          </nav>
         ) : null}
+        <span className="grow" />
+        {projects?.length ? (
+          <button className="tb-search" onClick={() => setPalette(true)}>
+            <Icon name="search" size={13} /> Search or run a command <span className="kbd">⌘K</span>
+          </button>
+        ) : null}
+        <button
+          className="tmode"
+          onClick={toggleTheme}
+          title="Light or dark (⌘⇧L)"
+          aria-label={`Switch to ${resolved === "dark" ? "light" : "dark"}`}
+        >
+          <span className={resolved === "light" ? "on" : ""}>
+            <Icon name="sun" size={13} />
+          </span>
+          <span className={resolved === "dark" ? "on" : ""}>
+            <Icon name="moon" size={13} />
+          </span>
+        </button>
+      </header>
+
+      <div className="body">
+        {sidebar && pinned ? sidebar : null}
+        {sidebar && !pinned ? (
+          <>
+            <div className="hot-edge" onMouseEnter={() => setPeek(true)} aria-hidden="true" />
+            {peek ? (
+              <div className="peek" onMouseLeave={() => setPeek(false)}>
+                {sidebar}
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        <main className="main">
+          {projects && projects.length === 0 ? (
+            <Welcome agents={agents} info={info} onAdd={() => setAdding(true)} />
+          ) : screen.kind === "section" && projects ? (
+            screen.section === "overview" ? (
+              <Overview
+                projects={projects}
+                runs={projectRuns}
+                onOpenRun={(id) => showRun(id)}
+                onNewTask={openProject}
+                onAddProject={() => setAdding(true)}
+              />
+            ) : screen.section === "traces" ? (
+              <TracesPage projects={projects} />
+            ) : screen.section === "errors" ? (
+              <ErrorsPage projects={projects} onOpenTrace={(id) => showRun(id, "trace")} />
+            ) : (
+              <EvalsPage />
+            )
+          ) : screen.kind === "run" && project ? (
+            <RunScreen
+              key={screen.runId}
+              runId={screen.runId}
+              project={project}
+              initialTab={screen.tab}
+              openers={openers}
+              onBack={() => setScreen({ kind: "home" })}
+            />
+          ) : project ? (
+            <NewTask
+              key={project.id}
+              project={project}
+              info={projectInfo}
+              options={options}
+              onStarted={(id) => showRun(id)}
+              onAgentChange={(a) => void changeAgent(a)}
+              onEditActions={() => setEditingActions(true)}
+            />
+          ) : null}
+        </main>
       </div>
+
+      {palette ? <Palette commands={commands} onClose={() => setPalette(false)} /> : null}
+      {editingActions && project ? (
+        <ActionsDialog
+          project={project}
+          actions={
+            projectInfo?.actions ??
+            project.actions ?? { setup: null, checks: [], dev: null, sendBackFailures: true }
+          }
+          onClose={() => setEditingActions(false)}
+          onSaved={(a) => {
+            setEditingActions(false);
+            setProjectInfo((pi) => (pi ? { ...pi, actions: a } : pi));
+            void loadProjects();
+            showToast("Actions saved", { tone: "ok" });
+          }}
+        />
+      ) : null}
       {adding ? (
         <AddProject
           options={options}
@@ -171,13 +524,12 @@ export function App() {
           onAdded={(added) => {
             setAdding(false);
             void loadProjects().then(() => {
-              if (added[0]) setSelected(added[0].id);
-              setOpenRun(undefined);
-              setView("runs");
+              if (added[0]) openProject(added[0].id);
             });
           }}
         />
       ) : null}
+      <Toasts />
     </div>
   );
 }

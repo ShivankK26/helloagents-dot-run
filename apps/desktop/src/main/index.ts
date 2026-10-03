@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { access, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   AnthropicModel,
@@ -10,20 +10,43 @@ import {
   git,
   isGitRepo,
   loadShellPath,
+  detectActions,
   digestRun,
   RunManager,
   toErrors,
   TraceStore,
   type AgentId,
+  type ProjectActions,
+  type RunSettings,
 } from "@helloagents/engine";
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, shell } from "electron";
 import {
   IPC,
   type AppInfo,
   type ErrorListItem,
   type FolderInfo,
+  type Opener,
   type RunListItem,
+  type ShipKind,
+  type ThemeMode,
 } from "../shared/api";
+
+/** Apps that can open a project folder, if installed. Finder and Terminal always are. */
+const OPENERS: Array<Opener & { app: string; path?: string }> = [
+  { id: "zed", name: "Zed", app: "Zed", path: "/Applications/Zed.app" },
+  { id: "cursor", name: "Cursor", app: "Cursor", path: "/Applications/Cursor.app" },
+  {
+    id: "vscode",
+    name: "VS Code",
+    app: "Visual Studio Code",
+    path: "/Applications/Visual Studio Code.app",
+  },
+  { id: "xcode", name: "Xcode", app: "Xcode", path: "/Applications/Xcode.app" },
+  { id: "finder", name: "Finder", app: "Finder" },
+  { id: "iterm", name: "iTerm", app: "iTerm", path: "/Applications/iTerm.app" },
+  { id: "ghostty", name: "Ghostty", app: "Ghostty", path: "/Applications/Ghostty.app" },
+  { id: "terminal", name: "Terminal", app: "Terminal" },
+];
 
 const isMac = process.platform === "darwin";
 let win: BrowserWindow | undefined;
@@ -37,7 +60,7 @@ function createWindow(): BrowserWindow {
     title: "helloagents",
     ...(!app.isPackaged && { icon: APP_ICON }),
     show: false,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0f1012" : "#f3f4f6",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#000000" : "#ffffff",
     ...(isMac && { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 18 } }),
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.js"),
@@ -112,7 +135,11 @@ app.whenReady().then(async () => {
   const manager = new RunManager({
     store,
     worktreesRoot: path.join(dataDir, "worktrees"),
-    onChange: (runId) => win?.webContents.send(IPC.runChanged, runId),
+    onChange: (runId) => {
+      win?.webContents.send(IPC.runChanged, runId);
+      updateBadge();
+    },
+    onSettled: (runId) => notifySettled(runId),
     // HELLOAGENTS_CLAUDE_PATH points at a fake CLI for free demos.
     ...(process.env.HELLOAGENTS_CLAUDE_PATH && { claudePath: process.env.HELLOAGENTS_CLAUDE_PATH }),
     createModel: () => {
@@ -127,6 +154,7 @@ app.whenReady().then(async () => {
   const listItem = (run: NonNullable<ReturnType<TraceStore["getRun"]>>): RunListItem => ({
     ...run,
     active: manager.isActive(run.id),
+    devRunning: manager.devRunning(run.id),
     digest: digestRun(store.events(run.id)),
   });
 
@@ -210,9 +238,96 @@ app.whenReady().then(async () => {
   ipcMain.handle(IPC.followUp, (_e, runId: string, message: string) =>
     manager.followUp(runId, message),
   );
-  ipcMain.handle(IPC.startRun, (_e, projectId: string, task: string) =>
-    manager.start(projectId, task),
+  ipcMain.handle(IPC.startRun, (_e, projectId: string, task: string, settings?: RunSettings) =>
+    manager.start(projectId, task, settings ?? {}),
   );
+  ipcMain.handle(IPC.projectInfo, (_e, projectId: string) => manager.projectInfo(projectId));
+  ipcMain.handle(IPC.setProjectActions, (_e, projectId: string, actions: ProjectActions) =>
+    store.setProjectActions(projectId, actions),
+  );
+  ipcMain.handle(IPC.detectActions, async (_e, projectId: string) => {
+    const project = store.getProject(projectId);
+    if (!project) throw new Error("That project no longer exists.");
+    const actions = await detectActions(project.path);
+    store.setProjectActions(projectId, actions);
+    return actions;
+  });
+  ipcMain.handle(IPC.resumeRun, (_e, runId: string) => manager.resume(runId));
+  ipcMain.handle(IPC.runChecks, (_e, runId: string) => manager.runChecks(runId));
+  ipcMain.handle(IPC.ship, (_e, runId: string, kind: ShipKind) =>
+    kind === "commit"
+      ? manager.commit(runId)
+      : kind === "push"
+        ? manager.push(runId)
+        : kind === "pr"
+          ? manager.openPullRequest(runId)
+          : manager.merge(runId),
+  );
+  ipcMain.handle(IPC.startDev, async (_e, runId: string) => {
+    const url = await manager.startDev(runId);
+    win?.webContents.send(IPC.runChanged, runId);
+    // Give the server a moment to come up before opening it.
+    setTimeout(() => void shell.openExternal(url), 2500);
+    return url;
+  });
+  ipcMain.handle(IPC.stopDev, (_e, runId: string) => {
+    manager.stopDev(runId);
+    win?.webContents.send(IPC.runChanged, runId);
+  });
+  ipcMain.handle(IPC.listOpeners, async () => {
+    const found: Opener[] = [];
+    for (const o of OPENERS) {
+      if (
+        !o.path ||
+        (await access(o.path).then(
+          () => true,
+          () => false,
+        ))
+      )
+        found.push({ id: o.id, name: o.name });
+    }
+    return found;
+  });
+  ipcMain.handle(IPC.openIn, async (_e, openerId: string, dir: string) => {
+    const o = OPENERS.find((x) => x.id === openerId);
+    if (!o) return;
+    if (o.id === "finder") return void (await shell.openPath(dir));
+    const { execFile } = await import("node:child_process");
+    await new Promise<void>((resolve, reject) =>
+      execFile("open", ["-a", o.app, dir], (err) => (err ? reject(err) : resolve())),
+    );
+  });
+  ipcMain.handle(IPC.setTheme, (_e, mode: ThemeMode) => {
+    nativeTheme.themeSource = mode;
+    win?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? "#000000" : "#ffffff");
+  });
+
+  /** The Dock shows how many agents are working. */
+  function updateBadge(): void {
+    const n = manager.activeRuns().length;
+    if (isMac) app.dock?.setBadge(n ? String(n) : "");
+  }
+
+  /** A system notification when a run finishes while you're looking elsewhere. */
+  function notifySettled(runId: string): void {
+    updateBadge();
+    if (win?.isFocused() || !Notification.isSupported()) return;
+    const run = store.getRun(runId);
+    if (!run || run.status === "cancelled") return;
+    const tests = digestRun(store.events(runId)).tests;
+    const project = run.projectId ? store.getProject(run.projectId)?.name : undefined;
+    const failed = run.status !== "done" || (tests && !tests.passed);
+    const n = new Notification({
+      title: failed ? `${project ?? "A run"} needs you` : `${project ?? "A run"} is done`,
+      body: `${run.title}\n${failed ? (tests && !tests.passed ? "Checks are failing." : (run.summary ?? "It didn't finish.")) : tests ? "Checks pass." : "Finished."}`,
+      silent: false,
+    });
+    n.on("click", () => {
+      win?.show();
+      win?.webContents.send(IPC.openRun, runId);
+    });
+    n.show();
+  }
   ipcMain.handle(IPC.cancelRun, (_e, runId: string) => manager.cancel(runId));
   ipcMain.handle(IPC.discardRun, (_e, runId: string) => manager.discard(runId));
   ipcMain.handle(IPC.runEvents, (_e, runId: string, afterSeq: number) =>
@@ -231,7 +346,33 @@ app.whenReady().then(async () => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) win = createWindow();
   });
-  app.on("before-quit", () => store.close());
+  // Quitting while agents work: ask, then stop them cleanly so each run records where it stopped.
+  let quitting = false;
+  app.on("before-quit", (event) => {
+    if (quitting) return;
+    const working = manager.activeRuns().length;
+    if (working && !process.env.HELLOAGENTS_CAPTURE) {
+      const choice = dialog.showMessageBoxSync({
+        type: "question",
+        buttons: ["Stop them and quit", "Keep working"],
+        defaultId: 1,
+        cancelId: 1,
+        message: `${working} run${working === 1 ? " is" : "s are"} still working`,
+        detail:
+          "Quitting stops them. Their work so far stays on their branches, and you can resume them later. To keep them working, close the window instead: helloagents keeps running in the Dock.",
+      });
+      if (choice === 1) {
+        event.preventDefault();
+        return;
+      }
+    }
+    event.preventDefault();
+    quitting = true;
+    void manager.stopAll().finally(() => {
+      store.close();
+      app.quit();
+    });
+  });
 });
 
 app.on("window-all-closed", () => {

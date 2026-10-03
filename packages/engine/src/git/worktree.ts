@@ -50,14 +50,19 @@ export interface Worktree {
  * Creates an isolated checkout for one agent: a new branch off the current
  * HEAD, in its own folder outside the repo. The user's working copy is untouched.
  */
-export async function createWorktree(repo: string, root: string, name: string): Promise<Worktree> {
+export async function createWorktree(
+  repo: string,
+  root: string,
+  name: string,
+  baseRef = "HEAD",
+): Promise<Worktree> {
   const slug =
     name
       .toLowerCase()
       .replace(/[^a-z0-9-]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 48) || "run";
-  const base = (await git(repo, ["rev-parse", "HEAD"])).trim();
+  const base = (await git(repo, ["rev-parse", "--verify", `${baseRef}^{commit}`])).trim();
   const branch = `helloagents/${slug}`;
   const dir = path.join(root, `${path.basename(repo)}-${slug}`);
   await mkdir(root, { recursive: true });
@@ -85,4 +90,65 @@ export async function cloneRepo(url: string, dest: string): Promise<string> {
   await mkdir(path.dirname(dest), { recursive: true });
   await git(path.dirname(dest), ["clone", "--", url, dest]);
   return dest;
+}
+
+/** The checked-out branch, or null when HEAD is detached. */
+export async function currentBranch(repo: string): Promise<string | null> {
+  const name = (await git(repo, ["rev-parse", "--abbrev-ref", "HEAD"])).trim();
+  return name === "HEAD" ? null : name;
+}
+
+/** Local branches, most recently used first, without helloagents' own run branches. */
+export async function listBranches(repo: string): Promise<string[]> {
+  const out = await git(repo, [
+    "for-each-ref",
+    "--sort=-committerdate",
+    "--format=%(refname:short)",
+    "refs/heads",
+  ]);
+  return out
+    .split("\n")
+    .map((b) => b.trim())
+    .filter((b) => b && !b.startsWith("helloagents/"));
+}
+
+export async function headCommit(repo: string): Promise<string> {
+  return (await git(repo, ["rev-parse", "--short", "HEAD"])).trim();
+}
+
+export async function hasUncommitted(dir: string): Promise<boolean> {
+  return (await git(dir, ["status", "--porcelain"])).trim().length > 0;
+}
+
+/** Commits everything in a checkout. Returns the new commit, or null if there was nothing to commit. */
+export async function commitAll(dir: string, message: string): Promise<string | null> {
+  if (!(await hasUncommitted(dir))) return null;
+  await git(dir, ["add", "--all"]);
+  await git(dir, ["commit", "--quiet", "-m", message]);
+  return headCommit(dir);
+}
+
+/** Pushes a branch to origin and sets it as upstream. */
+export async function pushBranch(dir: string, branch: string): Promise<void> {
+  await git(dir, ["push", "--set-upstream", "origin", branch]);
+}
+
+/**
+ * Merges a run's branch into the branch it came from, in the user's own
+ * checkout. Refuses when that checkout is on another branch or has
+ * uncommitted work, rather than touching it.
+ */
+export async function mergeInto(repo: string, branch: string, into: string): Promise<void> {
+  const current = await currentBranch(repo);
+  if (current !== into) {
+    throw new Error(
+      `Your project is on "${current ?? "a detached HEAD"}". Switch it to "${into}" first.`,
+    );
+  }
+  if (await hasUncommitted(repo)) {
+    throw new Error(
+      `Your project has uncommitted changes on "${into}". Commit or stash them first.`,
+    );
+  }
+  await git(repo, ["merge", "--no-ff", "--no-edit", branch]);
 }

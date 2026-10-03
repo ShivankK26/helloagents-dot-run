@@ -45,12 +45,12 @@ export function outcomeOf(run: RunListItem): Outcome {
     };
   }
   if (d.tests && !d.tests.passed) {
-    const counts = d.tests.line === "failed" ? "" : ` · ${d.tests.line}`;
-    return { tone: "bad", label: "Tests failing", line: `Tests failing${counts}` };
+    const counts = /\d/.test(d.tests.line) ? ` · ${d.tests.line}` : "";
+    return { tone: "bad", label: "Checks failing", line: `Checks failing${counts}` };
   }
   const files = d.filesChanged.length;
   const tests = d.tests
-    ? ` · tests pass${d.tests.line === "passed" ? "" : ` (${d.tests.line})`}`
+    ? ` · checks pass${/\d/.test(d.tests.line) ? ` (${d.tests.line})` : ""}`
     : "";
   if (files)
     return {

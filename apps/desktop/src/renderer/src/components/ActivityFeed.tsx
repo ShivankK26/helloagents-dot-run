@@ -120,7 +120,7 @@ function Step({ e }: { e: ToolResult }) {
   }
   if (isCommandTool(e.name)) {
     const command = describeToolCall(e.name, e.input);
-    const isTest = TEST.test(command);
+    const isTest = e.name === "checks" || (e.name !== "setup" && TEST.test(command));
     return (
       <details className={`step-details ${e.ok ? "" : "bad"}`} open={!e.ok && isTest}>
         <summary className={`step ${e.ok ? "ok" : "bad"}`}>
@@ -128,7 +128,16 @@ function Step({ e }: { e: ToolResult }) {
             <Icon name="term" size={12} />
           </span>
           <span className="step-cmd">
-            Ran <code>{command}</code>
+            {e.name === "checks" || e.name === "setup" ? (
+              <>
+                {e.name === "checks" ? "Checks " : "Setup "}
+                <code>{((e.input as { commands?: string[] }).commands ?? []).join(" · ")}</code>
+              </>
+            ) : (
+              <>
+                Ran <code>{command}</code>
+              </>
+            )}
           </span>
           <span className={`r ${isTest ? (e.ok ? "okc" : "badc") : ""}`}>
             {isTest ? testResultLine(e.output, e.ok) : e.ok ? ms(e.durationMs) : "failed"}

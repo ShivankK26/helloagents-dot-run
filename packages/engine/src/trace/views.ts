@@ -57,12 +57,17 @@ const oneLine = (s: string, max = 160) => {
 };
 
 /** Tools that run shell commands: the built-in harness's and Claude Code's. */
-export const isCommandTool = (name: string) => name === "run_command" || name === "Bash";
+export const isCommandTool = (name: string) =>
+  name === "run_command" || name === "Bash" || name === "checks" || name === "setup";
 
 export function describeToolCall(name: string, input: unknown): string {
   const i = (input ?? {}) as Record<string, unknown>;
   if (name === "run_command") return [i.command, ...((i.args as unknown[]) ?? [])].join(" ");
   if (name === "Bash") return String(i.command ?? "Bash");
+  if (name === "checks" || name === "setup") {
+    const cmds = Array.isArray(i.commands) ? (i.commands as unknown[]).map(String) : [];
+    return `${name === "checks" ? "Checks" : "Setup"}: ${cmds.join(", ")}`;
+  }
   if (name === "finish") return "finish";
   // Claude Code names the target file_path or pattern; the harness uses path.
   const target = [i.path, i.file_path, i.pattern, i.url].find((v) => typeof v === "string");
@@ -207,6 +212,7 @@ export function digestRun(events: WithAgent[]): RunDigest {
   let tests: RunDigest["tests"] = null;
   let stage: RunStage = "read";
   let answer = "";
+  let checked = false;
   const rank: Record<RunStage, number> = { read: 0, edit: 1, test: 2, wrap: 3 };
   const reach = (s: RunStage) => {
     if (rank[s] > rank[stage]) stage = s;
@@ -223,9 +229,22 @@ export function digestRun(events: WithAgent[]): RunDigest {
       reach("edit");
     }
     if (kind === "command") {
-      commands++;
       const command = describeToolCall(e.name, e.input);
-      if (TEST_COMMAND.test(command)) {
+      if (e.name === "checks") {
+        // The project's own checks are the verdict, whatever the agent ran before.
+        const counted = testResultLine(e.output, e.ok);
+        tests = {
+          passed: e.ok,
+          line: /\d/.test(counted) ? counted : e.ok ? "checks pass" : "checks fail",
+          command,
+        };
+        checked = true;
+        reach("test");
+        continue;
+      }
+      if (e.name === "setup") continue; // the app's step, not the agent's work
+      commands++;
+      if (!checked && TEST_COMMAND.test(command)) {
         tests = { passed: e.ok, line: testResultLine(e.output, e.ok), command };
         reach("test");
       }
