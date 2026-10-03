@@ -1,19 +1,26 @@
 <!doctype html><html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600&family=IBM+Plex+Mono:wght@500&family=Silkscreen&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600&family=Geist+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
-  html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#f4f2eb;color:#14161a;font-family:Geist,sans-serif}
-  .wrap{position:absolute;inset:64px 80px;display:flex;flex-direction:column}
-  .lock{display:flex;align-items:center;gap:14px;font-weight:600;font-size:30px;letter-spacing:-.01em}
-  h1{margin:auto 0 0;font-size:112px;line-height:.95;letter-spacing:-.055em;font-weight:600}
-  h1 span{font-family:Silkscreen,monospace;font-weight:400;color:#ef5b2b;font-size:.86em;letter-spacing:-.02em}
-  .row{margin-top:34px;display:flex;align-items:center;gap:20px;font:500 22px "IBM Plex Mono",monospace;color:#3d4149}
-  .strip{display:flex;gap:6px}.strip i{width:32px;height:11px;border-radius:3px}
-  .card{position:absolute;right:0;top:40px;width:330px;background:#fbfaf6;border:1px solid #dedad0;border-radius:16px;padding:20px 22px;transform:rotate(4deg);box-shadow:0 30px 60px -30px rgba(20,22,26,.35)}
-  .card small{font:500 13px "IBM Plex Mono",monospace;letter-spacing:.12em;color:#6b6f76;text-transform:uppercase}
-  .card b{display:block;font-size:22px;margin-top:6px}.card p{margin:6px 0 0;color:#6b6f76;font-size:16px}
-</style></head><body><div class="wrap">
-  <div class="lock"><svg width="50" height="50" viewBox="0 0 32 32"><path d="M9 4h14a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H13.5L8 28.2V24H9a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6Z" fill="#14161a"/><path d="m10 10.2 4.3 3.8-4.3 3.8" stroke="#f4f2eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="16.6" y="16.4" width="6.4" height="2.8" rx="1.4" fill="#ff7a3d"/></svg>helloagents</div>
-  <div class="card"><small>trace · claude-code-1</small><b>2 tests failed</b><p>Sent back to the agent that wrote the code.</p></div>
-  <h1>Many agents.<br>One <span>merge.</span></h1>
-  <div class="row"><span class="strip"><i style="background:#1f8a4f"></i><i style="background:#ef5b2b"></i><i style="background:#1f8a4f"></i></span>open-source desktop app for coding agents</div>
-</div></body></html>
+  html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#f6f6f2;color:#101214;font-family:Geist,sans-serif}
+  .lock{position:absolute;left:80px;top:64px;display:flex;align-items:center;gap:14px;font-weight:600;font-size:30px;letter-spacing:-.01em}
+  h1{position:absolute;left:80px;bottom:120px;margin:0;font-size:96px;line-height:.98;letter-spacing:-.05em;font-weight:600;width:600px}
+  h1 i{display:inline-block;width:.42em;height:.16em;background:#f25a24;border-radius:.04em;margin-left:.08em}
+  .tag{position:absolute;left:80px;bottom:64px;font:500 20px "Geist Mono",monospace;color:#6b6f75}
+  svg.g{position:absolute;right:56px;top:130px}
+</style></head><body>
+  <div class="lock"><svg width="48" height="48" viewBox="0 0 32 32"><path d="M9 4h14a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H13.5L8 28.2V24H9a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6Z" fill="#101214"/><path d="m10 10.2 4.3 3.8-4.3 3.8" stroke="#f6f6f2" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="16.6" y="16.4" width="6.4" height="2.8" rx="1.4" fill="#f25a24"/></svg>helloagents</div>
+  <svg class="g" width="470" height="380" viewBox="0 0 470 380">
+    <g fill="none" stroke="#101214" stroke-width="3" stroke-opacity=".55">
+      <path d="M40 330 C90 330 90 70 140 70 H330 C380 70 380 330 420 330"/>
+      <path d="M40 330 C90 330 90 170 140 170 H330 C380 170 380 330 420 330"/>
+      <path d="M40 330 C90 330 90 260 140 260 H330 C380 260 380 330 420 330"/>
+    </g>
+    <path d="M10 330 H460" stroke="#101214" stroke-width="4"/>
+    <circle cx="190" cy="70" r="9" fill="#fff" stroke="#101214" stroke-width="3"/><circle cx="280" cy="70" r="9" fill="#18834a"/>
+    <circle cx="190" cy="170" r="9" fill="#fff" stroke="#101214" stroke-width="3"/><circle cx="240" cy="170" r="9" fill="#d23b2b"/><circle cx="300" cy="170" r="9" fill="#18834a"/>
+    <circle cx="190" cy="260" r="9" fill="#fff" stroke="#101214" stroke-width="3"/><circle cx="270" cy="260" r="9" fill="#18834a"/>
+    <circle cx="420" cy="330" r="15" fill="#fde6dc" stroke="#f25a24" stroke-width="3"/>
+  </svg>
+  <h1>Hand off the task. Merge the result.<i></i></h1>
+  <div class="tag">open-source desktop app for coding agents</div>
+</body></html>
