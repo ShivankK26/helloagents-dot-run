@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { ProjectRecord, RunListItem } from "../../../shared/api";
 import { agentName } from "../agents";
 import { compact, ms, tokenParts } from "../format";
+import { outcomeOf } from "../outcome";
 import { ago } from "../time";
 import { Icon } from "./Icons";
-import { StatusDot } from "./Status";
 import { TraceView } from "./TraceView";
 
 /** Every run across projects, and the trace of the one you pick. */
@@ -45,7 +45,7 @@ export function TracesPage({
         <div className={`split-page ${current ? "has-selection" : ""}`}>
           <ul className="list-col" aria-label="Runs">
             {runs?.map((r) => {
-              const status = r.active ? "running" : r.status;
+              const o = outcomeOf(r);
               return (
                 <li key={r.id}>
                   <button
@@ -53,7 +53,7 @@ export function TracesPage({
                     aria-current={current?.id === r.id}
                     onClick={() => setSelected(r.id)}
                   >
-                    <StatusDot status={status} />
+                    <i className={`dot ${o.tone}`} aria-hidden="true" />
                     <span className="list-main">
                       <span className="list-title">{r.title}</span>
                       <span className="list-meta mono">

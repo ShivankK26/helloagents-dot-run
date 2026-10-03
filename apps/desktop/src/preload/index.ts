@@ -16,6 +16,7 @@ const api: HelloagentsApi = {
   updateProjectAgents: (id, agents) => invoke(IPC.updateProjectAgents, id, agents),
   removeProject: (id) => invoke(IPC.removeProject, id),
   listRuns: (projectId) => invoke(IPC.listRuns, projectId),
+  followUp: (runId, message) => invoke(IPC.followUp, runId, message),
   listAllRuns: (limit) => invoke(IPC.listAllRuns, limit),
   listErrors: (limit) => invoke(IPC.listErrors, limit),
   getRun: (runId) => invoke(IPC.getRun, runId),

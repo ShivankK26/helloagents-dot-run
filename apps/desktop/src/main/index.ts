@@ -10,6 +10,7 @@ import {
   git,
   isGitRepo,
   loadShellPath,
+  digestRun,
   RunManager,
   toErrors,
   TraceStore,
@@ -89,6 +90,15 @@ function captureAndQuit(w: BrowserWindow, file: string): void {
   });
 }
 
+// One copy at a time: a second launch focuses the open window instead of
+// starting another app on the same data (which renders blank).
+if (!app.requestSingleInstanceLock()) app.quit();
+app.on("second-instance", () => {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.focus();
+});
+
 app.whenReady().then(async () => {
   if (isMac && !app.isPackaged) app.dock?.setIcon(APP_ICON);
   // Finder-launched apps get a minimal PATH; use the login shell's instead.
@@ -116,6 +126,7 @@ app.whenReady().then(async () => {
   const listItem = (run: NonNullable<ReturnType<TraceStore["getRun"]>>): RunListItem => ({
     ...run,
     active: manager.isActive(run.id),
+    digest: digestRun(store.events(run.id)),
   });
 
   ipcMain.handle(IPC.getInfo, async (): Promise<AppInfo> => ({
@@ -195,6 +206,9 @@ app.whenReady().then(async () => {
     const run = store.getRun(runId);
     return run ? listItem(run) : null;
   });
+  ipcMain.handle(IPC.followUp, (_e, runId: string, message: string) =>
+    manager.followUp(runId, message),
+  );
   ipcMain.handle(IPC.startRun, (_e, projectId: string, task: string) =>
     manager.start(projectId, task),
   );

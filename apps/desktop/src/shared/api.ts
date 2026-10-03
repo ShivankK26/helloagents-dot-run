@@ -6,7 +6,7 @@ import type {
   RunRecord,
   StoredEvent,
 } from "@helloagents/engine/types";
-import type { RunError } from "@helloagents/engine/views";
+import type { RunDigest, RunError } from "@helloagents/engine/views";
 
 export type { AgentId, AgentProvider, ProjectRecord, RunRecord, StoredEvent };
 
@@ -32,6 +32,8 @@ export interface FolderInfo {
 
 export interface RunListItem extends RunRecord {
   active: boolean;
+  /** Files read and changed, commands, the last test result and the current stage. */
+  digest: RunDigest;
 }
 
 /** Something that went wrong in a run, with the run it belongs to. */
@@ -71,6 +73,8 @@ export interface HelloagentsApi {
   listErrors(limit?: number): Promise<ErrorListItem[]>;
   getRun(runId: string): Promise<RunListItem | null>;
   startRun(projectId: string, task: string): Promise<string>;
+  /** Continues a finished run on the same branch (and Claude Code session). */
+  followUp(runId: string, message: string): Promise<void>;
   cancelRun(runId: string): Promise<void>;
   discardRun(runId: string): Promise<void>;
   runEvents(runId: string, afterSeq: number): Promise<StoredEvent[]>;
@@ -98,6 +102,7 @@ export const IPC = {
   listErrors: "runs:errors",
   getRun: "runs:get",
   startRun: "runs:start",
+  followUp: "runs:follow-up",
   cancelRun: "runs:cancel",
   discardRun: "runs:discard",
   runEvents: "runs:events",

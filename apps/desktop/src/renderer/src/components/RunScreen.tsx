@@ -1,0 +1,501 @@
+import { firstParagraph, toErrors, toolKind, isCommandTool } from "@helloagents/engine/views";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ProjectRecord, RunListItem, StoredEvent } from "../../../shared/api";
+import { agentName } from "../agents";
+import { compact, ms, tokenParts } from "../format";
+import { outcomeOf, STAGES } from "../outcome";
+import { elapsed } from "../time";
+import { ActivityFeed } from "./ActivityFeed";
+import { ChangesView } from "./ChangesView";
+import { Icon } from "./Icons";
+import { Markdown } from "./Markdown";
+import { TraceView } from "./TraceView";
+
+export type RunTab = "activity" | "changes" | "trace";
+
+/** One run, using the whole window: what the agent is doing, how it went, and every detail. */
+export function RunScreen({
+  runId,
+  project,
+  initialTab = "activity",
+  onBack,
+}: {
+  runId: string;
+  project: ProjectRecord;
+  initialTab?: RunTab;
+  onBack: () => void;
+}) {
+  const api = window.helloagents;
+  const [run, setRun] = useState<RunListItem | null>(null);
+  const [events, setEvents] = useState<StoredEvent[]>([]);
+  const [tab, setTab] = useState<RunTab>(initialTab);
+  const [diff, setDiff] = useState("");
+  const [diffLoaded, setDiffLoaded] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const lastSeq = useRef(0);
+  const feedEnd = useRef<HTMLDivElement>(null);
+
+  const refresh = useCallback(
+    () =>
+      Promise.all([api.getRun(runId), api.runEvents(runId, lastSeq.current)]).then(([r, fresh]) => {
+        setRun(r);
+        const last = fresh.at(-1);
+        if (!last) return;
+        lastSeq.current = last.seq;
+        setEvents((prev) => [...prev, ...fresh]);
+      }),
+    [api, runId],
+  );
+  useEffect(() => {
+    void refresh();
+    return api.onRunChanged((id) => id === runId && void refresh());
+  }, [api, runId, refresh]);
+
+  useEffect(() => {
+    if (!run?.active) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [run?.active]);
+
+  useEffect(() => {
+    if (tab !== "changes") return;
+    void api.runDiff(runId).then((d) => {
+      setDiff(d);
+      setDiffLoaded(true);
+    });
+  }, [api, runId, tab, run?.status, run?.digest.filesChanged.length]);
+
+  useEffect(() => {
+    if (tab === "activity" && run?.active) feedEnd.current?.scrollIntoView({ block: "end" });
+  }, [events.length, tab, run?.active]);
+
+  if (!run) return <div className="run-screen" />;
+
+  const outcome = outcomeOf(run);
+  const tokens = tokenParts(run.usage);
+  const d = run.digest;
+  const took = elapsed(run.startedAt, run.endedAt ?? now);
+  const worktree = run.worktree;
+  const canFollowUp = Boolean(worktree) && !run.active;
+
+  async function discard() {
+    await api.discardRun(runId);
+    onBack();
+  }
+
+  return (
+    <div className="run-screen">
+      <header className="run-bar">
+        <nav className="crumb" aria-label="Breadcrumb">
+          <button className="crumb-back" onClick={onBack}>
+            <Icon name="back" size={14} />
+            {project.name}
+          </button>
+          <span className="crumb-sep">/</span>
+          <h1 title={run.title}>{run.title}</h1>
+        </nav>
+        <span className={`pill ${outcome.tone}`}>{outcome.label}</span>
+        <span className="run-meta">
+          <span>{took}</span>
+          {tokens.fresh ? (
+            <span title="New tokens, then the conversation re-read from cache">
+              {compact(tokens.fresh)} tokens
+              {tokens.cached ? ` · ${compact(tokens.cached)} cached` : ""}
+            </span>
+          ) : null}
+        </span>
+        <div className="run-actions">
+          {run.active ? (
+            <button className="btn" onClick={() => void api.cancelRun(runId)}>
+              <Icon name="stop" size={13} /> Stop
+            </button>
+          ) : worktree ? (
+            confirmDiscard ? (
+              <>
+                <span className="confirm">Delete this run's branch and files?</span>
+                <button className="btn btn-danger" onClick={() => void discard()}>
+                  Discard
+                </button>
+                <button className="btn btn-ghost" onClick={() => setConfirmDiscard(false)}>
+                  Keep
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => void api.revealInFinder(worktree.path)}
+                >
+                  <Icon name="reveal" size={13} /> Open folder
+                </button>
+                <button className="btn btn-ghost" onClick={() => setConfirmDiscard(true)}>
+                  Discard
+                </button>
+              </>
+            )
+          ) : null}
+        </div>
+      </header>
+
+      {run.active ? (
+        <ol className="stages" aria-label="Progress">
+          {STAGES.map((s, i) => {
+            const at = STAGES.findIndex((x) => x.id === d.stage);
+            const state = i < at ? "done" : i === at ? "now" : "next";
+            return (
+              <li key={s.id} className={`stage ${state}`}>
+                <i aria-hidden="true">{state === "done" ? "✓" : ""}</i>
+                {s.label}
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
+
+      <nav className="tabs run-tabs" role="tablist">
+        {(["activity", "changes", "trace"] as const).map((t) => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            className="tab"
+            onClick={() => setTab(t)}
+          >
+            {t === "activity" ? "Activity" : t === "changes" ? "Changes" : "Trace"}
+            {t === "changes" && d.filesChanged.length ? (
+              <span className="count">{d.filesChanged.length}</span>
+            ) : null}
+          </button>
+        ))}
+      </nav>
+
+      <div className="run-body">
+        {tab === "activity" ? (
+          <div className="activity-layout">
+            <div className="feed">
+              <div className="feed-inner">
+                {!run.active ? (
+                  <SummaryCard
+                    run={run}
+                    events={events}
+                    took={took}
+                    onReview={() => setTab("changes")}
+                    onSendBack={(message) => void api.followUp(runId, message)}
+                  />
+                ) : null}
+                {!run.active && !d.filesChanged.length && d.answer ? (
+                  <details className="folded">
+                    <summary>
+                      <Icon name="chevron" size={12} /> How the agent got there
+                    </summary>
+                    <ActivityFeed events={events} active={false} hideAnswer={d.answer} />
+                  </details>
+                ) : (
+                  <ActivityFeed
+                    events={events}
+                    active={run.active}
+                    hideAnswer={run.active ? "" : d.answer}
+                  />
+                )}
+                <div ref={feedEnd} />
+              </div>
+            </div>
+            <SidePanel run={run} events={events} took={took} onTrace={() => setTab("trace")} />
+          </div>
+        ) : null}
+        {tab === "changes" ? <ChangesView diff={diff} loading={!diffLoaded} /> : null}
+        {tab === "trace" ? (
+          <div className="trace-tab">
+            <TraceView runId={runId} project={project} embedded />
+          </div>
+        ) : null}
+      </div>
+
+      {worktree ? <Dock runId={runId} enabled={canFollowUp} active={run.active} /> : null}
+    </div>
+  );
+}
+
+/** A short summary: how it went, a few facts, the first lines of the answer. */
+function SummaryCard({
+  run,
+  events,
+  took,
+  onReview,
+  onSendBack,
+}: {
+  run: RunListItem;
+  events: StoredEvent[];
+  took: string;
+  onReview: () => void;
+  onSendBack: (message: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const o = outcomeOf(run);
+  const d = run.digest;
+  const failure = o.tone === "bad" ? toErrors(events).at(-1) : undefined;
+  const files = d.filesChanged.length;
+  const title =
+    run.status === "cancelled"
+      ? "Stopped"
+      : o.tone === "bad"
+        ? d.tests && !d.tests.passed
+          ? `Tests still failing${d.tests.line === "failed" ? "" : ` · ${d.tests.line}`}`
+          : "Didn't finish"
+        : files
+          ? `Done in ${took}${d.tests ? ` · tests pass` : ""}`
+          : `Answered in ${took}`;
+  const gist = d.answer ? firstParagraph(d.answer) : (run.summary ?? "");
+  const hasMore = Boolean(d.answer) && d.answer.trim() !== gist.trim();
+
+  return (
+    <section className={`summary-card ${o.tone}`} aria-label="Summary">
+      <div className="sum-top">
+        <span className="sum-mark" aria-hidden="true">
+          {o.tone === "bad" ? "✗" : o.tone === "muted" ? "■" : "✓"}
+        </span>
+        <b>{title}</b>
+      </div>
+      <div className="facts">
+        <span className="chip">
+          {files ? `${files} file${files === 1 ? "" : "s"} changed` : "No files changed"}
+        </span>
+        {d.filesRead ? (
+          <span className="chip">
+            Read {d.filesRead} file{d.filesRead === 1 ? "" : "s"}
+          </span>
+        ) : null}
+        {d.commands ? (
+          <span className="chip">
+            {d.commands} command{d.commands === 1 ? "" : "s"}
+          </span>
+        ) : null}
+        {d.tests ? (
+          <span className={`chip ${d.tests.passed ? "okc" : "badc"}`}>
+            {d.tests.line === "passed"
+              ? "Tests pass"
+              : d.tests.line === "failed"
+                ? "Tests fail"
+                : `Tests: ${d.tests.line}`}
+          </span>
+        ) : null}
+      </div>
+
+      {failure ? <pre className="excerpt">{failure.excerpt || failure.title}</pre> : null}
+      {run.status !== "done" && run.error && !failure ? (
+        <pre className="excerpt">{run.error}</pre>
+      ) : null}
+
+      {gist ? (
+        <div className={`gist ${open ? "" : "clamp"}`}>
+          <Markdown text={open && hasMore ? d.answer : gist} />
+        </div>
+      ) : null}
+
+      <div className="sum-actions">
+        {failure && run.worktree ? (
+          <button
+            className="btn btn-primary"
+            onClick={() =>
+              onSendBack(
+                `This still fails:\n\n${failure.excerpt || failure.title}\n\nFix it and run the tests again.`,
+              )
+            }
+          >
+            <Icon name="send" size={13} /> Send this back to {agentName(run.agent ?? "claude-code")}
+          </button>
+        ) : null}
+        {files && o.tone !== "bad" ? (
+          <button className="btn" onClick={onReview}>
+            Review changes
+          </button>
+        ) : null}
+        {hasMore ? (
+          <button className="link-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {open ? "Show less" : "Read the full answer"}
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function SidePanel({
+  run,
+  events,
+  took,
+  onTrace,
+}: {
+  run: RunListItem;
+  events: StoredEvent[];
+  took: string;
+  onTrace: () => void;
+}) {
+  const d = run.digest;
+  const tokens = tokenParts(run.usage);
+  const start = events.find((e) => e.event.type === "agent.start")?.event;
+  const model = start?.type === "agent.start" ? start.model : run.model;
+  // Where the time went.
+  let reading = 0;
+  let thinking = 0;
+  let commands = 0;
+  for (const { event: e } of events) {
+    if (e.type === "model.response") thinking += e.durationMs;
+    if (e.type === "tool.result") {
+      if (toolKind(e.name) === "read") reading += e.durationMs;
+      else if (isCommandTool(e.name)) commands += e.durationMs;
+    }
+  }
+  const spent = reading + thinking + commands;
+  const total = spent || 1;
+
+  return (
+    <aside className="side-panel">
+      {run.active ? (
+        <div className="now-card">
+          <small>Now</small>
+          <b>{outcomeOf(run).line}</b>
+          <span>{took} so far</span>
+        </div>
+      ) : (
+        <section>
+          <h2 className="label">This run</h2>
+          <dl className="run-facts">
+            <dt>Agent</dt>
+            <dd>{agentName(run.agent ?? "claude-code")}</dd>
+            <dt>Model</dt>
+            <dd title={model}>{model}</dd>
+            {run.worktree ? (
+              <>
+                <dt>Branch</dt>
+                <dd title={run.worktree.branch}>{run.worktree.branch}</dd>
+              </>
+            ) : null}
+            <dt>Started</dt>
+            <dd>
+              {new Date(run.startedAt).toLocaleTimeString([], {
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </dd>
+            <dt>Took</dt>
+            <dd>{took}</dd>
+            <dt>New tokens</dt>
+            <dd>{compact(tokens.fresh)}</dd>
+            <dt>Cached</dt>
+            <dd>{compact(tokens.cached)}</dd>
+          </dl>
+        </section>
+      )}
+
+      {d.filesChanged.length ? (
+        <section>
+          <h2 className="label">Files changed</h2>
+          <ul className="file-list">
+            {d.filesChanged.map((f) => (
+              <li key={f} title={f}>
+                <Icon name="file" size={13} />
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {spent > 0 ? (
+        <section>
+          <h2 className="label">Where the time went</h2>
+          <div className="split-bar" aria-hidden="true">
+            <i style={{ width: `${(reading / total) * 100}%` }} className="reading" />
+            <i style={{ width: `${(thinking / total) * 100}%` }} className="thinking" />
+            <i style={{ width: `${(commands / total) * 100}%` }} className="commands" />
+          </div>
+          <dl className="run-facts legend">
+            <dt>
+              <i className="reading" /> Reading files
+            </dt>
+            <dd>{ms(reading)}</dd>
+            <dt>
+              <i className="thinking" /> Thinking
+            </dt>
+            <dd>{ms(thinking)}</dd>
+            <dt>
+              <i className="commands" /> Running commands
+            </dt>
+            <dd>{ms(commands)}</dd>
+          </dl>
+        </section>
+      ) : null}
+
+      <button className="btn" onClick={onTrace}>
+        <Icon name="trace" size={13} /> Open trace
+      </button>
+    </aside>
+  );
+}
+
+/** The follow-up box: one line until you click it. */
+function Dock({ runId, enabled, active }: { runId: string; enabled: boolean; active: boolean }) {
+  const api = window.helloagents;
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function send() {
+    const message = text.trim();
+    if (!message || !enabled || sending) return;
+    setSending(true);
+    setError(undefined);
+    try {
+      await api.followUp(runId, message);
+      setText("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <form
+      className="dock"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void send();
+      }}
+    >
+      <div className={`dock-box ${text ? "has-text" : ""}`}>
+        <label htmlFor={`follow-${runId}`} className="sr">
+          Follow-up
+        </label>
+        <textarea
+          id={`follow-${runId}`}
+          value={text}
+          disabled={!enabled}
+          placeholder={
+            active ? "You can follow up when it finishes…" : "Ask a follow-up, or ask for a change…"
+          }
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void send();
+            }
+          }}
+        />
+        <button
+          className="icon-btn send"
+          type="submit"
+          disabled={!enabled || !text.trim() || sending}
+          aria-label="Send"
+        >
+          <Icon name="send" size={15} />
+        </button>
+      </div>
+      <p className="dock-hint">
+        {error ?? "Follow-ups continue this conversation on the same branch · ⌘↵ to send"}
+      </p>
+    </form>
+  );
+}

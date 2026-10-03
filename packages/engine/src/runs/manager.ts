@@ -3,7 +3,7 @@ import { runAgent } from "../harness/agent";
 import type { ModelClient } from "../harness/model";
 import { createWorktree, removeWorktree, worktreeDiff, type Worktree } from "../git/worktree";
 import type { TraceStore } from "../trace/store";
-import type { AgentEvent } from "../types";
+import type { AgentEvent, AgentId } from "../types";
 import { runClaudeCode } from "../workers/claude-code";
 
 export interface RunManagerOptions {
@@ -69,6 +69,40 @@ export class RunManager {
     });
     notify();
 
+    this.work(runId, project.workerAgent, task, worktree.path);
+    return runId;
+  }
+
+  /**
+   * Sends a follow-up to a finished run: same branch, and for Claude Code the
+   * same conversation, so the agent remembers what it already did.
+   */
+  async followUp(runId: string, message: string): Promise<void> {
+    const { store } = this.opts;
+    const run = store.getRun(runId);
+    if (!run?.worktree) throw new Error("This run has no branch to continue on.");
+    if (this.active.has(runId))
+      throw new Error("This run is still working. Wait for it to finish.");
+    const agent = run.agent ?? "claude-code";
+    const sessionId = store
+      .events(runId)
+      .map(({ event }) => ("sessionId" in event ? event.sessionId : undefined))
+      .filter(Boolean)
+      .at(-1);
+    store.reopenRun(runId);
+    this.opts.onChange?.(runId);
+    this.work(runId, agent, message, run.worktree.path, sessionId);
+  }
+
+  private work(
+    runId: string,
+    agent: AgentId,
+    task: string,
+    workspace: string,
+    resumeSessionId?: string,
+  ): void {
+    const { store } = this.opts;
+    const notify = () => this.opts.onChange?.(runId);
     const controller = new AbortController();
     this.active.set(runId, controller);
     const onEvent = (event: AgentEvent) => {
@@ -78,20 +112,21 @@ export class RunManager {
 
     const work = (async () => {
       try {
-        if (project.workerAgent === "claude-code") {
+        if (agent === "claude-code") {
           await runClaudeCode({
             task,
-            workspace: worktree.path,
+            workspace,
             signal: controller.signal,
             onEvent,
+            ...(resumeSessionId && { resumeSessionId }),
             ...(this.opts.claudePath && { claudePath: this.opts.claudePath }),
           });
-        } else if (project.workerAgent === "harness") {
+        } else if (agent === "harness") {
           if (!this.opts.createModel)
             throw new Error("The built-in agent isn't set up on this machine.");
           await runAgent({
             task,
-            workspace: worktree.path,
+            workspace,
             model: this.opts.createModel(),
             signal: controller.signal,
             onEvent,
@@ -115,7 +150,6 @@ export class RunManager {
       }
     })();
     this.done.set(runId, work);
-    return runId;
   }
 
   isActive(runId: string): boolean {

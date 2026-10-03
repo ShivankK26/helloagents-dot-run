@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
 import { git, reply, RunManager, ScriptedModel, TraceStore } from "../src/index";
@@ -8,6 +10,7 @@ const stores: TraceStore[] = [];
 afterEach(() => {
   stores.splice(0).forEach((s) => s.close());
   delete process.env.FAKE_CLAUDE_MODE;
+  delete process.env.FAKE_CLAUDE_ARGS_FILE;
 });
 
 async function setup(
@@ -53,6 +56,33 @@ describe("RunManager", () => {
     expect(manager.isActive(runId)).toBe(false);
     expect(new Set(changes)).toEqual(new Set([runId]));
     expect(await manager.diff(runId)).toContain("+// fixed by fake claude");
+  });
+
+  test("a follow-up continues the same run, branch and Claude Code session", async () => {
+    const { store, manager, project } = await setup();
+    const runId = await manager.start(project.id, "Fix add()");
+    await manager.settled(runId);
+    const first = store.getRun(runId);
+
+    const argsFile = path.join(await tempDir(), "args.json");
+    process.env.FAKE_CLAUDE_ARGS_FILE = argsFile;
+    await manager.followUp(runId, "Also add a test");
+    expect(store.getRun(runId)?.status).toBe("running");
+    await manager.settled(runId);
+
+    const args = JSON.parse(await readFile(argsFile, "utf8")) as string[];
+    expect(args.slice(0, 2)).toEqual(["-p", "Also add a test"]);
+    expect(args[args.indexOf("--resume") + 1]).toBe("11111111-2222-3333-4444-555555555555");
+    const run = store.getRun(runId);
+    expect(run?.status).toBe("done");
+    expect(run?.worktree).toEqual(first?.worktree);
+    // Totals add up across the two turns of work.
+    expect(run?.usage.outputTokens).toBe((first?.usage.outputTokens ?? 0) * 2);
+    const starts = store.events(runId).filter((e) => e.event.type === "agent.start");
+    expect(starts.map((e) => e.event.type === "agent.start" && e.event.task)).toEqual([
+      "Fix add()",
+      "Also add a test",
+    ]);
   });
 
   test("can be cancelled mid-run", async () => {

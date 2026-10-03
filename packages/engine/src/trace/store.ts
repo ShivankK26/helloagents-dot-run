@@ -186,7 +186,17 @@ export class TraceStore {
     ).map(toRun);
   }
 
-  /** Appends one event. An agent.end on the main agent also closes the run. */
+  /** Marks a finished run as running again, for a follow-up in the same session. */
+  reopenRun(id: string): void {
+    this.db
+      .prepare("UPDATE runs SET status = 'running', ended_at = NULL, error = NULL WHERE id = ?")
+      .run(id);
+  }
+
+  /**
+   * Appends one event. An agent.end on the main agent also closes the run.
+   * Tokens and cost add up, so follow-ups in the same run are counted too.
+   */
   record(runId: string, agentId: string, event: AgentEvent): void {
     this.db
       .prepare("INSERT INTO events (run_id, agent_id, type, at, data) VALUES (?, ?, ?, ?, ?)")
@@ -194,8 +204,10 @@ export class TraceStore {
     if (event.type === "agent.end" && agentId === "main") {
       this.db
         .prepare(
-          `UPDATE runs SET status = ?, ended_at = ?, cost_usd = ?, input_tokens = ?, output_tokens = ?,
-             cache_read_tokens = ?, cache_write_tokens = ?, summary = ?, error = ? WHERE id = ?`,
+          `UPDATE runs SET status = ?, ended_at = ?, cost_usd = cost_usd + ?,
+             input_tokens = input_tokens + ?, output_tokens = output_tokens + ?,
+             cache_read_tokens = cache_read_tokens + ?, cache_write_tokens = cache_write_tokens + ?,
+             summary = ?, error = ? WHERE id = ?`,
         )
         .run(
           event.status,

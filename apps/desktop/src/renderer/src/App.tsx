@@ -1,17 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
-import type { AgentProvider, AppInfo, ProjectRecord } from "../../shared/api";
+import type { AgentId, AgentProvider, AppInfo, ProjectRecord } from "../../shared/api";
 import { agentOptions } from "./agents";
 import { AddProject } from "./components/AddProject";
 import { ErrorsPage } from "./components/ErrorsPage";
 import { EvalsPage } from "./components/EvalsPage";
-import { ProjectView } from "./components/ProjectView";
+import { ProjectHome } from "./components/ProjectHome";
+import { RunScreen, type RunTab } from "./components/RunScreen";
 import { Sidebar, type View } from "./components/Sidebar";
 import { TracesPage } from "./components/TracesPage";
 import { Welcome } from "./components/Welcome";
-import { Icon } from "./components/Icons";
 import { Logo } from "./Logo";
 
-const COLLAPSED_KEY = "helloagents.sidebarCollapsed";
+const PINNED_KEY = "helloagents.sidebarPinned";
+
+function readPinned(): boolean {
+  try {
+    return localStorage.getItem(PINNED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function App() {
   const api = window.helloagents;
@@ -19,16 +27,21 @@ export function App() {
   const [agents, setAgents] = useState<AgentProvider[]>([]);
   const [projects, setProjects] = useState<ProjectRecord[]>();
   const [selected, setSelected] = useState<string>();
+  const [openRun, setOpenRun] = useState<{ id: string; tab: RunTab }>();
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<View>("runs");
-  const [traceRun, setTraceRun] = useState<string>();
   const [errorCount, setErrorCount] = useState(0);
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === "1");
-  const toggleSidebar = useCallback(
+  const [pinned, setPinned] = useState(readPinned);
+
+  const togglePin = useCallback(
     () =>
-      setCollapsed((c) => {
-        localStorage.setItem(COLLAPSED_KEY, c ? "0" : "1");
-        return !c;
+      setPinned((p) => {
+        try {
+          localStorage.setItem(PINNED_KEY, p ? "0" : "1");
+        } catch {
+          // Not remembered; it still toggles for this session.
+        }
+        return !p;
       }),
     [],
   );
@@ -48,17 +61,17 @@ export function App() {
     void loadProjects();
   }, [api, loadProjects]);
 
-  // ⌘B / Ctrl+B shows or hides the sidebar, as in most editors.
+  // ⌘B / Ctrl+B keeps the sidebar open or lets it close again.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
-        toggleSidebar();
+        togglePin();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toggleSidebar]);
+  }, [togglePin]);
 
   useEffect(() => {
     const count = () => void api.listErrors().then((list) => setErrorCount(list.length));
@@ -69,33 +82,43 @@ export function App() {
   const options = agentOptions(agents, info);
   const project = projects?.find((p) => p.id === selected);
 
+  /** Opens a run's own screen, from anywhere in the app. */
+  const showRun = useCallback(
+    (runId: string, tab: RunTab = "activity") =>
+      void api.getRun(runId).then((run) => {
+        if (run?.projectId) setSelected(run.projectId);
+        setOpenRun({ id: runId, tab });
+        setView("runs");
+      }),
+    [api],
+  );
+
+  async function changeAgent(agent: AgentId) {
+    if (!project) return;
+    await api.updateProjectAgents(project.id, {
+      workerAgent: agent,
+      plannerAgent: project.plannerAgent,
+    });
+    await loadProjects();
+  }
+
   return (
     <div className="app">
       <header className="titlebar">
-        {projects && projects.length > 0 ? (
-          <button
-            className="icon-btn titlebar-btn"
-            onClick={toggleSidebar}
-            aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
-            aria-pressed={!collapsed}
-            title={`${collapsed ? "Show" : "Hide"} sidebar (⌘B)`}
-          >
-            <Icon name="sidebar" />
-          </button>
-        ) : null}
         <div className="brand">
-          <Logo size={20} /> helloagents
+          <Logo size={18} /> helloagents
         </div>
       </header>
       <div className="body">
         {projects && projects.length > 0 ? (
           <>
             <Sidebar
-              collapsed={collapsed}
+              pinned={pinned}
+              onTogglePin={togglePin}
               view={view}
               onView={(v) => {
-                setTraceRun(undefined);
                 setView(v);
+                if (v === "runs") setOpenRun(undefined);
               }}
               errorCount={errorCount}
               projects={projects}
@@ -103,25 +126,34 @@ export function App() {
               agents={agents}
               onSelect={(id) => {
                 setSelected(id);
+                setOpenRun(undefined);
                 setView("runs");
               }}
               onAdd={() => setAdding(true)}
             />
             <main className="main">
               {view === "runs" && project ? (
-                <ProjectView key={project.id} project={project} options={options} />
+                openRun ? (
+                  <RunScreen
+                    key={openRun.id}
+                    runId={openRun.id}
+                    project={project}
+                    initialTab={openRun.tab}
+                    onBack={() => setOpenRun(undefined)}
+                  />
+                ) : (
+                  <ProjectHome
+                    key={project.id}
+                    project={project}
+                    options={options}
+                    onOpenRun={(id) => setOpenRun({ id, tab: "activity" })}
+                    onAgentChange={(a) => void changeAgent(a)}
+                  />
+                )
               ) : null}
-              {view === "traces" ? (
-                <TracesPage key={traceRun ?? "all"} projects={projects} initialRunId={traceRun} />
-              ) : null}
+              {view === "traces" ? <TracesPage projects={projects} /> : null}
               {view === "errors" ? (
-                <ErrorsPage
-                  projects={projects}
-                  onOpenTrace={(runId) => {
-                    setTraceRun(runId);
-                    setView("traces");
-                  }}
-                />
+                <ErrorsPage projects={projects} onOpenTrace={(runId) => showRun(runId, "trace")} />
               ) : null}
               {view === "evals" ? <EvalsPage /> : null}
             </main>
@@ -140,6 +172,7 @@ export function App() {
             setAdding(false);
             void loadProjects().then(() => {
               if (added[0]) setSelected(added[0].id);
+              setOpenRun(undefined);
               setView("runs");
             });
           }}

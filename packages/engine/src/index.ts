@@ -18,9 +18,17 @@ export type { RunRecord, RunStatus, StoredEvent } from "./trace/store";
 export {
   describeToolCall,
   failureExcerpt,
+  digestRun,
+  firstParagraph,
   isCommandTool,
+  testResultLine,
   toErrors,
   toLogLines,
+  toolKind,
+  toolPath,
+  type RunDigest,
+  type RunStage,
+  type ToolKind,
 } from "./trace/views";
 export type { LogLevel, LogLine, RunError } from "./trace/views";
 

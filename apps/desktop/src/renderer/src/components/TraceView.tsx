@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProjectRecord, RunListItem, StoredEvent } from "../../../shared/api";
 import { agentName } from "../agents";
 import { compact, ms, tokenParts } from "../format";
+import { outcomeOf } from "../outcome";
 import { Markdown } from "./Markdown";
-import { StatusPill } from "./Status";
 
 type Step = Extract<StoredEvent["event"], { type: "model.response" | "tool.result" }>;
 
@@ -15,7 +15,16 @@ const offset = (n: number, total: number) =>
     : `${Math.floor(n / 60_000)}:${String(Math.floor((n % 60_000) / 1000)).padStart(2, "0")}`;
 
 /** One run's trace: a timeline of every model turn and tool call, and its log. */
-export function TraceView({ runId, project }: { runId: string; project?: ProjectRecord }) {
+export function TraceView({
+  runId,
+  project,
+  embedded = false,
+}: {
+  runId: string;
+  project?: ProjectRecord;
+  /** Inside a run's Trace tab: no title header, the run screen already shows it. */
+  embedded?: boolean;
+}) {
   const api = window.helloagents;
   const [run, setRun] = useState<RunListItem | null>(null);
   const [events, setEvents] = useState<StoredEvent[]>([]);
@@ -47,7 +56,7 @@ export function TraceView({ runId, project }: { runId: string; project?: Project
 
   if (!run)
     return (
-      <div className="trace">
+      <div className={`trace ${embedded ? "embedded" : ""}`}>
         <p className="empty">Loading…</p>
       </div>
     );
@@ -62,21 +71,23 @@ export function TraceView({ runId, project }: { runId: string; project?: Project
   const failed = tools.filter((s) => s.event.type === "tool.result" && !s.event.ok).length;
   const turns = steps.filter((s) => s.event.type === "model.response").length;
   const tokens = tokenParts(run.usage);
-  const status = run.active ? "running" : run.status;
+  const outcome = outcomeOf(run);
 
   return (
-    <div className="trace">
-      <header className="trace-head">
-        <div className="trace-title">
-          <h2>{run.title}</h2>
-          <div className="run-meta mono">
-            <StatusPill status={status} />
-            {project ? <span>{project.name}</span> : null}
-            <span>{run.agent ? agentName(run.agent) : run.model}</span>
-            <span>{new Date(start).toLocaleString()}</span>
+    <div className={`trace ${embedded ? "embedded" : ""}`}>
+      {embedded ? null : (
+        <header className="trace-head">
+          <div className="trace-title">
+            <h2>{run.title}</h2>
+            <div className="run-meta mono">
+              <span className={`pill ${outcome.tone}`}>{outcome.label}</span>
+              {project ? <span>{project.name}</span> : null}
+              <span>{run.agent ? agentName(run.agent) : run.model}</span>
+              <span>{new Date(start).toLocaleString()}</span>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <dl className="stats">
         <div>

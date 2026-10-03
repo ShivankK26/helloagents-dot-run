@@ -147,3 +147,98 @@ export function toErrors(events: WithAgent[]): RunError[] {
   }
   return errors;
 }
+
+/** What a tool call does, for grouping activity and working out a run's stage. */
+export type ToolKind = "read" | "edit" | "command" | "other";
+
+export function toolKind(name: string): ToolKind {
+  if (/^(Read|Glob|Grep|LS|read_file|list_files|search_files)$/.test(name)) return "read";
+  if (/^(Edit|Write|MultiEdit|NotebookEdit|write_file|edit_file)$/.test(name)) return "edit";
+  if (isCommandTool(name)) return "command";
+  return "other";
+}
+
+/** The file a read or edit touched, when there is one. */
+export function toolPath(input: unknown): string | undefined {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const p = i.file_path ?? i.path ?? i.notebook_path;
+  return typeof p === "string" ? p : undefined;
+}
+
+const TEST_COMMAND =
+  /\b(test|tests|jest|vitest|pytest|mocha|ava|playwright|rspec|phpunit|unittest)\b|go test|cargo test/i;
+
+/** "14 passed", "1 failed · 13 passed", or a plain verdict when no counts are printed. */
+export function testResultLine(output: string, ok: boolean): string {
+  const count = (re: RegExp) => {
+    const all = [...output.matchAll(re)];
+    return all.length ? Number(all[all.length - 1]?.[1]) : undefined;
+  };
+  const passed = count(/(\d+)\s+(?:passed|passing)\b/gi);
+  const failed = count(/(\d+)\s+(?:failed|failing)\b/gi);
+  if (failed)
+    return passed !== undefined ? `${failed} failed · ${passed} passed` : `${failed} failed`;
+  if (passed !== undefined) return `${passed} passed`;
+  return ok ? "passed" : "failed";
+}
+
+/** The four plain stages shown while a run works. */
+export type RunStage = "read" | "edit" | "test" | "wrap";
+
+export interface RunDigest {
+  /** Distinct files the agent read. */
+  filesRead: number;
+  /** Distinct files the agent edited or created, in order. */
+  filesChanged: string[];
+  commands: number;
+  /** The last test command's result, if the agent ran tests. */
+  tests: { passed: boolean; line: string; command: string } | null;
+  /** Where a running agent is now: the most advanced stage it has reached. */
+  stage: RunStage;
+  /** The agent's last message: for a question, the answer. */
+  answer: string;
+}
+
+/** A small summary of a run, built from its events. */
+export function digestRun(events: WithAgent[]): RunDigest {
+  const read = new Set<string>();
+  const changed: string[] = [];
+  let commands = 0;
+  let tests: RunDigest["tests"] = null;
+  let stage: RunStage = "read";
+  let answer = "";
+  const rank: Record<RunStage, number> = { read: 0, edit: 1, test: 2, wrap: 3 };
+  const reach = (s: RunStage) => {
+    if (rank[s] > rank[stage]) stage = s;
+  };
+  for (const { event: e } of events) {
+    if (e.type === "agent.start") stage = "read"; // a follow-up starts over
+    if (e.type === "model.response" && e.text.trim()) answer = e.text.trim();
+    if (e.type !== "tool.result") continue;
+    const kind = toolKind(e.name);
+    const file = toolPath(e.input);
+    if (kind === "read" && file) read.add(file);
+    if (kind === "edit") {
+      if (file && !changed.includes(file)) changed.push(file);
+      reach("edit");
+    }
+    if (kind === "command") {
+      commands++;
+      const command = describeToolCall(e.name, e.input);
+      if (TEST_COMMAND.test(command)) {
+        tests = { passed: e.ok, line: testResultLine(e.output, e.ok), command };
+        reach("test");
+      }
+    }
+  }
+  return { filesRead: read.size, filesChanged: changed, commands, tests, stage, answer };
+}
+
+/** The first paragraph of an answer, without Markdown headings: what a summary shows first. */
+export function firstParagraph(text: string): string {
+  const blocks = text
+    .split(/\n\s*\n/)
+    .map((b) => b.trim())
+    .filter((b) => b && !/^(#{1,6}\s|```|\||[-*+]\s|\d+[.)]\s)/.test(b));
+  return (blocks[0] ?? text.trim()).replace(/\s*\n\s*/g, " ");
+}

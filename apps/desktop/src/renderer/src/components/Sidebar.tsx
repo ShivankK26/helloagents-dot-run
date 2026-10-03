@@ -10,8 +10,13 @@ const SECTIONS: Array<{ id: View; label: string; icon: "runs" | "trace" | "alert
   { id: "evals", label: "Evals", icon: "gauge" },
 ];
 
+/**
+ * A slim rail of icons that opens over the content while you hover it (or
+ * tab into it). "Keep open" pins it at full width.
+ */
 export function Sidebar({
-  collapsed,
+  pinned,
+  onTogglePin,
   view,
   onView,
   errorCount,
@@ -21,8 +26,8 @@ export function Sidebar({
   onSelect,
   onAdd,
 }: {
-  /** Icons only: a narrow rail that leaves more room for the work. */
-  collapsed: boolean;
+  pinned: boolean;
+  onTogglePin: () => void;
   view: View;
   onView: (view: View) => void;
   errorCount: number;
@@ -33,68 +38,71 @@ export function Sidebar({
   onAdd: () => void;
 }) {
   return (
-    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
-      <nav className="side-nav" aria-label="Sections">
+    <div className={`rail-slot ${pinned ? "pinned" : ""}`}>
+      <nav className="rail" aria-label="Sidebar">
         {SECTIONS.map((s) => (
           <button
             key={s.id}
-            className="nav-row"
+            className="r-row"
             aria-current={view === s.id ? "page" : undefined}
             onClick={() => onView(s.id)}
-            title={collapsed ? s.label : undefined}
-            aria-label={collapsed ? s.label : undefined}
+            title={s.label}
           >
             <Icon name={s.icon} />
-            <span className="side-text">{s.label}</span>
+            {s.id === "errors" && errorCount ? <i className="r-badge" aria-hidden="true" /> : null}
+            <span className="r-text">{s.label}</span>
             {s.id === "errors" && errorCount ? (
-              <span className="count bad">{errorCount}</span>
+              <small className="r-text">{errorCount}</small>
             ) : null}
-            {s.id === "evals" ? <span className="soon mono side-text">soon</span> : null}
+            {s.id === "evals" ? <small className="r-text">soon</small> : null}
           </button>
         ))}
-      </nav>
-      <div className="side-head">
-        <h2 className="section-label side-text">Projects</h2>
-        <button
-          className="icon-btn"
-          onClick={onAdd}
-          aria-label="Add a project"
-          title="Add a project"
-        >
-          <Icon name="plus" />
-        </button>
-      </div>
-      <ul className="project-list">
+
+        <div className="r-sep" />
+        <div className="r-label r-text">Projects</div>
         {projects.map((p) => (
-          <li key={p.id}>
-            <button
-              className="project-row"
-              aria-current={view === "runs" && selected === p.id}
-              onClick={() => onSelect(p.id)}
-              title={collapsed ? p.name : undefined}
-              aria-label={collapsed ? p.name : undefined}
-            >
-              <Icon name="folder" /> <span className="side-text">{p.name}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="side-foot">
-        <h2 className="section-label side-text">Agents</h2>
-        {agents.map((a) => (
-          <div
-            key={a.id}
-            className="agent-status"
-            title={`${a.name}: ${a.installed ? a.billing : a.installHint}`}
+          <button
+            key={p.id}
+            className="r-row"
+            aria-current={view === "runs" && selected === p.id ? "true" : undefined}
+            onClick={() => onSelect(p.id)}
+            title={p.name}
           >
-            <span className={`dot ${a.installed ? "ok" : ""}`} />
-            <span className="side-text">{a.name}</span>
-            <span className="mono muted side-text">
-              {a.installed ? (a.version ?? "") : "not installed"}
-            </span>
-          </div>
+            <Icon name="folder" />
+            <span className="r-text">{p.name}</span>
+          </button>
         ))}
-      </div>
-    </aside>
+        <button className="r-row" onClick={onAdd} title="Add a project">
+          <Icon name="plus" />
+          <span className="r-text">Add a project</span>
+        </button>
+
+        <div className="r-foot">
+          <button
+            className="r-row"
+            onClick={onTogglePin}
+            aria-pressed={pinned}
+            title={`${pinned ? "Let the sidebar close" : "Keep the sidebar open"} (⌘B)`}
+          >
+            <Icon name="pin" />
+            <span className="r-text">{pinned ? "Let it close" : "Keep open"}</span>
+            <small className="r-text">⌘B</small>
+          </button>
+          {agents.map((a) => (
+            <div
+              key={a.id}
+              className="r-row r-agent"
+              title={`${a.name}: ${a.installed ? a.billing : a.installHint}`}
+            >
+              <span className="r-dot">
+                <i className={`dot ${a.installed ? "ok" : ""}`} />
+              </span>
+              <span className="r-text">{a.name}</span>
+              <small className="r-text">{a.installed ? (a.version ?? "") : "not installed"}</small>
+            </div>
+          ))}
+        </div>
+      </nav>
+    </div>
   );
 }

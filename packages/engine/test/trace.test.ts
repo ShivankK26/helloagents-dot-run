@@ -4,6 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   describeToolCall,
+  digestRun,
+  firstParagraph,
   failureExcerpt,
   reply,
   runAgent,
@@ -300,5 +302,53 @@ describe("Claude Code tools", () => {
     expect(errors.map((e) => e.title)).toEqual(["npm test failed"]);
     expect(describeToolCall("Edit", { file_path: "src/a.ts" })).toBe("Edit src/a.ts");
     expect(describeToolCall("Grep", { pattern: "TODO" })).toBe("Grep TODO");
+  });
+});
+
+describe("digestRun", () => {
+  const tool = (name: string, input: unknown, ok = true, output = "") => ({
+    agentId: "main",
+    event: {
+      type: "tool.result" as const,
+      at: 1,
+      turn: 1,
+      id: name,
+      name,
+      input,
+      ok,
+      output,
+      durationMs: 1,
+    },
+  });
+  test("counts files, finds the last test result and the stage reached", () => {
+    const d = digestRun([
+      tool("Read", { file_path: "a.ts" }),
+      tool("Read", { file_path: "a.ts" }),
+      tool("Grep", { pattern: "x" }),
+      tool("Edit", { file_path: "a.ts" }),
+      tool("Write", { file_path: "a.test.ts" }),
+      tool("Bash", { command: "npm test" }, false, "Tests  1 failed | 13 passed (14)"),
+    ]);
+    expect(d).toMatchObject({
+      filesRead: 1,
+      filesChanged: ["a.ts", "a.test.ts"],
+      commands: 1,
+      stage: "test",
+    });
+    expect(d.tests).toEqual({ passed: false, line: "1 failed · 13 passed", command: "npm test" });
+  });
+
+  test("a question with no edits stays in the reading stage", () => {
+    expect(digestRun([tool("Bash", { command: "git log -5" })])).toMatchObject({
+      stage: "read",
+      tests: null,
+      commands: 1,
+    });
+  });
+
+  test("firstParagraph skips headings and lists", () => {
+    expect(
+      firstParagraph("## Overview\n\n**UGC Engine** makes videos.\nOne user.\n\n- a\n- b"),
+    ).toBe("**UGC Engine** makes videos. One user.");
   });
 });
