@@ -78,6 +78,19 @@ export type AgentEvent =
       sessionId?: string;
     };
 
+/** Which agent does the work: a connected CLI, or the built-in harness (needs an API key). */
+export type AgentId = "claude-code" | "codex" | "harness";
+
+export interface ProjectRecord {
+  id: string;
+  name: string;
+  /** Absolute path to the git repository. */
+  path: string;
+  workerAgent: AgentId;
+  plannerAgent: AgentId;
+  createdAt: number;
+}
+
 /** A coding-agent CLI the user can connect, detected on this machine. */
 export interface AgentProvider {
   id: "claude-code" | "codex";
@@ -87,4 +100,31 @@ export interface AgentProvider {
   /** How runs are paid for, in the user's words. */
   billing: string;
   installHint: string;
+}
+
+export type RunStatus = "running" | AgentStatus;
+
+export interface RunRecord {
+  id: string;
+  title: string;
+  workspace: string;
+  model: string;
+  status: RunStatus;
+  startedAt: number;
+  endedAt: number | null;
+  costUsd: number;
+  usage: TokenUsage;
+  summary: string | null;
+  error: string | null;
+  projectId: string | null;
+  agent: AgentId | null;
+  worktree: { path: string; branch: string; base: string } | null;
+}
+
+export interface StoredEvent {
+  seq: number;
+  runId: string;
+  /** Which agent emitted it. A single-agent run uses "main". */
+  agentId: string;
+  event: AgentEvent;
 }

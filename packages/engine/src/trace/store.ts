@@ -2,31 +2,16 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
-import type { AgentEvent, AgentStatus, TokenUsage } from "../types";
+import type {
+  AgentEvent,
+  AgentId,
+  ProjectRecord,
+  RunRecord,
+  RunStatus,
+  StoredEvent,
+} from "../types";
 
-export type RunStatus = "running" | AgentStatus;
-
-export interface RunRecord {
-  id: string;
-  title: string;
-  workspace: string;
-  model: string;
-  status: RunStatus;
-  startedAt: number;
-  endedAt: number | null;
-  costUsd: number;
-  usage: TokenUsage;
-  summary: string | null;
-  error: string | null;
-}
-
-export interface StoredEvent {
-  seq: number;
-  runId: string;
-  /** Which agent emitted it. A single-agent run uses "main". */
-  agentId: string;
-  event: AgentEvent;
-}
+export type { RunRecord, RunStatus, StoredEvent } from "../types";
 
 // Each entry upgrades the database by one version. Never edit an old entry;
 // add a new one, so existing databases upgrade cleanly.
@@ -57,6 +42,20 @@ const MIGRATIONS = [
    );
    CREATE INDEX events_by_run ON events(run_id, seq);
    CREATE INDEX runs_by_start ON runs(started_at DESC);`,
+  `CREATE TABLE projects (
+     id TEXT PRIMARY KEY,
+     name TEXT NOT NULL,
+     path TEXT NOT NULL UNIQUE,
+     worker_agent TEXT NOT NULL DEFAULT 'claude-code',
+     planner_agent TEXT NOT NULL DEFAULT 'claude-code',
+     created_at INTEGER NOT NULL
+   );
+   ALTER TABLE runs ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE CASCADE;
+   ALTER TABLE runs ADD COLUMN agent TEXT;
+   ALTER TABLE runs ADD COLUMN worktree_path TEXT;
+   ALTER TABLE runs ADD COLUMN branch TEXT;
+   ALTER TABLE runs ADD COLUMN base_commit TEXT;
+   CREATE INDEX runs_by_project ON runs(project_id, started_at DESC);`,
 ];
 
 /** Saves runs and their events to a local SQLite file. */
@@ -97,12 +96,94 @@ export class TraceStore {
     model: string;
     id?: string;
     startedAt?: number;
+    projectId?: string;
+    agent?: AgentId;
+    worktree?: { path: string; branch: string; base: string };
   }): string {
     const id = input.id ?? randomUUID();
     this.db
-      .prepare("INSERT INTO runs (id, title, workspace, model, started_at) VALUES (?, ?, ?, ?, ?)")
-      .run(id, input.title, input.workspace, input.model, input.startedAt ?? Date.now());
+      .prepare(
+        `INSERT INTO runs (id, title, workspace, model, started_at, project_id, agent, worktree_path, branch, base_commit)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        input.title,
+        input.workspace,
+        input.model,
+        input.startedAt ?? Date.now(),
+        input.projectId ?? null,
+        input.agent ?? null,
+        input.worktree?.path ?? null,
+        input.worktree?.branch ?? null,
+        input.worktree?.base ?? null,
+      );
     return id;
+  }
+
+  /** Marks a run as failed before any agent event, e.g. when its worktree couldn't be created. */
+  failRun(id: string, summary: string, error: string): void {
+    this.db
+      .prepare(
+        "UPDATE runs SET status = 'error', ended_at = ?, summary = ?, error = ? WHERE id = ?",
+      )
+      .run(Date.now(), summary, error, id);
+  }
+
+  addProject(input: {
+    name: string;
+    path: string;
+    workerAgent?: AgentId;
+    plannerAgent?: AgentId;
+  }): ProjectRecord {
+    const existing = this.db
+      .prepare("SELECT * FROM projects WHERE path = ?")
+      .get(input.path) as unknown as ProjectRow | undefined;
+    if (existing) return toProject(existing);
+    const id = randomUUID();
+    this.db
+      .prepare(
+        "INSERT INTO projects (id, name, path, worker_agent, planner_agent, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      )
+      .run(
+        id,
+        input.name,
+        input.path,
+        input.workerAgent ?? "claude-code",
+        input.plannerAgent ?? "claude-code",
+        Date.now(),
+      );
+    return this.getProject(id) as ProjectRecord;
+  }
+
+  listProjects(): ProjectRecord[] {
+    return (
+      this.db.prepare("SELECT * FROM projects ORDER BY created_at").all() as unknown as ProjectRow[]
+    ).map(toProject);
+  }
+
+  getProject(id: string): ProjectRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM projects WHERE id = ?").get(id) as unknown as
+      ProjectRow | undefined;
+    return row && toProject(row);
+  }
+
+  updateProjectAgents(id: string, agents: { workerAgent: AgentId; plannerAgent: AgentId }): void {
+    this.db
+      .prepare("UPDATE projects SET worker_agent = ?, planner_agent = ? WHERE id = ?")
+      .run(agents.workerAgent, agents.plannerAgent, id);
+  }
+
+  removeProject(id: string): void {
+    this.db.prepare("DELETE FROM projects WHERE id = ?").run(id);
+  }
+
+  listProjectRuns(projectId: string, limit = 100): RunRecord[] {
+    return (
+      this.db
+        .prepare("SELECT * FROM runs WHERE project_id = ? ORDER BY started_at DESC LIMIT ?")
+        .all(projectId, limit) as unknown as RunRow[]
+    ).map(toRun);
   }
 
   /** Appends one event. An agent.end on the main agent also closes the run. */
@@ -187,6 +268,26 @@ export class TraceStore {
   }
 }
 
+interface ProjectRow {
+  id: string;
+  name: string;
+  path: string;
+  worker_agent: AgentId;
+  planner_agent: AgentId;
+  created_at: number;
+}
+
+function toProject(r: ProjectRow): ProjectRecord {
+  return {
+    id: r.id,
+    name: r.name,
+    path: r.path,
+    workerAgent: r.worker_agent,
+    plannerAgent: r.planner_agent,
+    createdAt: r.created_at,
+  };
+}
+
 interface RunRow {
   id: string;
   title: string;
@@ -202,6 +303,11 @@ interface RunRow {
   cache_write_tokens: number;
   summary: string | null;
   error: string | null;
+  project_id: string | null;
+  agent: AgentId | null;
+  worktree_path: string | null;
+  branch: string | null;
+  base_commit: string | null;
 }
 
 interface EventRow {
@@ -229,5 +335,11 @@ function toRun(r: RunRow): RunRecord {
     },
     summary: r.summary,
     error: r.error,
+    projectId: r.project_id,
+    agent: r.agent,
+    worktree:
+      r.worktree_path && r.branch && r.base_commit
+        ? { path: r.worktree_path, branch: r.branch, base: r.base_commit }
+        : null,
   };
 }

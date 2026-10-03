@@ -27,6 +27,7 @@ out({
   tools: ["Read", "Edit", "Bash"],
 });
 out({ type: "system", subtype: "commands_changed", commands: [] });
+if (mode === "slow") await new Promise((r) => setTimeout(r, 20000));
 out({
   type: "assistant",
   message: {

@@ -31,3 +31,5 @@ export {
   worktreeDiff,
 } from "./git/worktree";
 export type { Worktree } from "./git/worktree";
+export { RunManager } from "./runs/manager";
+export type { RunManagerOptions } from "./runs/manager";

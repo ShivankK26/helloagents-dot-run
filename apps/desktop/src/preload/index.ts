@@ -1,10 +1,33 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { IPC, type HelloagentsApi } from "../shared/api";
 
 // The only bridge between the window and the machine. Add functions here
 // deliberately; never expose ipcRenderer itself.
+const invoke = (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args);
+
 const api: HelloagentsApi = {
-  getInfo: () => ipcRenderer.invoke(IPC.getInfo),
+  getInfo: () => invoke(IPC.getInfo),
+  detectAgents: () => invoke(IPC.detectAgents),
+  chooseFolder: () => invoke(IPC.chooseFolder),
+  inspectFolder: (path) => invoke(IPC.inspectFolder, path),
+  cloneRepo: (url) => invoke(IPC.cloneRepo, url),
+  listProjects: () => invoke(IPC.listProjects),
+  addProject: (input) => invoke(IPC.addProject, input),
+  updateProjectAgents: (id, agents) => invoke(IPC.updateProjectAgents, id, agents),
+  removeProject: (id) => invoke(IPC.removeProject, id),
+  listRuns: (projectId) => invoke(IPC.listRuns, projectId),
+  getRun: (runId) => invoke(IPC.getRun, runId),
+  startRun: (projectId, task) => invoke(IPC.startRun, projectId, task),
+  cancelRun: (runId) => invoke(IPC.cancelRun, runId),
+  discardRun: (runId) => invoke(IPC.discardRun, runId),
+  runEvents: (runId, afterSeq) => invoke(IPC.runEvents, runId, afterSeq),
+  runDiff: (runId) => invoke(IPC.runDiff, runId),
+  revealInFinder: (path) => invoke(IPC.revealInFinder, path),
+  onRunChanged: (listener) => {
+    const handler = (_event: IpcRendererEvent, runId: string) => listener(runId);
+    ipcRenderer.on(IPC.runChanged, handler);
+    return () => ipcRenderer.removeListener(IPC.runChanged, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld("helloagents", api);
