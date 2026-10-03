@@ -1,15 +1,19 @@
 <!doctype html><html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600&family=IBM+Plex+Mono:wght@500&family=Silkscreen&display=swap" rel="stylesheet">
 <style>
-  html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#f3f4f6;color:#111316;font-family:"IBM Plex Sans",sans-serif}
-  .wrap{position:absolute;inset:70px 80px;display:flex;flex-direction:column}
-  .lock{display:flex;align-items:center;gap:16px;font-weight:700;font-size:34px;letter-spacing:-.01em}
-  h1{margin:auto 0 0;font-size:78px;line-height:1.02;letter-spacing:-.04em;font-weight:700;max-width:13em}
-  h1 span{color:#8d939c}
-  .row{margin-top:40px;display:flex;align-items:center;gap:22px;font:500 24px "IBM Plex Mono",monospace;color:#59606a}
-  .strip{display:flex;gap:6px}.strip i{width:34px;height:12px;border-radius:3px}
+  html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#f4f2eb;color:#14161a;font-family:Geist,sans-serif}
+  .wrap{position:absolute;inset:64px 80px;display:flex;flex-direction:column}
+  .lock{display:flex;align-items:center;gap:14px;font-weight:600;font-size:30px;letter-spacing:-.01em}
+  h1{margin:auto 0 0;font-size:112px;line-height:.95;letter-spacing:-.055em;font-weight:600}
+  h1 span{font-family:Silkscreen,monospace;font-weight:400;color:#ef5b2b;font-size:.86em;letter-spacing:-.02em}
+  .row{margin-top:34px;display:flex;align-items:center;gap:20px;font:500 22px "IBM Plex Mono",monospace;color:#3d4149}
+  .strip{display:flex;gap:6px}.strip i{width:32px;height:11px;border-radius:3px}
+  .card{position:absolute;right:0;top:40px;width:330px;background:#fbfaf6;border:1px solid #dedad0;border-radius:16px;padding:20px 22px;transform:rotate(4deg);box-shadow:0 30px 60px -30px rgba(20,22,26,.35)}
+  .card small{font:500 13px "IBM Plex Mono",monospace;letter-spacing:.12em;color:#6b6f76;text-transform:uppercase}
+  .card b{display:block;font-size:22px;margin-top:6px}.card p{margin:6px 0 0;color:#6b6f76;font-size:16px}
 </style></head><body><div class="wrap">
-  <div class="lock"><svg width="56" height="56" viewBox="0 0 32 32"><path d="M9 4h14a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H13.5L8 28.2V24H9a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6Z" fill="#111316"/><path d="m10 10.2 4.3 3.8-4.3 3.8" stroke="#f3f4f6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="16.6" y="16.4" width="6.4" height="2.8" rx="1.4" fill="#ff7a3d"/></svg>helloagents</div>
-  <h1>Many coding agents. <span>One change you can trust.</span></h1>
-  <div class="row"><span class="strip"><i style="background:#1d8a4c"></i><i style="background:#e4572a"></i><i style="background:#1d8a4c"></i></span>open-source desktop app · traces, logs and evals built in</div>
+  <div class="lock"><svg width="50" height="50" viewBox="0 0 32 32"><path d="M9 4h14a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H13.5L8 28.2V24H9a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6Z" fill="#14161a"/><path d="m10 10.2 4.3 3.8-4.3 3.8" stroke="#f4f2eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="16.6" y="16.4" width="6.4" height="2.8" rx="1.4" fill="#ff7a3d"/></svg>helloagents</div>
+  <div class="card"><small>trace · claude-code-1</small><b>2 tests failed</b><p>Sent back to the agent that wrote the code.</p></div>
+  <h1>Many agents.<br>One <span>merge.</span></h1>
+  <div class="row"><span class="strip"><i style="background:#1f8a4f"></i><i style="background:#ef5b2b"></i><i style="background:#1f8a4f"></i></span>open-source desktop app for coding agents</div>
 </div></body></html>
