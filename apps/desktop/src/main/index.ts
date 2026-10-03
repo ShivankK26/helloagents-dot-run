@@ -108,6 +108,7 @@ app.whenReady().then(async () => {
   // HELLOAGENTS_DATA_DIR keeps demos and tests away from real data.
   const dataDir = process.env.HELLOAGENTS_DATA_DIR ?? app.getPath("userData");
   const store = new TraceStore(path.join(dataDir, "helloagents.db"));
+  store.closeInterruptedRuns();
   const manager = new RunManager({
     store,
     worktreesRoot: path.join(dataDir, "worktrees"),

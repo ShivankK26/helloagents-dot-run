@@ -186,6 +186,20 @@ export class TraceStore {
     ).map(toRun);
   }
 
+  /**
+   * Runs still marked "running" when the app starts were cut off when it last
+   * closed. Marks them stopped so they don't look stuck or failed.
+   */
+  closeInterruptedRuns(): number {
+    const result = this.db
+      .prepare(
+        `UPDATE runs SET status = 'cancelled', ended_at = COALESCE(ended_at, ?),
+           summary = COALESCE(summary, 'Stopped when helloagents closed.') WHERE status = 'running'`,
+      )
+      .run(Date.now());
+    return Number(result.changes);
+  }
+
   /** Marks a finished run as running again, for a follow-up in the same session. */
   reopenRun(id: string): void {
     this.db

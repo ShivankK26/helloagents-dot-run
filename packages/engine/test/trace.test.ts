@@ -352,3 +352,17 @@ describe("digestRun", () => {
     ).toBe("**UGC Engine** makes videos. One user.");
   });
 });
+
+describe("closeInterruptedRuns", () => {
+  test("marks runs left running by a closed app as stopped", () => {
+    const store = new TraceStore(":memory:");
+    const id = store.createRun({ title: "x", workspace: "/tmp", model: "m" });
+    expect(store.closeInterruptedRuns()).toBe(1);
+    expect(store.getRun(id)).toMatchObject({
+      status: "cancelled",
+      summary: "Stopped when helloagents closed.",
+    });
+    expect(store.closeInterruptedRuns()).toBe(0);
+    store.close();
+  });
+});
