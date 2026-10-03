@@ -18,3 +18,10 @@ export async function workspace(files: Record<string, string> = {}): Promise<str
   }
   return dir;
 }
+
+/** An empty temp folder, removed after the test. */
+export async function tempDir(): Promise<string> {
+  const dir = await mkdtemp(path.join(tmpdir(), "helloagents-tmp-"));
+  dirs.push(dir);
+  return dir;
+}

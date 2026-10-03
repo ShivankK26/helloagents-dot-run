@@ -17,3 +17,17 @@ export { TraceStore } from "./trace/store";
 export type { RunRecord, RunStatus, StoredEvent } from "./trace/store";
 export { describeToolCall, failureExcerpt, toErrors, toLogLines } from "./trace/views";
 export type { LogLevel, LogLine, RunError } from "./trace/views";
+
+export { claudeArgs, DEFAULT_CLAUDE_TOOLS, runClaudeCode } from "./workers/claude-code";
+export type { ClaudeCodeOptions, ClaudeCodeResult } from "./workers/claude-code";
+export { detectAgents } from "./workers/detect";
+export {
+  cloneRepo,
+  createWorktree,
+  findChildRepos,
+  git,
+  isGitRepo,
+  removeWorktree,
+  worktreeDiff,
+} from "./git/worktree";
+export type { Worktree } from "./git/worktree";

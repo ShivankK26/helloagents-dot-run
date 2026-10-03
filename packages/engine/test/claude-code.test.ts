@@ -1,0 +1,138 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterEach, describe, expect, test } from "vitest";
+import { claudeArgs, runClaudeCode, type AgentEvent } from "../src/index";
+import { tempDir, workspace } from "./helpers";
+
+const FAKE = fileURLToPath(new URL("./fixtures/fake-claude.mjs", import.meta.url));
+afterEach(() => {
+  delete process.env.FAKE_CLAUDE_MODE;
+  delete process.env.FAKE_CLAUDE_ARGS_FILE;
+});
+
+async function run(mode = "success", extra: Partial<Parameters<typeof runClaudeCode>[0]> = {}) {
+  process.env.FAKE_CLAUDE_MODE = mode;
+  const ws = await workspace({ "math.js": "export const add = (a, b) => a - b;\n" });
+  const events: AgentEvent[] = [];
+  const result = await runClaudeCode({
+    task: "Fix add()",
+    workspace: ws,
+    claudePath: FAKE,
+    onEvent: (e) => events.push(e),
+    ...extra,
+  });
+  return { ws, events, result };
+}
+
+describe("claudeArgs", () => {
+  test("runs headless with streamed JSON, auto-accepted edits and no prompts", () => {
+    const args = claudeArgs({ task: "Fix it" });
+    expect(args.slice(0, 2)).toEqual(["-p", "Fix it"]);
+    expect(args).toEqual(
+      expect.arrayContaining([
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-mode",
+        "acceptEdits",
+        "--permission-prompts",
+        "none",
+      ]),
+    );
+    expect(args[args.indexOf("--allowedTools") + 1]).toContain("Bash(npm *)");
+    expect(args).not.toContain("--bare"); // bare mode would skip the user's Claude login
+  });
+
+  test("resumes a session to send feedback, and can cap turns", () => {
+    const args = claudeArgs({ task: "2 tests failed", resumeSessionId: "abc", maxTurns: 20 });
+    expect(args.slice(-4)).toEqual(["--max-turns", "20", "--resume", "abc"]);
+  });
+});
+
+describe("runClaudeCode", () => {
+  test("turns Claude Code's stream into harness events", async () => {
+    const { events, result, ws } = await run();
+    expect(events.map((e) => (e.type === "tool.result" ? `${e.name}:${e.ok}` : e.type))).toEqual([
+      "agent.start",
+      "model.response",
+      "Edit:true",
+      "model.response",
+      "Bash:true",
+      "agent.end",
+    ]);
+    expect(events[0]).toMatchObject({
+      type: "agent.start",
+      model: "claude-opus-5-5[1m]",
+      sessionId: "11111111-2222-3333-4444-555555555555",
+    });
+    expect(events[1]).toMatchObject({
+      type: "model.response",
+      turn: 1,
+      text: "I'll fix add() in math.js.",
+      toolCalls: [{ name: "Edit" }],
+    });
+    expect(events[4]).toMatchObject({
+      type: "tool.result",
+      output: "3 tests passed",
+      input: { command: "npm test" },
+    });
+    expect(result).toMatchObject({
+      status: "done",
+      summary: "Fixed add() and the tests pass.",
+      turns: 2,
+      costUsd: 0.42,
+      sessionId: "11111111-2222-3333-4444-555555555555",
+    });
+    expect(result.usage).toEqual({
+      inputTokens: 8,
+      outputTokens: 60,
+      cacheReadTokens: 19200,
+      cacheWriteTokens: 1200,
+    });
+    expect(await readFile(path.join(ws, "math.js"), "utf8")).toContain("fixed by fake claude");
+  });
+
+  test("runs in the given workspace", async () => {
+    const { events, ws } = await run();
+    expect(events[0]).toMatchObject({ workspace: ws });
+  });
+
+  test("marks failed tool results", async () => {
+    const { events } = await run("fail");
+    expect(events.find((e) => e.type === "tool.result" && e.name === "Bash")).toMatchObject({
+      ok: false,
+      output: "1 test failed",
+    });
+  });
+
+  test("reports an error result with its subtype", async () => {
+    const { result } = await run("error");
+    expect(result).toMatchObject({ status: "budget", error: "error_max_turns" });
+  });
+
+  test("explains a crash using the end of stderr", async () => {
+    const { result } = await run("crash");
+    expect(result.status).toBe("error");
+    expect(result.error).toMatch(/exit code 1\nError: Invalid API key/);
+  });
+
+  test("explains a missing CLI", async () => {
+    const ws = await tempDir();
+    const result = await runClaudeCode({ task: "x", workspace: ws, claudePath: "/nope/claude" });
+    expect(result).toMatchObject({
+      status: "error",
+      error: expect.stringMatching(/isn't installed/),
+    });
+  });
+
+  test("passes the resume id through to the CLI", async () => {
+    const argsFile = path.join(await tempDir(), "args.json");
+    process.env.FAKE_CLAUDE_ARGS_FILE = argsFile;
+    const { result } = await run("success", { resumeSessionId: "resume-me" });
+    expect(JSON.parse(await readFile(argsFile, "utf8"))).toEqual(
+      expect.arrayContaining(["--resume", "resume-me"]),
+    );
+    expect(result.sessionId).toBe("resume-me");
+  });
+});

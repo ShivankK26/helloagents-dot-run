@@ -33,7 +33,15 @@ export interface ToolCall {
 
 /** Everything an agent does, in order. Traces, logs and the UI are built from these. */
 export type AgentEvent =
-  | { type: "agent.start"; at: number; task: string; model: string; workspace: string }
+  | {
+      type: "agent.start";
+      at: number;
+      task: string;
+      model: string;
+      workspace: string;
+      /** Set by workers that keep a resumable session (Claude Code). */
+      sessionId?: string;
+    }
   | {
       type: "model.response";
       at: number;
@@ -67,4 +75,16 @@ export type AgentEvent =
       usage: TokenUsage;
       costUsd: number;
       error?: string;
+      sessionId?: string;
     };
+
+/** A coding-agent CLI the user can connect, detected on this machine. */
+export interface AgentProvider {
+  id: "claude-code" | "codex";
+  name: string;
+  installed: boolean;
+  version?: string;
+  /** How runs are paid for, in the user's words. */
+  billing: string;
+  installHint: string;
+}
