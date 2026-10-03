@@ -8,7 +8,10 @@ import { ProjectView } from "./components/ProjectView";
 import { Sidebar, type View } from "./components/Sidebar";
 import { TracesPage } from "./components/TracesPage";
 import { Welcome } from "./components/Welcome";
+import { Icon } from "./components/Icons";
 import { Logo } from "./Logo";
+
+const COLLAPSED_KEY = "helloagents.sidebarCollapsed";
 
 export function App() {
   const api = window.helloagents;
@@ -20,6 +23,15 @@ export function App() {
   const [view, setView] = useState<View>("runs");
   const [traceRun, setTraceRun] = useState<string>();
   const [errorCount, setErrorCount] = useState(0);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === "1");
+  const toggleSidebar = useCallback(
+    () =>
+      setCollapsed((c) => {
+        localStorage.setItem(COLLAPSED_KEY, c ? "0" : "1");
+        return !c;
+      }),
+    [],
+  );
 
   const loadProjects = useCallback(
     () =>
@@ -36,6 +48,18 @@ export function App() {
     void loadProjects();
   }, [api, loadProjects]);
 
+  // ⌘B / Ctrl+B shows or hides the sidebar, as in most editors.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleSidebar]);
+
   useEffect(() => {
     const count = () => void api.listErrors().then((list) => setErrorCount(list.length));
     count();
@@ -48,6 +72,17 @@ export function App() {
   return (
     <div className="app">
       <header className="titlebar">
+        {projects && projects.length > 0 ? (
+          <button
+            className="icon-btn titlebar-btn"
+            onClick={toggleSidebar}
+            aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
+            aria-pressed={!collapsed}
+            title={`${collapsed ? "Show" : "Hide"} sidebar (⌘B)`}
+          >
+            <Icon name="sidebar" />
+          </button>
+        ) : null}
         <div className="brand">
           <Logo size={20} /> helloagents
         </div>
@@ -56,6 +91,7 @@ export function App() {
         {projects && projects.length > 0 ? (
           <>
             <Sidebar
+              collapsed={collapsed}
               view={view}
               onView={(v) => {
                 setTraceRun(undefined);

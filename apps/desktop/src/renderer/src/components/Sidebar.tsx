@@ -11,6 +11,7 @@ const SECTIONS: Array<{ id: View; label: string; icon: "runs" | "trace" | "alert
 ];
 
 export function Sidebar({
+  collapsed,
   view,
   onView,
   errorCount,
@@ -20,6 +21,8 @@ export function Sidebar({
   onSelect,
   onAdd,
 }: {
+  /** Icons only: a narrow rail that leaves more room for the work. */
+  collapsed: boolean;
   view: View;
   onView: (view: View) => void;
   errorCount: number;
@@ -30,7 +33,7 @@ export function Sidebar({
   onAdd: () => void;
 }) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       <nav className="side-nav" aria-label="Sections">
         {SECTIONS.map((s) => (
           <button
@@ -38,18 +41,20 @@ export function Sidebar({
             className="nav-row"
             aria-current={view === s.id ? "page" : undefined}
             onClick={() => onView(s.id)}
+            title={collapsed ? s.label : undefined}
+            aria-label={collapsed ? s.label : undefined}
           >
             <Icon name={s.icon} />
-            <span>{s.label}</span>
+            <span className="side-text">{s.label}</span>
             {s.id === "errors" && errorCount ? (
               <span className="count bad">{errorCount}</span>
             ) : null}
-            {s.id === "evals" ? <span className="soon mono">soon</span> : null}
+            {s.id === "evals" ? <span className="soon mono side-text">soon</span> : null}
           </button>
         ))}
       </nav>
       <div className="side-head">
-        <h2 className="section-label">Projects</h2>
+        <h2 className="section-label side-text">Projects</h2>
         <button
           className="icon-btn"
           onClick={onAdd}
@@ -66,19 +71,27 @@ export function Sidebar({
               className="project-row"
               aria-current={view === "runs" && selected === p.id}
               onClick={() => onSelect(p.id)}
+              title={collapsed ? p.name : undefined}
+              aria-label={collapsed ? p.name : undefined}
             >
-              <Icon name="folder" /> <span>{p.name}</span>
+              <Icon name="folder" /> <span className="side-text">{p.name}</span>
             </button>
           </li>
         ))}
       </ul>
       <div className="side-foot">
-        <h2 className="section-label">Agents</h2>
+        <h2 className="section-label side-text">Agents</h2>
         {agents.map((a) => (
-          <div key={a.id} className="agent-status" title={a.installed ? a.billing : a.installHint}>
+          <div
+            key={a.id}
+            className="agent-status"
+            title={`${a.name}: ${a.installed ? a.billing : a.installHint}`}
+          >
             <span className={`dot ${a.installed ? "ok" : ""}`} />
-            <span>{a.name}</span>
-            <span className="mono muted">{a.installed ? (a.version ?? "") : "not installed"}</span>
+            <span className="side-text">{a.name}</span>
+            <span className="mono muted side-text">
+              {a.installed ? (a.version ?? "") : "not installed"}
+            </span>
           </div>
         ))}
       </div>

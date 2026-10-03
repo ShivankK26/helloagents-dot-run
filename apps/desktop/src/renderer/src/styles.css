@@ -134,6 +134,12 @@ kbd {
   background: var(--surface);
   flex-shrink: 0;
 }
+.titlebar {
+  gap: 10px;
+}
+.titlebar-btn {
+  -webkit-app-region: no-drag;
+}
 .brand {
   display: flex;
   align-items: center;
@@ -302,6 +308,46 @@ kbd {
   flex-direction: column;
   padding: 12px 10px;
   gap: 6px;
+}
+.sidebar {
+  transition: width 0.18s ease;
+}
+/* Collapsed: a 56px rail of icons; names show as tooltips. */
+.sidebar.collapsed {
+  width: 56px;
+  padding-inline: 8px;
+}
+.sidebar.collapsed .side-text,
+.sidebar.collapsed .nav-row .count {
+  display: none;
+}
+.sidebar.collapsed .nav-row,
+.sidebar.collapsed .project-row {
+  justify-content: center;
+  padding-inline: 0;
+  position: relative;
+}
+.sidebar.collapsed .side-head {
+  justify-content: center;
+  padding: 0;
+}
+.sidebar.collapsed .side-foot {
+  padding-inline: 0;
+  align-items: center;
+}
+.sidebar.collapsed .agent-status {
+  justify-content: center;
+}
+/* Keep a hint of the error count on the rail. */
+.sidebar.collapsed .nav-row:has(.count)::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 9px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bad);
 }
 .side-head {
   display: flex;

@@ -1,26 +1,202 @@
-<!doctype html><html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600&family=Geist+Mono:wght@500&display=swap" rel="stylesheet">
-<style>
-  html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#f6f6f2;color:#101214;font-family:Geist,sans-serif}
-  .lock{position:absolute;left:80px;top:64px;display:flex;align-items:center;gap:14px;font-weight:600;font-size:30px;letter-spacing:-.01em}
-  h1{position:absolute;left:80px;bottom:120px;margin:0;font-size:96px;line-height:.98;letter-spacing:-.05em;font-weight:600;width:600px}
-  h1 i{display:inline-block;width:.42em;height:.16em;background:#f25a24;border-radius:.04em;margin-left:.08em}
-  .tag{position:absolute;left:80px;bottom:64px;font:500 20px "Geist Mono",monospace;color:#6b6f75}
-  svg.g{position:absolute;right:56px;top:130px}
-</style></head><body>
-  <div class="lock"><svg width="48" height="48" viewBox="0 0 32 32"><path d="M5 7.5c8 0 8 8.5 14 8.5M5 24.5c8 0 8-8.5 14-8.5M5 16h14" fill="none" stroke="#101214" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24.5" cy="16" r="4.2" fill="#f25a24"/></svg>helloagents</div>
-  <svg class="g" width="470" height="380" viewBox="0 0 470 380">
-    <g fill="none" stroke="#101214" stroke-width="3" stroke-opacity=".55">
-      <path d="M40 330 C90 330 90 70 140 70 H330 C380 70 380 330 420 330"/>
-      <path d="M40 330 C90 330 90 170 140 170 H330 C380 170 380 330 420 330"/>
-      <path d="M40 330 C90 330 90 260 140 260 H330 C380 260 380 330 420 330"/>
-    </g>
-    <path d="M10 330 H460" stroke="#101214" stroke-width="4"/>
-    <circle cx="190" cy="70" r="9" fill="#fff" stroke="#101214" stroke-width="3"/><circle cx="280" cy="70" r="9" fill="#18834a"/>
-    <circle cx="190" cy="170" r="9" fill="#fff" stroke="#101214" stroke-width="3"/><circle cx="240" cy="170" r="9" fill="#d23b2b"/><circle cx="300" cy="170" r="9" fill="#18834a"/>
-    <circle cx="190" cy="260" r="9" fill="#fff" stroke="#101214" stroke-width="3"/><circle cx="270" cy="260" r="9" fill="#18834a"/>
-    <circle cx="420" cy="330" r="15" fill="#fde6dc" stroke="#f25a24" stroke-width="3"/>
-  </svg>
-  <h1>Hand off the task. Merge the result.<i></i></h1>
-  <div class="tag">open-source desktop app for coding agents</div>
-</body></html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- Source for apps/web/public/og-image.png (1200×630), the link preview. Matches the landing page hero. -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #f6f6f2;
+        color: #101214;
+        font-family: Geist, sans-serif;
+      }
+      .left {
+        position: absolute;
+        left: 72px;
+        top: 64px;
+        bottom: 64px;
+        width: 520px;
+        display: flex;
+        flex-direction: column;
+      }
+      .lock {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 600;
+        font-size: 28px;
+        letter-spacing: -0.015em;
+      }
+      h1 {
+        margin: auto 0 22px;
+        font-size: 74px;
+        line-height: 0.98;
+        letter-spacing: -0.045em;
+        font-weight: 600;
+      }
+      h1 em {
+        font-style: normal;
+        color: #f25a24;
+      }
+      .sub {
+        font-size: 24px;
+        line-height: 1.4;
+        color: #5b6068;
+      }
+      .chips {
+        display: flex;
+        gap: 10px;
+        margin-top: 26px;
+      }
+      .chip {
+        font: 500 16px "Geist Mono", monospace;
+        color: #30343a;
+        background: #fff;
+        border: 1px solid #e4e4de;
+        border-radius: 999px;
+        padding: 6px 14px;
+      }
+      /* A slice of the app, like the landing page picture. */
+      .window {
+        position: absolute;
+        left: 640px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 500px;
+        border-radius: 18px;
+        border: 1px solid #d9d9d2;
+        background: #fff;
+        box-shadow:
+          0 40px 80px -30px rgb(16 18 20 / 0.3),
+          0 10px 24px -12px rgb(16 18 20 / 0.14);
+        overflow: hidden;
+        font-size: 17px;
+      }
+      .bar {
+        height: 46px;
+        border-bottom: 1px solid #e4e4de;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 0 18px;
+      }
+      .bar i {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #e4e4df;
+      }
+      .body {
+        padding: 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .title {
+        font-weight: 600;
+        font-size: 20px;
+      }
+      .meta {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        font: 15px "Geist Mono", monospace;
+        color: #8d929a;
+        margin-top: -6px;
+      }
+      .pill {
+        font-weight: 500;
+        background: #fde6dc;
+        color: #f25a24;
+        border-radius: 999px;
+        padding: 2px 10px;
+      }
+      .say {
+        line-height: 1.45;
+      }
+      .step {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font: 16px "Geist Mono", monospace;
+        color: #5b6068;
+      }
+      .tick {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: #e3f3e9;
+        color: #1b8a4b;
+        font-size: 12px;
+      }
+      .working {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+        color: #8d929a;
+      }
+      .spin {
+        width: 18px;
+        height: 18px;
+        border: 2.5px solid #cfd3d9;
+        border-top-color: #f25a24;
+        border-radius: 50%;
+      }
+      .step em {
+        font-style: normal;
+        color: #1b8a4b;
+        margin-left: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="left">
+      <div class="lock">
+        <svg width="40" height="40" viewBox="0 0 32 32">
+          <path
+            d="M5 7.5c8 0 8 8.5 14 8.5M5 24.5c8 0 8-8.5 14-8.5M5 16h14"
+            fill="none"
+            stroke="#101214"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <circle cx="24.5" cy="16" r="4.2" fill="#f25a24" />
+        </svg>
+        helloagents
+      </div>
+      <h1>Hand off the task. Merge the <em>result.</em></h1>
+      <p class="sub">Claude Code works on its own copy of your project. You merge when it looks right.</p>
+      <div class="chips">
+        <span class="chip">Free</span>
+        <span class="chip">Mac app</span>
+        <span class="chip">No API key</span>
+      </div>
+    </div>
+
+    <div class="window">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="body">
+        <div class="title">Add rate limiting to uploads</div>
+        <div class="meta"><span class="pill">Working</span><span>Claude Code</span><span>1m 42s</span></div>
+        <div class="say">I'll add a limit of 10 uploads a minute per user, then cover it with a test.</div>
+        <div class="step"><span class="tick">✓</span> Read src/upload.ts</div>
+        <div class="step"><span class="tick">✓</span> Edit src/upload.ts</div>
+        <div class="step"><span class="tick">✓</span> Write test/upload.test.ts</div>
+        <div class="step"><span class="tick">✓</span> npm test <em>14 passed</em></div>
+        <div class="working"><span class="spin"></span> Checking the change one more time…</div>
+      </div>
+    </div>
+  </body>
+</html>
