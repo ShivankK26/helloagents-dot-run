@@ -27,7 +27,7 @@ function createWindow(): BrowserWindow {
     minWidth: 940,
     minHeight: 600,
     title: "helloagents",
-    icon: APP_ICON,
+    ...(!app.isPackaged && { icon: APP_ICON }),
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#0f1012" : "#f3f4f6",
     ...(isMac && { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 18 } }),
@@ -83,7 +83,7 @@ function captureAndQuit(w: BrowserWindow, file: string): void {
 }
 
 app.whenReady().then(async () => {
-  if (isMac) app.dock?.setIcon(APP_ICON);
+  if (isMac && !app.isPackaged) app.dock?.setIcon(APP_ICON);
   // Finder-launched apps get a minimal PATH; use the login shell's instead.
   const shellPath = await loadShellPath();
   if (shellPath) process.env.PATH = shellPath;

@@ -4,5 +4,8 @@ packages:
 
 # Packages whose install scripts may run.
 allowBuilds:
-  electron: set this to true or false
+  # The Electron binary comes from the desktop app's postinstall (install-electron).
+  electron: false
+  # Only used to build Windows installers.
+  electron-winstaller: false
   esbuild: true

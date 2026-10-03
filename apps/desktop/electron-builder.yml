@@ -1,0 +1,28 @@
+# Packages the built app (out/) into a .dmg. Everything the app needs is
+# bundled by electron-vite, so no node_modules ship inside it.
+appId: run.helloagents.app
+productName: helloagents
+copyright: Copyright © 2026 Shivank Kapur
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - out/**
+  - package.json
+  - "!node_modules/**"
+asar: true
+mac:
+  category: public.app-category.developer-tools
+  icon: resources/icon.png
+  target:
+    - target: dmg
+      arch: universal
+  # No Apple Developer ID yet: sign ad hoc so Apple silicon will run it.
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  notarize: false
+dmg:
+  title: helloagents
+  # A stable name, so /releases/latest/download/helloagents-mac.dmg always works.
+  artifactName: helloagents-mac.dmg

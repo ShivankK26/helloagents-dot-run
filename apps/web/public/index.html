@@ -6,7 +6,7 @@
     <title>helloagents: hand off the task, merge the result</title>
     <meta
       name="description"
-      content="helloagents is an open-source desktop app that branches a coding task out to several AI agents, sends failing tests back to the agent that wrote the code, and hands you one reviewed change to merge. Works with Claude Code on your own plan."
+      content="A free Mac app that gives your coding tasks to Claude Code. Each task runs on its own branch, you see every step, and you merge when it looks right."
     />
     <link rel="canonical" href="https://www.helloagents.run/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -16,7 +16,7 @@
     <meta property="og:title" content="helloagents: hand off the task, merge the result" />
     <meta
       property="og:description"
-      content="An open-source desktop app that runs several coding agents on their own branches, checks their work with your tests, and shows you every step."
+      content="A free Mac app that gives your coding tasks to Claude Code. Each task runs on its own branch, you see every step, and you merge when it looks right."
     />
     <meta property="og:url" content="https://www.helloagents.run/" />
     <meta property="og:image" content="https://www.helloagents.run/og-image.png" />
@@ -30,37 +30,34 @@
       href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600;700&display=swap"
     />
     <style>
-      /* One light look on purpose: neutral paper, ink, and the coral of the logo's cursor. */
+      /* One light look on purpose: warm paper, near-black ink, coral only for "the result". */
       :root {
-        --bg: #f6f6f2;
+        --paper: #f6f6f2;
         --panel: #ffffff;
-        --sunk: #efefe9;
         --ink: #101214;
-        --ink-2: #3b3f45;
-        --muted: #6b6f75;
-        --faint: #9b9ea2;
-        --line: #e1e1da;
+        --muted: #5b6068;
+        --faint: #8d929a;
+        --line: #e4e4de;
         --coral: #f25a24;
         --coral-soft: #fde6dc;
-        --ok: #18834a;
-        --ok-soft: #dff1e5;
-        --bad: #d23b2b;
-        --bad-soft: #fae1dd;
+        --ok: #1b8a4b;
+        --ok-soft: #e3f3e9;
+        --app-bg: #f3f4f6;
         --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-        --mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+        --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
         color-scheme: light;
       }
       * {
         box-sizing: border-box;
       }
       html {
-        scroll-padding-top: 84px;
+        scroll-behavior: smooth;
       }
       body {
         margin: 0;
-        background: var(--bg);
+        background: var(--paper);
         color: var(--ink);
-        font: 16px/1.6 var(--sans);
+        font: 17px/1.6 var(--sans);
         -webkit-font-smoothing: antialiased;
       }
       a {
@@ -71,48 +68,33 @@
         outline-offset: 3px;
         border-radius: 6px;
       }
-      code {
-        font-family: var(--mono);
-        font-size: 0.88em;
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
       }
       .wrap {
-        max-width: 1140px;
+        max-width: 1120px;
         margin: 0 auto;
         padding-inline: 24px;
-      }
-      .label {
-        font: 500 12px var(--mono);
-        color: var(--muted);
-        letter-spacing: 0.02em;
-      }
-      .label::before {
-        content: "// ";
-        color: var(--coral);
       }
 
       /* Nav */
       .nav {
-        position: sticky;
-        top: 0;
-        z-index: 20;
-        background: color-mix(in srgb, var(--bg) 88%, transparent);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-bottom: 1px solid var(--line);
-      }
-      .nav .wrap {
         display: flex;
         align-items: center;
-        gap: 20px;
-        height: 62px;
+        justify-content: space-between;
+        gap: 16px;
+        padding-block: 20px;
       }
       .brand {
         display: flex;
         align-items: center;
         gap: 9px;
         font-weight: 600;
-        font-size: 16.5px;
-        letter-spacing: -0.01em;
+        font-size: 18px;
+        letter-spacing: -0.015em;
         text-decoration: none;
       }
       .brand svg {
@@ -121,1563 +103,818 @@
       }
       .nav-links {
         display: flex;
-        gap: 2px;
-        margin-left: 10px;
+        align-items: center;
+        gap: 22px;
+        font-size: 15px;
       }
       .nav-links a {
-        font-size: 14.5px;
-        color: var(--ink-2);
         text-decoration: none;
-        padding: 6px 10px;
-        border-radius: 8px;
+        color: var(--muted);
       }
       .nav-links a:hover {
-        background: var(--sunk);
+        color: var(--ink);
       }
+
+      /* Buttons */
       .btn {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        height: 42px;
-        padding: 0 18px;
-        border-radius: 10px;
-        border: 1px solid var(--line);
-        background: var(--panel);
-        font: 500 15px var(--sans);
+        gap: 9px;
+        height: 48px;
+        padding: 0 22px;
+        border-radius: 12px;
+        font-weight: 500;
+        font-size: 16px;
         text-decoration: none;
         white-space: nowrap;
+        transition: transform 0.15s ease;
       }
       .btn:hover {
-        border-color: #cfcfc6;
-      }
-      .btn-ink {
-        background: var(--ink);
-        color: var(--bg);
-        border-color: var(--ink);
-      }
-      .btn-ink:hover {
-        background: #26292d;
+        transform: translateY(-1px);
       }
       .btn svg {
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
+      }
+      .btn-dark,
+      .nav-links a.btn-dark {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .btn-ghost {
+        color: var(--ink);
+        border: 1px solid var(--line);
+        background: var(--panel);
       }
       .nav .btn {
-        margin-left: auto;
-        height: 36px;
-        padding: 0 14px;
-        font-size: 14px;
+        height: 38px;
+        padding: 0 15px;
+        font-size: 14.5px;
+        border-radius: 10px;
       }
 
       /* Hero */
       .hero {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-        gap: 48px;
+        text-align: center;
+        padding-block: 72px 56px;
+        display: flex;
+        flex-direction: column;
         align-items: center;
-        padding-block: 84px 72px;
+        gap: 22px;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--muted);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 14px 5px 10px;
+      }
+      .eyebrow i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--coral);
       }
       h1 {
-        margin: 16px 0 0;
-        font-size: clamp(44px, 6.4vw, 78px);
-        line-height: 0.98;
-        letter-spacing: -0.05em;
+        font-size: clamp(44px, 7.4vw, 84px);
+        line-height: 1;
+        letter-spacing: -0.045em;
         font-weight: 600;
         text-wrap: balance;
+        max-width: 13ch;
       }
-      .cursor {
-        display: inline-block;
-        width: 0.42em;
-        height: 0.16em;
-        margin-left: 0.08em;
-        border-radius: 0.04em;
-        background: var(--coral);
-        vertical-align: baseline;
-        animation: cursor 1.1s steps(1) infinite;
-      }
-      @keyframes cursor {
-        50% {
-          opacity: 0;
-        }
+      h1 em {
+        font-style: normal;
+        color: var(--coral);
       }
       .lede {
-        margin: 24px 0 0;
-        max-width: 31em;
-        font-size: clamp(17px, 1.8vw, 19px);
-        line-height: 1.55;
-        color: var(--ink-2);
+        font-size: clamp(18px, 2.1vw, 21px);
+        color: var(--muted);
+        max-width: 34em;
+        text-wrap: balance;
       }
       .ctas {
         display: flex;
         flex-wrap: wrap;
-        align-items: center;
-        gap: 10px;
-        margin-top: 30px;
-      }
-      .fine {
-        margin-top: 14px;
-        font: 12.5px var(--mono);
-        color: var(--muted);
-      }
-
-      /* Branch graph */
-      .graph {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 18px 18px 14px;
-        box-shadow: 0 30px 70px -45px rgb(16 18 20 / 35%);
-      }
-      .graph-head {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        font: 12px var(--mono);
-        color: var(--muted);
-        padding: 0 4px 10px;
-        border-bottom: 1px solid var(--line);
-      }
-      .graph-head b {
-        color: var(--ink);
-        font-weight: 500;
-      }
-      .graph svg {
-        display: block;
-        width: 100%;
-        height: auto;
+        justify-content: center;
+        gap: 12px;
         margin-top: 6px;
       }
-      .graph text {
-        font: 12px var(--mono);
-        fill: var(--ink-2);
-      }
-      .graph .lane-name {
-        font: 500 12.5px var(--sans);
-        fill: var(--ink);
-      }
-      .graph .main-line {
-        stroke: var(--ink);
-        stroke-width: 2.5;
-        fill: none;
-      }
-      .graph .lane {
-        stroke: var(--ink);
-        stroke-opacity: 0.55;
-        stroke-width: 2;
-        fill: none;
-        stroke-dasharray: var(--len);
-        stroke-dashoffset: var(--len);
-        animation: draw 1.4s ease-out forwards;
-      }
-      .graph .lane.l2 {
-        animation-delay: 0.25s;
-      }
-      .graph .lane.l3 {
-        animation-delay: 0.5s;
-      }
-      .graph .merge-lane {
-        stroke: var(--ink);
-        stroke-opacity: 0.55;
-        stroke-width: 2;
-        fill: none;
-        stroke-dasharray: var(--len);
-        stroke-dashoffset: var(--len);
-        animation: draw 0.8s ease-out 3.9s forwards;
-      }
-      @keyframes draw {
-        to {
-          stroke-dashoffset: 0;
-        }
-      }
-      .graph .commit {
-        fill: var(--panel);
-        stroke: var(--ink);
-        stroke-width: 2;
-        opacity: 0;
-        animation: pop 0.3s ease-out forwards;
-      }
-      .graph .fail {
-        fill: var(--bad);
-        stroke: var(--bad);
-      }
-      .graph .pass {
-        fill: var(--ok);
-        stroke: var(--ok);
-      }
-      .graph .note {
-        opacity: 0;
-        animation: pop 0.3s ease-out forwards;
-      }
-      .graph .note rect {
-        fill: var(--bad-soft);
-      }
-      .graph .note.good rect {
-        fill: var(--ok-soft);
-      }
-      .graph .note text {
-        font-size: 11px;
-        fill: var(--bad);
-      }
-      .graph .note.good text {
-        fill: var(--ok);
-      }
-      .graph .loop {
-        stroke: var(--bad);
-        stroke-width: 1.5;
-        stroke-dasharray: 4 4;
-        fill: none;
-        opacity: 0;
-        animation: pop 0.3s ease-out forwards;
-      }
-      .graph .merge-node {
-        opacity: 0;
-        animation: pop 0.4s ease-out 4.6s forwards;
-      }
-      .graph .merge-node circle.ring {
-        fill: var(--coral-soft);
-        stroke: var(--coral);
-        stroke-width: 2;
-      }
-      .graph .merge-node text {
-        fill: var(--coral);
-        font-weight: 500;
-      }
-      @keyframes pop {
-        from {
-          opacity: 0;
-          transform: scale(0.6);
-        }
-        to {
-          opacity: 1;
-          transform: scale(1);
-        }
-      }
-      .graph * {
-        transform-box: fill-box;
-        transform-origin: center;
-      }
-      .graph-foot {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px 16px;
-        padding: 10px 4px 0;
-        border-top: 1px solid var(--line);
-        font: 12px var(--mono);
-        color: var(--muted);
-      }
-      .graph-foot i {
-        display: inline-block;
-        width: 9px;
-        height: 9px;
-        border-radius: 50%;
-        margin-right: 6px;
-        vertical-align: -1px;
-        border: 2px solid var(--ink);
-      }
-
-      /* Providers strip */
-      .providers {
-        border-block: 1px solid var(--line);
-        background: var(--panel);
-      }
-      .providers .wrap {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 12px 30px;
-        padding-block: 20px;
-      }
-      .providers span {
-        font: 13.5px var(--mono);
-        color: var(--ink-2);
-      }
-      .providers span.soon {
+      .fine {
+        font-size: 14px;
         color: var(--faint);
       }
-
-      section {
-        padding-block: 96px;
-      }
-      h2 {
-        margin: 14px 0 0;
-        font-size: clamp(32px, 4.4vw, 50px);
-        line-height: 1.04;
-        letter-spacing: -0.045em;
-        font-weight: 600;
-        max-width: 15em;
+      .first-open {
+        max-width: 44em;
         text-wrap: balance;
       }
-      .sub {
-        margin: 16px 0 0;
-        max-width: 38em;
-        color: var(--ink-2);
-        font-size: 17.5px;
+      .first-open b {
+        font-weight: 500;
+        color: var(--muted);
       }
 
-      /* A run as it happens: the product's own log */
-      .split {
-        display: grid;
-        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-        gap: 56px;
-        align-items: start;
+      /* App picture */
+      .shot {
+        padding-bottom: 96px;
       }
-      .sticky {
-        position: sticky;
-        top: 110px;
-      }
-      .steps {
-        list-style: none;
-        margin: 28px 0 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
-      }
-      .steps li {
-        display: grid;
-        grid-template-columns: 30px minmax(0, 1fr);
-        gap: 12px;
-      }
-      .steps .n {
-        font: 500 13px var(--mono);
-        color: var(--coral);
-        padding-top: 2px;
-      }
-      .steps b {
-        display: block;
-        font-weight: 600;
-      }
-      .steps span {
-        color: var(--ink-2);
-        font-size: 15px;
-      }
-      .log {
-        background: var(--ink);
-        color: #e8e8e3;
-        border-radius: 16px;
-        padding: 18px 0;
-        font: 13px/1.85 var(--mono);
-        overflow-x: auto;
-        box-shadow: 0 30px 70px -45px rgb(16 18 20 / 55%);
-      }
-      .log-head {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        padding: 0 20px 12px;
-        border-bottom: 1px solid #2a2d31;
-        color: #8d9096;
-        font-size: 12px;
-      }
-      .log ol {
-        list-style: none;
-        margin: 10px 0 0;
-        padding: 0;
-        min-width: 560px;
-      }
-      .log li {
-        display: grid;
-        grid-template-columns: 52px 112px minmax(0, 1fr);
-        gap: 10px;
-        padding: 1px 20px;
-      }
-      .log li.hl {
-        background: rgb(210 59 43 / 16%);
-      }
-      .log li.good {
-        background: rgb(24 131 74 / 16%);
-      }
-      .log .t {
-        color: #7d8086;
-      }
-      .log .who {
-        color: #b9bcc2;
-      }
-      .log .who.orch {
-        color: #ff8a5c;
-      }
-      .log .bad {
-        color: #ff7d6d;
-      }
-      .log .ok {
-        color: #6fd69a;
-      }
-
-      /* On the record */
-      .record {
-        margin-top: 44px;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        border-top: 1px solid var(--ink);
-      }
-      .record article {
-        padding: 26px 26px 28px 0;
-        border-bottom: 1px solid var(--line);
-      }
-      .record article:nth-child(odd) {
-        border-right: 1px solid var(--line);
-      }
-      .record article:nth-child(even) {
-        padding-left: 26px;
-      }
-      .record h3 {
-        margin: 10px 0 0;
-        font-size: 21px;
-        letter-spacing: -0.025em;
-      }
-      .record p {
-        margin: 6px 0 0;
-        color: var(--ink-2);
-        font-size: 15px;
-        max-width: 30em;
-      }
-      .record pre {
-        margin: 14px 0 0;
-        padding: 10px 12px;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        font: 12px/1.7 var(--mono);
-        color: var(--ink-2);
-        overflow-x: auto;
-        white-space: pre;
-      }
-      .add {
-        color: var(--ok);
-      }
-      .del {
-        color: var(--bad);
-      }
-      .acc {
-        color: var(--coral);
-      }
-
-      /* App window */
       .window {
-        margin: 44px 0 0;
-        background: var(--panel);
-        border: 1px solid var(--line);
         border-radius: 16px;
-        box-shadow: 0 40px 90px -55px rgb(16 18 20 / 45%);
+        border: 1px solid #d9d9d2;
+        background: var(--app-bg);
+        box-shadow:
+          0 1px 0 rgb(255 255 255 / 0.8) inset,
+          0 40px 80px -30px rgb(16 18 20 / 0.28),
+          0 10px 24px -12px rgb(16 18 20 / 0.12);
         overflow: hidden;
+        font-size: 13.5px;
+        line-height: 1.5;
+        text-align: left;
       }
-      .window-bar {
+      .titlebar {
+        height: 40px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--line);
         display: flex;
         align-items: center;
-        gap: 10px;
-        height: 42px;
-        padding: 0 16px;
-        border-bottom: 1px solid var(--line);
-        background: var(--sunk);
+        gap: 8px;
+        padding: 0 14px;
       }
       .lights {
         display: flex;
         gap: 7px;
+        margin-right: 14px;
       }
       .lights i {
         width: 11px;
         height: 11px;
         border-radius: 50%;
-        background: #d9d9d2;
+        background: #e4e4df;
       }
-      .window-title {
-        font: 12.5px var(--mono);
-        color: var(--muted);
-        margin-left: 8px;
+      .titlebar b {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .titlebar svg {
+        width: 17px;
+        height: 17px;
       }
       .app {
         display: grid;
-        grid-template-columns: 290px minmax(0, 1fr);
-        min-height: 380px;
+        grid-template-columns: 200px 1fr;
+        min-height: 480px;
       }
-      .runs {
-        list-style: none;
-        margin: 0;
-        padding: 8px;
+      .side {
+        background: var(--panel);
         border-right: 1px solid var(--line);
+        padding: 14px 10px;
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 4px;
       }
-      .runs li {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 4px 10px;
-        padding: 11px 12px;
-        border-radius: 10px;
-        font-size: 14px;
+      .side-label {
+        font: 500 10.5px var(--mono);
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--faint);
+        padding: 0 8px 4px;
       }
-      .runs li.sel {
-        background: var(--sunk);
-      }
-      .runs .t {
-        font-weight: 500;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .runs .w {
-        font: 12px var(--mono);
-        color: var(--muted);
-        text-align: right;
-      }
-      .runs .s {
-        font-size: 12.5px;
-        color: var(--muted);
+      .proj {
         display: flex;
         align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 7px;
+        color: var(--muted);
+      }
+      .proj.on {
+        background: var(--app-bg);
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .proj svg {
+        width: 15px;
+        height: 15px;
+        flex-shrink: 0;
+      }
+      .side-foot {
+        margin-top: auto;
+        border-top: 1px solid var(--line);
+        padding: 12px 8px 0;
+        display: flex;
+        flex-direction: column;
         gap: 6px;
       }
-      .strip {
-        display: inline-flex;
-        gap: 3px;
+      .agent {
+        display: flex;
         align-items: center;
-      }
-      .strip i {
-        width: 14px;
-        height: 5px;
-        border-radius: 2px;
-        background: #d9d9d2;
-        transition: background 0.4s;
-      }
-      .strip i.working {
-        background: var(--coral);
-      }
-      .strip i.fixing {
-        background: var(--bad);
-        animation: cursor 1.3s steps(1) infinite;
-      }
-      .strip i.done {
-        background: var(--ok);
+        gap: 8px;
+        font-size: 12.5px;
       }
       .dot {
-        width: 7px;
-        height: 7px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
-        background: #d9d9d2;
-      }
-      .dot.live {
-        background: var(--coral);
-        animation: cursor 1.3s steps(1) infinite;
+        background: #d6d9de;
+        flex-shrink: 0;
       }
       .dot.ok {
         background: var(--ok);
       }
-      .detail {
-        padding: 22px 24px;
+      .dot.live {
+        background: var(--coral);
+        animation: pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.35;
+        }
+      }
+      .main {
+        padding: 18px 20px 20px;
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 14px;
         min-width: 0;
       }
-      .detail h3 {
-        margin: 0;
-        font-size: 18px;
-        letter-spacing: -0.015em;
+      .main h3 {
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .composer {
+        background: var(--panel);
+        border: 1px solid #cfd3d9;
+        border-radius: 11px;
+        padding: 11px 12px 10px 14px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .typed::after {
+        content: "";
+        display: inline-block;
+        width: 2px;
+        height: 1.1em;
+        background: var(--coral);
+        vertical-align: -3px;
+        margin-left: 2px;
+        animation: blink 1s steps(1) infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+      .run-btn {
+        background: var(--ink);
+        color: var(--panel);
+        border-radius: 8px;
+        padding: 4px 12px;
+        font-weight: 500;
+        font-size: 12.5px;
+        flex-shrink: 0;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: 230px 1fr;
+        gap: 14px;
+        flex: 1;
+      }
+      .runs {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .run {
+        display: grid;
+        grid-template-columns: 8px 1fr auto;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 8px;
+        border-radius: 8px;
+      }
+      .run.on {
+        background: var(--panel);
+        box-shadow: 0 0 0 1px var(--line);
+      }
+      .run span:nth-child(2) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .run small {
+        font: 11px var(--mono);
+        color: var(--faint);
+      }
+      .detail {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .detail-head {
+        padding: 13px 15px 8px;
+      }
+      .detail-head b {
+        font-weight: 600;
+        font-size: 14px;
       }
       .meta {
-        font: 12.5px var(--mono);
-        color: var(--muted);
-        margin-top: 4px;
-      }
-      .progress .track {
-        height: 6px;
-        border-radius: 6px;
-        background: var(--sunk);
-        overflow: hidden;
-      }
-      .progress .track i {
-        display: block;
-        height: 100%;
-        width: 55%;
-        border-radius: 6px;
-        background: var(--coral);
-        transition:
-          width 0.8s,
-          background 0.4s;
-      }
-      .progress.done .track i {
-        background: var(--ok);
-      }
-      .phases {
         display: flex;
-        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 4px 12px;
+        align-items: center;
+        margin-top: 4px;
+        font: 11.5px var(--mono);
+        color: var(--faint);
+      }
+      .pill {
+        font: 500 11px var(--mono);
+        border-radius: 999px;
+        padding: 1px 8px;
+        background: var(--coral-soft);
+        color: var(--coral);
+      }
+      .tabs {
+        display: flex;
+        gap: 16px;
+        padding: 0 15px;
+        border-bottom: 1px solid var(--line);
+        font-weight: 500;
         font-size: 12.5px;
         color: var(--muted);
-        margin-top: 7px;
       }
-      .phases .on {
+      .tabs span {
+        padding: 6px 0 8px;
+      }
+      .tabs .on {
         color: var(--ink);
-        font-weight: 600;
+        box-shadow: inset 0 -2px 0 var(--ink);
       }
-      .agents {
+      .activity {
+        list-style: none;
+        margin: 0;
+        padding: 12px 15px 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .say {
+        max-width: 60ch;
+      }
+      .step {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font: 12px var(--mono);
+        color: var(--muted);
+      }
+      .tick {
+        width: 17px;
+        height: 17px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--ok-soft);
+        color: var(--ok);
+        font-size: 10px;
+        flex-shrink: 0;
+      }
+      .step em {
+        font-style: normal;
+        color: var(--ok);
+        margin-left: auto;
+      }
+      .working {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--faint);
+        font-size: 12.5px;
+      }
+      .spin {
+        width: 13px;
+        height: 13px;
+        border: 2px solid #cfd3d9;
+        border-top-color: var(--coral);
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Sections */
+      section {
+        padding-block: 96px;
+        border-top: 1px solid var(--line);
+      }
+      .section-head {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 44px;
+        max-width: 640px;
+      }
+      .kicker {
+        font: 500 13px var(--mono);
+        color: var(--coral);
+        letter-spacing: 0.02em;
+      }
+      h2 {
+        font-size: clamp(32px, 4.4vw, 48px);
+        line-height: 1.05;
+        letter-spacing: -0.035em;
+        font-weight: 600;
+        text-wrap: balance;
+      }
+      .steps,
+      .reasons {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
         list-style: none;
         margin: 0;
         padding: 0;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        overflow: hidden;
       }
-      .agents li {
-        display: grid;
-        grid-template-columns: 32px minmax(0, 1fr) auto;
-        gap: 12px;
-        align-items: center;
-        padding: 11px 14px;
-      }
-      .agents li + li {
-        border-top: 1px solid var(--line);
-      }
-      .badge {
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
-        display: grid;
-        place-items: center;
-        font: 500 11.5px var(--mono);
-        background: var(--sunk);
-      }
-      .job {
-        font-weight: 500;
-        font-size: 14px;
-      }
-      .note {
-        font-size: 13px;
-        color: var(--muted);
-      }
-      .note .bad {
-        color: var(--bad);
-      }
-      .tag {
-        font-size: 12px;
-        font-weight: 500;
-        padding: 3px 9px;
-        border-radius: 999px;
-        white-space: nowrap;
-        background: var(--sunk);
-        color: var(--muted);
-      }
-      .tag.ok {
-        background: var(--ok-soft);
-        color: var(--ok);
-      }
-      .tag.fix {
-        background: var(--bad-soft);
-        color: var(--bad);
-      }
-      .result {
-        border-radius: 12px;
-        padding: 14px 16px;
-        background: var(--sunk);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
-        font-size: 14px;
-        transition: background 0.4s;
-      }
-      .result b {
-        font-weight: 600;
-      }
-      .result span {
-        color: var(--muted);
-      }
-      .result.ready {
-        background: var(--coral-soft);
-      }
-      .fake-btn {
-        font: 500 13px var(--sans);
-        padding: 6px 14px;
-        border-radius: 8px;
-        background: var(--ink);
-        color: var(--bg);
-        opacity: 0.3;
-        transition: opacity 0.4s;
-      }
-      .result.ready .fake-btn {
-        opacity: 1;
-      }
-
-      /* Bring your own model */
-      .models {
-        margin-top: 40px;
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        overflow: hidden;
-        background: var(--panel);
-      }
-      .models > div {
-        display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) auto;
-        gap: 16px;
-        align-items: center;
-        padding: 18px 22px;
-      }
-      .models > div + div {
-        border-top: 1px solid var(--line);
-      }
-      .models b {
-        font-weight: 600;
-        font-size: 16.5px;
-      }
-      .models small {
-        display: block;
-        font: 12px var(--mono);
-        color: var(--muted);
-        margin-top: 2px;
-      }
-      .models p {
-        margin: 0;
-        color: var(--ink-2);
-        font-size: 15px;
-      }
-      .chip {
-        font: 500 12px var(--mono);
-        padding: 4px 10px;
-        border-radius: 999px;
-        white-space: nowrap;
-      }
-      .chip.yes {
-        background: var(--ok-soft);
-        color: var(--ok);
-      }
-      .chip.soon {
-        background: var(--sunk);
-        color: var(--muted);
-      }
-
-      /* Evals */
-      .evals {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: 56px;
-        align-items: center;
-      }
-      .report {
+      .steps li {
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 16px;
-        padding: 24px;
-      }
-      .report-head {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        font: 12px var(--mono);
-        color: var(--muted);
-        margin-bottom: 20px;
-      }
-      .report-head b {
-        color: var(--coral);
-        font-weight: 500;
-      }
-      .bars {
+        padding: 26px;
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 10px;
       }
-      .bar {
+      .num {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 7px 12px;
-        font-size: 14.5px;
+        place-items: center;
+        font: 600 15px var(--sans);
+        background: var(--ink);
+        color: var(--paper);
+        margin-bottom: 8px;
       }
-      .bar .v {
-        font: 500 14px var(--mono);
-      }
-      .bar .t {
-        grid-column: 1 / -1;
-        height: 8px;
-        border-radius: 8px;
-        background: var(--sunk);
-        overflow: hidden;
-      }
-      .bar .t i {
-        display: block;
-        height: 100%;
-        border-radius: 8px;
-        background: #b9bab3;
-      }
-      .bar.best .t i {
+      .steps li:last-child .num {
         background: var(--coral);
       }
-
-      /* FAQ */
-      .faq {
-        margin-top: 36px;
-        border-top: 1px solid var(--ink);
-        max-width: 820px;
+      h3 {
+        font-size: 21px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
       }
-      .faq details {
-        border-bottom: 1px solid var(--line);
-      }
-      .faq summary {
-        list-style: none;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-        padding: 20px 2px;
-        font-size: 18px;
-        font-weight: 500;
-        letter-spacing: -0.015em;
-      }
-      .faq summary::-webkit-details-marker {
-        display: none;
-      }
-      .faq summary::after {
-        content: "+";
-        font: 20px var(--mono);
+      .steps p,
+      .reasons p {
         color: var(--muted);
       }
-      .faq details[open] summary::after {
-        content: "−";
-      }
-      .faq p {
-        margin: 0 2px 20px;
-        color: var(--ink-2);
-        max-width: 44em;
+      .reasons li {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-top: 22px;
+        border-top: 2px solid var(--ink);
       }
 
-      .final {
-        border-top: 1px solid var(--line);
-        padding-top: 56px;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 24px 48px;
-        align-items: end;
+      /* Closing */
+      .closing {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
       }
-      .final h2 {
-        max-width: 12em;
+      .closing svg.mark {
+        width: 56px;
+        height: 56px;
       }
       footer {
         border-top: 1px solid var(--line);
-        padding-block: 28px 44px;
-        color: var(--muted);
+        padding-block: 28px;
         font-size: 14px;
+        color: var(--faint);
       }
       footer .wrap {
         display: flex;
-        flex-wrap: wrap;
         justify-content: space-between;
-        gap: 12px 24px;
-      }
-      footer nav {
-        display: flex;
-        gap: 20px;
+        align-items: center;
+        gap: 16px;
         flex-wrap: wrap;
       }
       footer a {
+        color: var(--muted);
         text-decoration: none;
-        color: var(--ink-2);
+      }
+      footer a:hover {
+        color: var(--ink);
       }
 
-      /* The graph is complete at rest; only the merge point breathes. */
-      .graph .lane,
-      .graph .merge-lane {
-        stroke-dasharray: none;
-        stroke-dashoffset: 0;
-        animation: none;
-      }
-      .graph .commit,
-      .graph .note,
-      .graph .loop,
-      .graph .merge-node {
-        opacity: 1;
-        animation: none;
-      }
-      .graph .merge-node .ring {
-        animation: breathe 2.4s ease-in-out infinite;
-      }
-      @keyframes breathe {
-        50% {
-          stroke-width: 5;
-        }
-      }
-
-      @media (max-width: 960px) {
-        .hero,
-        .split,
-        .evals,
-        .final {
-          grid-template-columns: 1fr;
-        }
-        .hero {
-          padding-top: 56px;
-        }
-        .sticky {
-          position: static;
-        }
-        .nav-links {
-          display: none;
-        }
+      @media (max-width: 860px) {
         .app {
           grid-template-columns: 1fr;
+          min-height: 0;
         }
+        .side,
         .runs {
-          border-right: 0;
-          border-bottom: 1px solid var(--line);
-        }
-        .runs li:not(.sel) {
           display: none;
         }
-        .models > div {
-          grid-template-columns: minmax(0, 1fr) auto;
+        .split {
+          grid-template-columns: 1fr;
         }
-        .models p {
-          grid-column: 1 / -1;
-          grid-row: 2;
+        .steps,
+        .reasons {
+          grid-template-columns: 1fr;
         }
-      }
-      @media (max-width: 640px) {
-        .wrap {
-          padding-inline: 16px;
+        .nav-links .text-link {
+          display: none;
+        }
+        .hero {
+          padding-block: 48px 40px;
         }
         section {
           padding-block: 64px;
         }
-        .record {
-          grid-template-columns: 1fr;
-        }
-        .record article,
-        .record article:nth-child(even) {
-          padding: 22px 0;
-          border-right: 0;
-        }
-        .agents li {
-          grid-template-columns: 30px minmax(0, 1fr);
-        }
-        .agents .tag {
-          grid-column: 2;
-          justify-self: start;
-        }
-        .detail {
-          padding: 18px 16px;
-        }
-        .models > div {
-          padding: 16px;
+        .shot {
+          padding-bottom: 64px;
         }
       }
       @media (prefers-reduced-motion: reduce) {
-        *,
-        .graph * {
+        * {
           animation: none !important;
           transition: none !important;
-          opacity: 1 !important;
-          stroke-dashoffset: 0 !important;
+        }
+        html {
+          scroll-behavior: auto;
         }
       }
     </style>
   </head>
   <body>
-    <header class="nav">
-      <div class="wrap">
-        <a class="brand" href="/" aria-label="helloagents home">
-          <svg viewBox="0 0 32 32" aria-hidden="true">
-            <path
-              d="M5 7.5c8 0 8 8.5 14 8.5M5 24.5c8 0 8-8.5 14-8.5M5 16h14"
-              fill="none"
-              stroke="#101214"
-              stroke-width="3"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-            <circle cx="24.5" cy="16" r="4.2" fill="#f25a24" />
-          </svg>
-          helloagents
-        </a>
-        <nav class="nav-links" aria-label="Main">
-          <a href="#run">How a run works</a>
-          <a href="#record">What you see</a>
-          <a href="#models">Models</a>
-          <a href="#faq">FAQ</a>
-        </nav>
-        <a
-          class="btn btn-ink"
-          href="https://github.com/ShivankK26/helloagents-dot-run"
-          rel="noopener"
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="mark" viewBox="0 0 32 32">
+        <path
+          d="M5 7.5c8 0 8 8.5 14 8.5M5 24.5c8 0 8-8.5 14-8.5M5 16h14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="3"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <circle cx="24.5" cy="16" r="4.2" fill="#f25a24" />
+      </symbol>
+      <symbol id="github" viewBox="0 0 24 24">
+        <path
+          fill="currentColor"
+          d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.7 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"
+        />
+      </symbol>
+      <symbol id="download" viewBox="0 0 24 24">
+        <path
+          d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="folder" viewBox="0 0 24 24">
+        <path
+          d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linejoin="round"
+        />
+      </symbol>
+    </svg>
+
+    <header class="wrap nav">
+      <a class="brand" href="/" aria-label="helloagents home">
+        <svg><use href="#mark" /></svg>
+        helloagents
+      </a>
+      <nav class="nav-links" aria-label="Main">
+        <a class="text-link" href="#how">How it works</a>
+        <a class="text-link" href="#why">Why it's different</a>
+        <a class="text-link" href="https://github.com/ShivankK26/helloagents-dot-run" rel="noopener"
           >GitHub</a
         >
-      </div>
+        <a
+          class="btn btn-dark"
+          href="https://github.com/ShivankK26/helloagents-dot-run/releases/latest/download/helloagents-mac.dmg"
+        >
+          <svg><use href="#download" /></svg> Download
+        </a>
+      </nav>
     </header>
 
     <main>
       <div class="wrap hero">
-        <div>
-          <span class="label">open-source desktop app for coding agents</span>
-          <h1>
-            Hand off the task. Merge the result.<span class="cursor" aria-hidden="true"></span>
-          </h1>
-          <p class="lede">
-            helloagents branches a coding task out to several AI agents, each in its own copy of
-            your repo. When a test fails, it goes back to the agent that wrote the code. You review
-            one change and merge it.
-          </p>
+        <span class="eyebrow"><i></i> Free and open source · for Mac</span>
+        <h1>Hand off the task. Merge the <em>result.</em></h1>
+        <p class="lede">
+          Tell Claude Code what to build. It works on its own copy of your project, and you merge
+          the result once it looks right.
+        </p>
+        <div class="ctas">
+          <a
+            class="btn btn-dark"
+            href="https://github.com/ShivankK26/helloagents-dot-run/releases/latest/download/helloagents-mac.dmg"
+          >
+            <svg><use href="#download" /></svg> Download for Mac
+          </a>
+          <a class="btn btn-ghost" href="#how">See how it works</a>
+        </div>
+        <p class="fine">
+          Apple silicon and Intel · Uses the Claude plan you already have. No API key needed.
+        </p>
+      </div>
+
+      <div class="wrap shot">
+        <div
+          class="window"
+          role="img"
+          aria-label="The helloagents app: a task is running on the stats-lib project, with each step the agent took listed as it works."
+        >
+          <div class="titlebar" aria-hidden="true">
+            <span class="lights"><i></i><i></i><i></i></span>
+            <b
+              ><svg><use href="#mark" /></svg> helloagents</b
+            >
+          </div>
+          <div class="app" aria-hidden="true">
+            <aside class="side">
+              <div class="side-label">Projects</div>
+              <div class="proj on">
+                <svg><use href="#folder" /></svg> stats-lib
+              </div>
+              <div class="proj">
+                <svg><use href="#folder" /></svg> marketing-site
+              </div>
+              <div class="proj">
+                <svg><use href="#folder" /></svg> api-server
+              </div>
+              <div class="side-foot">
+                <div class="side-label" style="padding: 0">Agents</div>
+                <div class="agent"><span class="dot ok"></span> Claude Code</div>
+                <div class="agent" style="color: var(--faint)">
+                  <span class="dot"></span> Codex · soon
+                </div>
+              </div>
+            </aside>
+            <div class="main">
+              <h3>stats-lib</h3>
+              <div class="composer">
+                <span class="typed">Add a median() function with tests</span>
+                <span class="run-btn">Run ⌘↵</span>
+              </div>
+              <div class="split">
+                <div class="runs">
+                  <div class="side-label" style="padding: 0 8px 4px">Runs</div>
+                  <div class="run on">
+                    <span class="dot live"></span><span>Add rate limiting to uploads</span
+                    ><small>now</small>
+                  </div>
+                  <div class="run">
+                    <span class="dot ok"></span><span>Fix the failing date tests</span
+                    ><small>2h</small>
+                  </div>
+                  <div class="run">
+                    <span class="dot ok"></span><span>Rename user to account</span><small>1d</small>
+                  </div>
+                </div>
+                <div class="detail">
+                  <div class="detail-head">
+                    <b>Add rate limiting to uploads</b>
+                    <div class="meta">
+                      <span class="pill">Working</span><span>Claude Code</span><span>1m 42s</span>
+                    </div>
+                  </div>
+                  <div class="tabs">
+                    <span class="on">Activity</span><span>Changes</span><span>Summary</span>
+                  </div>
+                  <ul class="activity">
+                    <li class="say">
+                      I'll add a limit of 10 uploads a minute per user, then cover it with a test.
+                    </li>
+                    <li class="step"><span class="tick">✓</span> Read src/upload.ts</li>
+                    <li class="step"><span class="tick">✓</span> Edit src/upload.ts</li>
+                    <li class="step"><span class="tick">✓</span> Write test/upload.test.ts</li>
+                    <li class="step"><span class="tick">✓</span> npm test <em>14 passed</em></li>
+                    <li class="working">
+                      <span class="spin"></span> Checking the change one more time…
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section id="how" aria-labelledby="how-title">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="kicker">How it works</span>
+            <h2 id="how-title">Three steps. No setup.</h2>
+          </div>
+          <ol class="steps">
+            <li>
+              <span class="num">1</span>
+              <h3>Add your project</h3>
+              <p>Pick a folder on your Mac. helloagents finds Claude Code on its own.</p>
+            </li>
+            <li>
+              <span class="num">2</span>
+              <h3>Describe the task</h3>
+              <p>Write what you want in plain words, the way you'd ask a teammate.</p>
+            </li>
+            <li>
+              <span class="num">3</span>
+              <h3>Review and merge</h3>
+              <p>See what changed, line by line. Keep it, or throw it away.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="why" aria-labelledby="why-title">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="kicker">Why it's different</span>
+            <h2 id="why-title">You stay in charge of your code.</h2>
+          </div>
+          <ul class="reasons">
+            <li>
+              <h3>Your files stay safe</h3>
+              <p>
+                Every task gets its own copy of the project. Nothing touches your work until you say
+                so.
+              </p>
+            </li>
+            <li>
+              <h3>Nothing is hidden</h3>
+              <p>
+                Watch each step as it happens: what the agent read, what it changed, which tests
+                passed.
+              </p>
+            </li>
+            <li>
+              <h3>Free to use</h3>
+              <p>
+                It runs on your Mac with the Claude plan you already pay for. No extra subscription.
+              </p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section aria-labelledby="end-title">
+        <div class="wrap closing">
+          <svg class="mark" aria-hidden="true"><use href="#mark" /></svg>
+          <h2 id="end-title">Give your next task to an agent.</h2>
           <div class="ctas">
             <a
-              class="btn btn-ink"
-              href="https://github.com/ShivankK26/helloagents-dot-run"
-              rel="noopener"
+              class="btn btn-dark"
+              href="https://github.com/ShivankK26/helloagents-dot-run/releases/latest/download/helloagents-mac.dmg"
             >
-              Follow on GitHub
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-              >
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
+              <svg><use href="#download" /></svg> Download for Mac
             </a>
-            <a class="btn" href="#run">See how a run works</a>
-          </div>
-          <p class="fine">Works with Claude Code on your own plan · macOS app coming soon</p>
-        </div>
-
-        <figure
-          class="graph"
-          style="margin: 0"
-          aria-label="A task branches out to three agents; one agent's tests fail, get fixed, and all branches merge back into main after your approval"
-        >
-          <div class="graph-head">
-            <span><b>run-218</b> · add rate limiting to uploads</span><span>3 agents</span>
-          </div>
-          <svg viewBox="0 0 520 330">
-            <path class="main-line" d="M24 290 H496" />
-            <circle cx="40" cy="290" r="6" fill="#101214" />
-            <text x="40" y="318" text-anchor="middle">main</text>
-            <path class="lane" style="--len: 460" d="M60 290 C110 290, 110 70, 160 70 H392" />
-            <path class="lane l2" style="--len: 400" d="M60 290 C110 290, 110 150, 160 150 H392" />
-            <path class="lane l3" style="--len: 340" d="M60 290 C110 290, 110 230, 160 230 H392" />
-            <text class="lane-name" x="164" y="58">H1 · build the limiter</text>
-            <text class="lane-name" x="164" y="138">CC · wire it into uploads</text>
-            <text class="lane-name" x="164" y="218">H2 · write the tests</text>
-            <circle class="commit" cx="214" cy="70" r="6" style="animation-delay: 1.2s" />
-            <circle class="commit pass" cx="318" cy="70" r="6" style="animation-delay: 1.8s" />
-            <circle class="commit" cx="214" cy="150" r="6" style="animation-delay: 1.4s" />
-            <circle class="commit fail" cx="268" cy="150" r="6" style="animation-delay: 2.2s" />
-            <path
-              class="loop"
-              d="M268 160 C268 186, 330 186, 330 160"
-              style="animation-delay: 2.6s"
-            />
-            <g class="note" style="animation-delay: 2.4s">
-              <rect x="210" y="166" width="104" height="20" rx="5" />
-              <text x="219" y="180">2 tests failed</text>
-            </g>
-            <circle class="commit pass" cx="330" cy="150" r="6" style="animation-delay: 3.2s" />
-            <g class="note good" style="animation-delay: 3.3s">
-              <rect x="300" y="116" width="86" height="20" rx="5" />
-              <text x="309" y="130">fixed · 14/14</text>
-            </g>
-            <circle class="commit" cx="214" cy="230" r="6" style="animation-delay: 1.6s" />
-            <circle class="commit pass" cx="300" cy="230" r="6" style="animation-delay: 2s" />
-            <path class="merge-lane" style="--len: 250" d="M392 70 C440 70, 440 290, 470 290" />
-            <path class="merge-lane" style="--len: 180" d="M392 150 C440 150, 440 290, 470 290" />
-            <path class="merge-lane" style="--len: 110" d="M392 230 C440 230, 440 290, 470 290" />
-            <g class="merge-node">
-              <circle class="ring" cx="470" cy="290" r="11" />
-              <text x="470" y="318" text-anchor="middle">you merge</text>
-            </g>
-          </svg>
-          <div class="graph-foot">
-            <span><i></i>commit</span
-            ><span
-              ><i style="border-color: var(--bad); background: var(--bad)"></i>tests failed</span
-            ><span><i style="border-color: var(--ok); background: var(--ok)"></i>tests pass</span>
-          </div>
-        </figure>
-      </div>
-
-      <div class="providers" aria-label="Works with">
-        <div class="wrap">
-          <span class="label">works with</span>
-          <span>Claude Code</span>
-          <span>Claude API</span>
-          <span>git worktrees</span>
-          <span>npm · pytest · go test · cargo</span>
-          <span class="soon">Codex CLI (soon)</span>
-          <span class="soon">local models (soon)</span>
-        </div>
-      </div>
-
-      <section id="run" aria-labelledby="run-title">
-        <div class="wrap split">
-          <div class="sticky">
-            <span class="label">how a run works</span>
-            <h2 id="run-title">Agents work in parallel. Your tests decide when they're done.</h2>
-            <ol class="steps">
-              <li>
-                <span class="n">01</span>
-                <div>
-                  <b>Plan</b
-                  ><span
-                    >A planner reads your repo and splits the task into pieces that can run side by
-                    side.</span
-                  >
-                </div>
-              </li>
-              <li>
-                <span class="n">02</span>
-                <div>
-                  <b>Branch</b
-                  ><span
-                    >Each piece gets its own agent on its own git worktree, so agents never
-                    overwrite each other.</span
-                  >
-                </div>
-              </li>
-              <li>
-                <span class="n">03</span>
-                <div>
-                  <b>Check</b
-                  ><span
-                    >Your tests run after every change. A failure goes back to the agent that caused
-                    it, with the output.</span
-                  >
-                </div>
-              </li>
-              <li>
-                <span class="n">04</span>
-                <div>
-                  <b>Merge</b
-                  ><span
-                    >A reviewer reads every diff. Nothing reaches <code>main</code> until you
-                    approve it.</span
-                  >
-                </div>
-              </li>
-            </ol>
-          </div>
-          <figure class="log" style="margin: 0" aria-label="The log of a run">
-            <div class="log-head"><span>run-218 · log</span><span>3:00 total</span></div>
-            <ol>
-              <li>
-                <span class="t">0:04</span><span class="who orch">orchestrator</span
-                ><span>read 14 files in acme/api</span>
-              </li>
-              <li>
-                <span class="t">0:12</span><span class="who orch">orchestrator</span
-                ><span>plan: limiter · upload route · tests</span>
-              </li>
-              <li>
-                <span class="t">0:14</span><span class="who orch">orchestrator</span
-                ><span>branch ao/t1 → harness-1, ao/t2 → claude-code, ao/t3 → harness-2</span>
-              </li>
-              <li>
-                <span class="t">0:58</span><span class="who">harness-1</span
-                ><span>npm test <span class="ok">✓ 6 passed</span></span>
-              </li>
-              <li>
-                <span class="t">1:11</span><span class="who">harness-2</span
-                ><span>npm test <span class="ok">✓ 9 passed</span></span>
-              </li>
-              <li class="hl">
-                <span class="t">1:36</span><span class="who">claude-code</span
-                ><span
-                  >npm test <span class="bad">✗ 2 failed</span> · retry-after header missing</span
-                >
-              </li>
-              <li>
-                <span class="t">1:39</span><span class="who orch">orchestrator</span
-                ><span>sent both failures back · attempt 2 of 3</span>
-              </li>
-              <li>
-                <span class="t">1:58</span><span class="who">claude-code</span
-                ><span>edit src/middleware/rateLimit.ts (+3 −1)</span>
-              </li>
-              <li class="good">
-                <span class="t">2:21</span><span class="who">claude-code</span
-                ><span>npm test <span class="ok">✓ 14 passed</span></span>
-              </li>
-              <li>
-                <span class="t">2:43</span><span class="who">reviewer</span
-                ><span>read 3 diffs · 1 suggestion, applied</span>
-              </li>
-              <li>
-                <span class="t">2:51</span><span class="who orch">orchestrator</span
-                ><span>merged 3 branches · full suite <span class="ok">✓ 29 passed</span></span>
-              </li>
-              <li>
-                <span class="t">3:00</span><span class="who orch">orchestrator</span
-                ><span>waiting for you to merge into main</span>
-              </li>
-            </ol>
-          </figure>
-        </div>
-      </section>
-
-      <section id="record" aria-labelledby="record-title" style="padding-top: 24px">
-        <div class="wrap">
-          <span class="label">what you see</span>
-          <h2 id="record-title">Every run is on the record.</h2>
-          <p class="sub">
-            Agents are hard to trust when you can't see inside them. Open any part of a run, even
-            while it's still going.
-          </p>
-          <div class="record">
-            <article>
-              <span class="label">changes</span>
-              <h3>The code, line by line</h3>
-              <p>
-                Every file each agent touched. Comment on a line and the agents work on your notes.
-              </p>
-              <pre><span class="del">- router.post('/upload', auth, async (req, res) =&gt; {</span>
-<span class="add">+ router.post('/upload', auth, rateLimit({ perMinute: 10 }), …</span></pre>
-            </article>
-            <article>
-              <span class="label">trace</span>
-              <h3>How each agent is thinking</h3>
-              <p>
-                Every model call and tool call, in order, with its input, output, tokens and context
-                use.
-              </p>
-              <pre><span class="acc">1:39</span>  feedback  2 tests fail. Fix them, keep the tests.
-<span class="acc">1:40</span>  model     rateLimit() never sets Retry-After.
-<span class="acc">1:58</span>  tool      edit_file src/middleware/rateLimit.ts</pre>
-            </article>
-            <article>
-              <span class="label">errors</span>
-              <h3>What broke, and the likely cause</h3>
-              <p>
-                The failing test, the file and line, each retry, and a way to retry with a note or
-                take over.
-              </p>
-              <pre><span class="del">Error: ENOENT, open '/tmp/u_83.bin'</span>
-  at readUpload (src/lib/storage.ts:21)
-<span class="acc">cause</span> saveUpload() isn't awaited on line 36</pre>
-            </article>
-            <article>
-              <span class="label">evals</span>
-              <h3>Whether it actually helps</h3>
-              <p>
-                Real tasks graded by hidden tests, run several times, comparing setups on pass rate,
-                cost and time.
-              </p>
-              <pre>one agent            52%  ████████░░░░░░░
-orchestrator         61%  █████████░░░░░░
-+ failures sent back <span class="acc">70%  ██████████░░░░░</span>   (example)</pre>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section aria-labelledby="app-title" style="padding-top: 0">
-        <div class="wrap">
-          <span class="label">the app</span>
-          <h2 id="app-title">One window for every run.</h2>
-          <figure class="window" aria-label="The helloagents app running a task">
-            <div class="window-bar">
-              <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="window-title">helloagents · acme/api</span>
-            </div>
-            <div class="app">
-              <ul class="runs" aria-hidden="true">
-                <li class="sel">
-                  <span class="t">Add rate limiting to uploads</span
-                  ><span class="w" data-clock>1:39</span>
-                  <span class="s"
-                    ><span class="dot live" data-live-dot></span
-                    ><span data-run-state>Agents working</span></span
-                  >
-                  <span class="strip" data-mini-strip
-                    ><i class="done"></i><i class="fixing"></i><i class="done"></i
-                  ></span>
-                </li>
-                <li>
-                  <span class="t">Add CSV export to reports</span><span class="w">12m</span>
-                  <span class="s"><span class="dot ok"></span>Merged</span>
-                  <span class="strip"
-                    ><i class="done"></i><i class="done"></i><i class="done"></i
-                  ></span>
-                </li>
-                <li>
-                  <span class="t">Fix pagination off-by-one</span><span class="w">1h</span>
-                  <span class="s"><span class="dot ok"></span>Merged</span>
-                  <span class="strip"><i class="done"></i><i class="done"></i></span>
-                </li>
-              </ul>
-              <div class="detail">
-                <div>
-                  <h3>Add rate limiting to the upload endpoint</h3>
-                  <div class="meta">
-                    <span data-clock>1:39</span> elapsed · 3 agents · your Claude plan
-                  </div>
-                </div>
-                <div class="progress" data-progress>
-                  <div class="track"><i></i></div>
-                  <div class="phases">
-                    <span>Plan</span><span class="on" data-phase="build">Branch</span
-                    ><span data-phase="check">Check</span><span data-phase="merge">Merge</span>
-                  </div>
-                </div>
-                <ul class="agents">
-                  <li>
-                    <span class="badge">H1</span
-                    ><span
-                      ><div class="job">Build the rate limiter</div>
-                      <div class="note">Tests passed (6 of 6)</div></span
-                    ><span class="tag ok">Done</span>
-                  </li>
-                  <li>
-                    <span class="badge">CC</span>
-                    <span
-                      ><div class="job">Add it to the upload endpoint</div>
-                      <div class="note" data-cc-note>
-                        <span class="bad">2 tests failed</span>, sent back to fix
-                      </div></span
-                    >
-                    <span class="tag fix" data-cc-tag>Fixing</span>
-                  </li>
-                  <li>
-                    <span class="badge">H2</span
-                    ><span
-                      ><div class="job">Write the tests</div>
-                      <div class="note">Tests passed (9 of 9)</div></span
-                    ><span class="tag ok">Done</span>
-                  </li>
-                </ul>
-                <div class="result" data-result>
-                  <span data-result-text
-                    ><b>Not ready yet.</b> <span>Merge unlocks when every test passes.</span></span
-                  >
-                  <span class="fake-btn" aria-hidden="true">Merge</span>
-                </div>
-              </div>
-            </div>
-          </figure>
-        </div>
-      </section>
-
-      <section id="models" aria-labelledby="models-title" style="padding-top: 0">
-        <div class="wrap">
-          <span class="label">bring your own model</span>
-          <h2 id="models-title">No API key? Use the Claude Code you already have.</h2>
-          <p class="sub">
-            Every part of a run, the planner, the agents and the reviewer, can run through Claude
-            Code on your own plan. Or bring a key, or keep everything on your machine.
-          </p>
-          <div class="models">
-            <div>
-              <span><b>Claude Code</b><small>your Claude Pro or Max plan</small></span>
-              <p>
-                Agents run through the <code>claude</code> CLI you're already signed in to. No key,
-                nothing extra to pay.
-              </p>
-              <span class="chip yes">first</span>
-            </div>
-            <div>
-              <span><b>Claude API</b><small>your Anthropic key</small></span>
-              <p>
-                The built-in helloagents agent, on Claude Opus 5 by default, with hard per-run
-                spending limits.
-              </p>
-              <span class="chip yes">working</span>
-            </div>
-            <div>
-              <span><b>Codex CLI</b><small>your ChatGPT plan</small></span>
-              <p>The same approach as Claude Code, for people who use OpenAI's coding agent.</p>
-              <span class="chip soon">planned</span>
-            </div>
-            <div>
-              <span><b>Local models</b><small>Ollama, on your machine</small></span>
-              <p>Free and fully offline. Less capable on hard tasks, but no account at all.</p>
-              <span class="chip soon">planned</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="evals" aria-labelledby="evals-title" style="padding-top: 0">
-        <div class="wrap evals">
-          <div>
-            <span class="label">evals built in</span>
-            <h2 id="evals-title">Measured, not promised.</h2>
-            <p class="sub">
-              An eval suite ships with the app: real coding tasks with hidden tests, each run
-              several times because agents don't give the same answer twice.
-            </p>
-          </div>
-          <figure class="report" style="margin: 0" aria-label="Example eval report">
-            <div class="report-head">
-              <span>coding tasks · 3 runs each</span><b>example report</b>
-            </div>
-            <div class="bars">
-              <div class="bar">
-                <span>One agent</span><span class="v">52%</span
-                ><span class="t"><i style="width: 52%"></i></span>
-              </div>
-              <div class="bar">
-                <span>Orchestrator</span><span class="v">61%</span
-                ><span class="t"><i style="width: 61%"></i></span>
-              </div>
-              <div class="bar best">
-                <span>Orchestrator, failures sent back</span><span class="v">70%</span
-                ><span class="t"><i style="width: 70%"></i></span>
-              </div>
-            </div>
-          </figure>
-        </div>
-      </section>
-
-      <section id="faq" aria-labelledby="faq-title" style="padding-top: 0">
-        <div class="wrap">
-          <span class="label">questions</span>
-          <h2 id="faq-title">Before you ask.</h2>
-          <div class="faq">
-            <details>
-              <summary>Is it free?</summary>
-              <p>
-                Yes. The desktop app is open source under the MIT license and runs on your machine.
-                You bring your own model access: a Claude plan, an API key, or (soon) a local model.
-              </p>
-            </details>
-            <details>
-              <summary>Can I use it with only Claude Code?</summary>
-              <p>
-                Yes. The planner, the agents and the reviewer can all run through the Claude Code
-                CLI you're signed in to, so no API key is needed.
-              </p>
-            </details>
-            <details>
-              <summary>Does my code leave my machine?</summary>
-              <p>
-                Only to the model provider you choose, the same as using Claude Code directly. Runs,
-                traces and logs are stored locally.
-              </p>
-            </details>
-            <details>
-              <summary>Can an agent break my repo?</summary>
-              <p>
-                Each agent works on its own branch in its own worktree. Agents can't write outside
-                it, commands run without a shell from an allowlist, and nothing reaches main until
-                you approve the merge.
-              </p>
-            </details>
-            <details>
-              <summary>When can I download it?</summary>
-              <p>
-                The agent harness and trace store work today from the terminal. The orchestrator and
-                the macOS app are in progress. Star the repo to follow along.
-              </p>
-            </details>
-          </div>
-        </div>
-      </section>
-
-      <section style="padding-top: 0">
-        <div class="wrap final">
-          <div>
-            <span class="label">built in public</span>
-            <h2>Hand off the task. Keep the final say.</h2>
-          </div>
-          <div class="ctas" style="margin: 0">
             <a
-              class="btn btn-ink"
+              class="btn btn-ghost"
               href="https://github.com/ShivankK26/helloagents-dot-run"
               rel="noopener"
-              >Star on GitHub</a
             >
-            <a
-              class="btn"
-              href="https://github.com/ShivankK26/helloagents-dot-run/commits/main"
-              rel="noopener"
-              >Recent progress</a
-            >
+              <svg><use href="#github" /></svg> View the code
+            </a>
           </div>
+          <p class="fine first-open">
+            Opening it the first time? macOS asks you to confirm because the app isn't notarized
+            yet. Open <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b>.
+          </p>
         </div>
       </section>
     </main>
 
     <footer>
       <div class="wrap">
-        <span>helloagents · MIT licensed</span>
-        <nav aria-label="Footer">
-          <a href="#run">How a run works</a>
-          <a href="#models">Models</a>
-          <a href="#faq">FAQ</a>
-          <a href="https://github.com/ShivankK26/helloagents-dot-run" rel="noopener">GitHub</a>
-        </nav>
+        <span>© 2026 helloagents · open source</span>
+        <a href="https://github.com/ShivankK26/helloagents-dot-run" rel="noopener">GitHub</a>
       </div>
     </footer>
-
-    <script>
-      // The app window plays one run: claude-code fixes its failing tests,
-      // a reviewer checks, and the run becomes ready to merge.
-      (() => {
-        const $ = (s) => document.querySelector(s);
-        const all = (s) => document.querySelectorAll(s);
-        const clock = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
-        const frames = [
-          {
-            t: 99,
-            cc: [
-              "fix",
-              "Fixing",
-              '<span class="bad">2 tests failed</span>, sent back to fix',
-              "fixing",
-            ],
-            progress: 55,
-            phase: "build",
-            state: "Agents working",
-            ready: false,
-          },
-          {
-            t: 118,
-            cc: ["fix", "Fixing", "Adding the missing Retry-After header", "fixing"],
-            progress: 62,
-            phase: "build",
-            state: "Agents working",
-            ready: false,
-          },
-          {
-            t: 141,
-            cc: ["ok", "Done", "Tests passed (14 of 14) after one retry", "done"],
-            progress: 78,
-            phase: "check",
-            state: "Reviewer checking",
-            ready: false,
-          },
-          {
-            t: 171,
-            cc: ["ok", "Done", "Reviewer approved it", "done"],
-            progress: 100,
-            phase: "merge",
-            state: "Ready to merge",
-            ready: true,
-          },
-        ];
-        function show(f) {
-          all("[data-clock]").forEach((el) => (el.textContent = clock(f.t)));
-          const [cls, label, note, strip] = f.cc;
-          const tag = $("[data-cc-tag]");
-          tag.className = `tag ${cls}`;
-          tag.textContent = label;
-          $("[data-cc-note]").innerHTML = note;
-          $("[data-mini-strip] i:nth-child(2)").className = strip;
-          $("[data-progress] .track i").style.width = `${f.progress}%`;
-          $("[data-progress]").classList.toggle("done", f.ready);
-          all("[data-phase]").forEach((el) =>
-            el.classList.toggle("on", el.dataset.phase === f.phase),
-          );
-          $("[data-run-state]").textContent = f.state;
-          $("[data-live-dot]").className = `dot ${f.ready ? "ok" : "live"}`;
-          $("[data-result]").classList.toggle("ready", f.ready);
-          $("[data-result-text]").innerHTML = f.ready
-            ? "<b>Ready to merge.</b> <span>29 of 29 tests pass · reviewed</span>"
-            : "<b>Not ready yet.</b> <span>Merge unlocks when every test passes.</span>";
-        }
-        if (matchMedia("(prefers-reduced-motion: reduce)").matches)
-          return show(frames[frames.length - 1]);
-        let i = 0;
-        show(frames[0]);
-        setInterval(() => {
-          i = (i + 1) % (frames.length + 1);
-          show(frames[Math.min(i, frames.length - 1)]);
-        }, 2200);
-      })();
-    </script>
   </body>
 </html>

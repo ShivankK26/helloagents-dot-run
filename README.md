@@ -6,6 +6,12 @@
 
 A desktop app that orchestrates coding agents. Give it a task: it splits the work across several agents, each in its own git worktree, sends failing tests back to the agent that wrote the code, and hands you one reviewed change to merge. It ships with traces, logs and an eval suite, so you can see how the agents work and measure whether the orchestration helps.
 
+## Download
+
+**[Download helloagents for Mac](https://github.com/ShivankK26/helloagents-dot-run/releases/latest/download/helloagents-mac.dmg)** (Apple silicon and Intel). You need [Claude Code](https://claude.com/claude-code) installed and signed in; runs use your Claude plan, no API key needed.
+
+The app isn't notarized yet, so the first time you open it macOS asks you to confirm: open **System Settings → Privacy & Security** and click **Open Anyway**.
+
 Status: rebuilding from scratch. The previous project in this repo, the helloagents.run sub-agent directory, is preserved at the [`directory-v1`](../../tree/directory-v1) tag.
 
 ## Development
@@ -18,6 +24,7 @@ pnpm dev          # open the app with hot reload
 pnpm test         # unit tests (no model calls, no cost)
 pnpm typecheck
 pnpm lint
+pnpm --filter @helloagents/desktop dist   # build dist/helloagents-mac.dmg (universal)
 
 pnpm helloagents demo          # watch a free, scripted agent fix examples/buggy-stats
 pnpm helloagents runs          # list runs
