@@ -12,6 +12,10 @@ const paths = {
   reveal: "M14 3h7v7M10 14 21 3M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5",
   trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
   check: "M5 12l5 5 9-11",
+  runs: "M4 6h16M4 12h16M4 18h10",
+  trace: "M4 5h7M7 10h9M10 15h10M5 20h6",
+  alert: "M12 4 2.5 20h19L12 4zM12 10v4M12 17.5v.01",
+  gauge: "M4.5 17a8 8 0 1 1 15 0M12 14l4-5",
 } as const;
 
 export function Icon({ name, size = 16 }: { name: keyof typeof paths; size?: number }) {

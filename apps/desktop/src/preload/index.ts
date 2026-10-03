@@ -16,6 +16,8 @@ const api: HelloagentsApi = {
   updateProjectAgents: (id, agents) => invoke(IPC.updateProjectAgents, id, agents),
   removeProject: (id) => invoke(IPC.removeProject, id),
   listRuns: (projectId) => invoke(IPC.listRuns, projectId),
+  listAllRuns: (limit) => invoke(IPC.listAllRuns, limit),
+  listErrors: (limit) => invoke(IPC.listErrors, limit),
   getRun: (runId) => invoke(IPC.getRun, runId),
   startRun: (projectId, task) => invoke(IPC.startRun, projectId, task),
   cancelRun: (runId) => invoke(IPC.cancelRun, runId),
@@ -23,6 +25,7 @@ const api: HelloagentsApi = {
   runEvents: (runId, afterSeq) => invoke(IPC.runEvents, runId, afterSeq),
   runDiff: (runId) => invoke(IPC.runDiff, runId),
   revealInFinder: (path) => invoke(IPC.revealInFinder, path),
+  openExternal: (url) => invoke(IPC.openExternal, url),
   onRunChanged: (listener) => {
     const handler = (_event: IpcRendererEvent, runId: string) => listener(runId);
     ipcRenderer.on(IPC.runChanged, handler);

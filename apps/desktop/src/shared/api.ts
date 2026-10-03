@@ -6,6 +6,7 @@ import type {
   RunRecord,
   StoredEvent,
 } from "@helloagents/engine/types";
+import type { RunError } from "@helloagents/engine/views";
 
 export type { AgentId, AgentProvider, ProjectRecord, RunRecord, StoredEvent };
 
@@ -33,6 +34,13 @@ export interface RunListItem extends RunRecord {
   active: boolean;
 }
 
+/** Something that went wrong in a run, with the run it belongs to. */
+export interface ErrorListItem extends RunError {
+  runId: string;
+  runTitle: string;
+  projectId: string | null;
+}
+
 /**
  * Everything the window is allowed to ask the main process for. The preload
  * script exposes exactly this object as `window.helloagents`, nothing more.
@@ -57,6 +65,10 @@ export interface HelloagentsApi {
   ): Promise<void>;
   removeProject(id: string): Promise<void>;
   listRuns(projectId: string): Promise<RunListItem[]>;
+  /** Recent runs across every project, newest first. */
+  listAllRuns(limit?: number): Promise<RunListItem[]>;
+  /** Errors from recent runs, newest first. */
+  listErrors(limit?: number): Promise<ErrorListItem[]>;
   getRun(runId: string): Promise<RunListItem | null>;
   startRun(projectId: string, task: string): Promise<string>;
   cancelRun(runId: string): Promise<void>;
@@ -64,6 +76,8 @@ export interface HelloagentsApi {
   runEvents(runId: string, afterSeq: number): Promise<StoredEvent[]>;
   runDiff(runId: string): Promise<string>;
   revealInFinder(path: string): Promise<void>;
+  /** Opens an http(s) link in the default browser. */
+  openExternal(url: string): Promise<void>;
   /** Called with a run id whenever that run changes. Returns an unsubscribe function. */
   onRunChanged(listener: (runId: string) => void): () => void;
 }
@@ -80,6 +94,8 @@ export const IPC = {
   updateProjectAgents: "projects:update-agents",
   removeProject: "projects:remove",
   listRuns: "runs:list",
+  listAllRuns: "runs:list-all",
+  listErrors: "runs:errors",
   getRun: "runs:get",
   startRun: "runs:start",
   cancelRun: "runs:cancel",
@@ -87,5 +103,6 @@ export const IPC = {
   runEvents: "runs:events",
   runDiff: "runs:diff",
   revealInFinder: "shell:reveal",
+  openExternal: "shell:open-external",
   runChanged: "runs:changed",
 } as const;

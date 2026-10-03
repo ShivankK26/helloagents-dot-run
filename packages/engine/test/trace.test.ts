@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
+  describeToolCall,
   failureExcerpt,
   reply,
   runAgent,
@@ -274,5 +275,30 @@ describe("failureExcerpt", () => {
   test("caps very long output", () => {
     const out = Array.from({ length: 100 }, (_, i) => `Error ${i}`).join("\n");
     expect(failureExcerpt(out, 5).split("\n").at(-1)).toBe("… 95 more lines");
+  });
+});
+
+describe("Claude Code tools", () => {
+  test("a failed Bash command counts as an error, described by its command", () => {
+    const at = 1;
+    const errors = toErrors([
+      {
+        agentId: "main",
+        event: {
+          type: "tool.result",
+          at,
+          turn: 1,
+          id: "t1",
+          name: "Bash",
+          input: { command: "npm test" },
+          ok: false,
+          output: "1 test failed",
+          durationMs: 10,
+        },
+      },
+    ]);
+    expect(errors.map((e) => e.title)).toEqual(["npm test failed"]);
+    expect(describeToolCall("Edit", { file_path: "src/a.ts" })).toBe("Edit src/a.ts");
+    expect(describeToolCall("Grep", { pattern: "TODO" })).toBe("Grep TODO");
   });
 });

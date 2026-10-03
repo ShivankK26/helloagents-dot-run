@@ -112,6 +112,38 @@ out({
   session_id: session,
 });
 out({ type: "rate_limit_event", rate_limit_info: { status: "allowed" } });
+// "rich" ends with a formatted answer, like a real explanation from Claude Code.
+const RICH = [
+  "**stats-lib** is a tiny statistics library.",
+  "",
+  "## What changed",
+  "1. `add()` now returns `a + b` instead of `a - b`.",
+  "2. Added a comment so the fix is easy to spot.",
+  "",
+  "| File | Change |",
+  "| --- | --- |",
+  "| `math.js` | fixed `add()` |",
+  "",
+  "> All 3 tests pass. See the [Node test runner docs](https://nodejs.org/api/test.html).",
+].join("\n");
+if (mode === "rich") {
+  out({
+    type: "assistant",
+    message: {
+      model: "claude-opus-5-5",
+      content: [{ type: "text", text: RICH }],
+      stop_reason: "end_turn",
+      usage: {
+        input_tokens: 2,
+        output_tokens: 90,
+        cache_read_input_tokens: 10400,
+        cache_creation_input_tokens: 0,
+      },
+    },
+    parent_tool_use_id: null,
+    session_id: session,
+  });
+}
 if (mode === "error") {
   out({
     type: "result",
@@ -127,7 +159,7 @@ if (mode === "error") {
     type: "result",
     subtype: "success",
     is_error: false,
-    result: "Fixed add() and the tests pass.",
+    result: mode === "rich" ? RICH : "Fixed add() and the tests pass.",
     total_cost_usd: 0.42,
     session_id: session,
     num_turns: 2,

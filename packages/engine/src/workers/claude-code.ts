@@ -12,6 +12,12 @@ export interface ClaudeCodeOptions {
   /** Tools Claude Code may use without asking. */
   allowedTools?: readonly string[];
   maxTurns?: number;
+  /**
+   * Start Claude Code without the user's MCP servers, plugins, hooks and
+   * skills, and with only the coding tools. Default true: those add tens of
+   * thousands of tokens to every turn and a worker doesn't need them.
+   */
+  lean?: boolean;
   signal?: AbortSignal;
   onEvent?: (event: AgentEvent) => void;
   /** Path to the claude executable (tests point this at a fake). */
@@ -53,8 +59,11 @@ export const DEFAULT_CLAUDE_TOOLS = [
   "Bash(ls *)",
 ] as const;
 
+/** Built-in tools a lean worker gets at all (allowedTools then limits Bash). */
+export const LEAN_CLAUDE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "Bash"] as const;
+
 export function claudeArgs(
-  opts: Pick<ClaudeCodeOptions, "task" | "resumeSessionId" | "allowedTools" | "maxTurns">,
+  opts: Pick<ClaudeCodeOptions, "task" | "resumeSessionId" | "allowedTools" | "maxTurns" | "lean">,
 ): string[] {
   const args = [
     "-p",
@@ -71,6 +80,18 @@ export function claudeArgs(
     "--permission-prompts",
     "none",
   ];
+  if (opts.lean ?? true) {
+    args.push(
+      // No MCP servers (none are passed with --mcp-config).
+      "--strict-mcp-config",
+      // The project's settings still apply; the user's plugins and hooks don't.
+      "--setting-sources",
+      "project,local",
+      "--disable-slash-commands",
+      "--tools",
+      LEAN_CLAUDE_TOOLS.join(","),
+    );
+  }
   if (opts.maxTurns) args.push("--max-turns", String(opts.maxTurns));
   if (opts.resumeSessionId) args.push("--resume", opts.resumeSessionId);
   return args;

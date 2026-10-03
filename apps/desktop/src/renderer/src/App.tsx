@@ -2,8 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import type { AgentProvider, AppInfo, ProjectRecord } from "../../shared/api";
 import { agentOptions } from "./agents";
 import { AddProject } from "./components/AddProject";
+import { ErrorsPage } from "./components/ErrorsPage";
+import { EvalsPage } from "./components/EvalsPage";
 import { ProjectView } from "./components/ProjectView";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, type View } from "./components/Sidebar";
+import { TracesPage } from "./components/TracesPage";
 import { Welcome } from "./components/Welcome";
 import { Logo } from "./Logo";
 
@@ -14,6 +17,9 @@ export function App() {
   const [projects, setProjects] = useState<ProjectRecord[]>();
   const [selected, setSelected] = useState<string>();
   const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<View>("runs");
+  const [traceRun, setTraceRun] = useState<string>();
+  const [errorCount, setErrorCount] = useState(0);
 
   const loadProjects = useCallback(
     () =>
@@ -30,6 +36,12 @@ export function App() {
     void loadProjects();
   }, [api, loadProjects]);
 
+  useEffect(() => {
+    const count = () => void api.listErrors().then((list) => setErrorCount(list.length));
+    count();
+    return api.onRunChanged(count);
+  }, [api]);
+
   const options = agentOptions(agents, info);
   const project = projects?.find((p) => p.id === selected);
 
@@ -44,16 +56,38 @@ export function App() {
         {projects && projects.length > 0 ? (
           <>
             <Sidebar
+              view={view}
+              onView={(v) => {
+                setTraceRun(undefined);
+                setView(v);
+              }}
+              errorCount={errorCount}
               projects={projects}
               selected={selected}
               agents={agents}
-              onSelect={setSelected}
+              onSelect={(id) => {
+                setSelected(id);
+                setView("runs");
+              }}
               onAdd={() => setAdding(true)}
             />
             <main className="main">
-              {project ? (
+              {view === "runs" && project ? (
                 <ProjectView key={project.id} project={project} options={options} />
               ) : null}
+              {view === "traces" ? (
+                <TracesPage key={traceRun ?? "all"} projects={projects} initialRunId={traceRun} />
+              ) : null}
+              {view === "errors" ? (
+                <ErrorsPage
+                  projects={projects}
+                  onOpenTrace={(runId) => {
+                    setTraceRun(runId);
+                    setView("traces");
+                  }}
+                />
+              ) : null}
+              {view === "evals" ? <EvalsPage /> : null}
             </main>
           </>
         ) : projects ? (
@@ -68,7 +102,10 @@ export function App() {
           onClose={() => setAdding(false)}
           onAdded={(added) => {
             setAdding(false);
-            void loadProjects().then(() => added[0] && setSelected(added[0].id));
+            void loadProjects().then(() => {
+              if (added[0]) setSelected(added[0].id);
+              setView("runs");
+            });
           }}
         />
       ) : null}

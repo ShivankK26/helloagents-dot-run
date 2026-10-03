@@ -11,11 +11,18 @@ import {
   isGitRepo,
   loadShellPath,
   RunManager,
+  toErrors,
   TraceStore,
   type AgentId,
 } from "@helloagents/engine";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron";
-import { IPC, type AppInfo, type FolderInfo, type RunListItem } from "../shared/api";
+import {
+  IPC,
+  type AppInfo,
+  type ErrorListItem,
+  type FolderInfo,
+  type RunListItem,
+} from "../shared/api";
 
 const isMac = process.platform === "darwin";
 let win: BrowserWindow | undefined;
@@ -168,6 +175,22 @@ app.whenReady().then(async () => {
   ipcMain.handle(IPC.listRuns, (_e, projectId: string) =>
     store.listProjectRuns(projectId).map(listItem),
   );
+  ipcMain.handle(IPC.listAllRuns, (_e, limit?: number) =>
+    store.listRuns(limit ?? 100).map(listItem),
+  );
+  ipcMain.handle(IPC.listErrors, (_e, limit?: number): ErrorListItem[] =>
+    store
+      .listRuns(limit ?? 100)
+      .flatMap((run) =>
+        toErrors(store.events(run.id)).map((err) => ({
+          ...err,
+          runId: run.id,
+          runTitle: run.title,
+          projectId: run.projectId,
+        })),
+      )
+      .sort((a, b) => b.at - a.at),
+  );
   ipcMain.handle(IPC.getRun, (_e, runId: string) => {
     const run = store.getRun(runId);
     return run ? listItem(run) : null;
@@ -182,6 +205,10 @@ app.whenReady().then(async () => {
   );
   ipcMain.handle(IPC.runDiff, (_e, runId: string) => manager.diff(runId));
   ipcMain.handle(IPC.revealInFinder, (_e, p: string) => shell.showItemInFolder(p));
+  // Links in agent output: only web links, never file: or custom schemes.
+  ipcMain.handle(IPC.openExternal, (_e, url: string) => {
+    if (/^https?:\/\//i.test(url)) return shell.openExternal(url);
+  });
 
   win = createWindow();
   if (process.env.HELLOAGENTS_CAPTURE) captureAndQuit(win, process.env.HELLOAGENTS_CAPTURE);

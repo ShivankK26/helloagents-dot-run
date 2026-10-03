@@ -1,20 +1,15 @@
-import { toErrors } from "@helloagents/engine/views";
+import { describeToolCall, toErrors } from "@helloagents/engine/views";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RunListItem, StoredEvent } from "../../../shared/api";
 import { agentName } from "../agents";
+import { compact, tokenParts } from "../format";
 import { elapsed } from "../time";
+import { Markdown } from "./Markdown";
 import { Diff } from "./Diff";
 import { Icon } from "./Icons";
 import { StatusPill } from "./Status";
 
 type Tab = "activity" | "changes" | "summary";
-
-function describe(name: string, input: unknown): string {
-  const i = (input ?? {}) as Record<string, unknown>;
-  const target = i.command ?? i.file_path ?? i.path ?? i.pattern ?? i.url ?? "";
-  if (name === "run_command") return [i.command, ...((i.args as unknown[]) ?? [])].join(" ");
-  return `${name} ${String(target)}`.trim();
-}
 
 export function RunDetail({ runId, onBack }: { runId: string; onBack: () => void }) {
   const api = window.helloagents;
@@ -67,8 +62,13 @@ export function RunDetail({ runId, onBack }: { runId: string; onBack: () => void
   const worktree = run.worktree;
   const status = run.active ? "running" : run.status;
   const errors = toErrors(events);
+  // Claude Code's final message is also the run summary; don't show it twice.
+  const lastSaid = events
+    .map(({ event: e }) => (e.type === "model.response" ? e.text.trim() : ""))
+    .filter(Boolean)
+    .at(-1);
   const u = run.usage;
-  const tokens = u.inputTokens + u.outputTokens + u.cacheReadTokens + u.cacheWriteTokens;
+  const tokens = tokenParts(u);
 
   return (
     <div className="run-detail">
@@ -82,7 +82,12 @@ export function RunDetail({ runId, onBack }: { runId: string; onBack: () => void
             <StatusPill status={status} />
             <span>{run.agent ? agentName(run.agent) : run.model}</span>
             <span>{elapsed(run.startedAt, run.endedAt ?? now)}</span>
-            {tokens ? <span>{(tokens / 1000).toFixed(1)}k tokens</span> : null}
+            {tokens.fresh ? (
+              <span title="New tokens: input, output and cache writes. Cache re-reads are counted separately.">
+                {compact(tokens.fresh)} tokens
+                {tokens.cached ? ` · ${compact(tokens.cached)} cached` : ""}
+              </span>
+            ) : null}
             {run.worktree ? (
               <span title={run.worktree.path}>
                 <Icon name="branch" size={13} /> {run.worktree.branch}
@@ -147,7 +152,7 @@ export function RunDetail({ runId, onBack }: { runId: string; onBack: () => void
               if (e.type === "model.response")
                 return e.text ? (
                   <li key={seq} className="act-say">
-                    {e.text}
+                    <Markdown text={e.text} />
                   </li>
                 ) : null;
               if (e.type === "tool.result") {
@@ -156,7 +161,7 @@ export function RunDetail({ runId, onBack }: { runId: string; onBack: () => void
                     <details>
                       <summary>
                         <span className="mark">{e.ok ? "✓" : "✗"}</span>
-                        <span className="mono">{describe(e.name, e.input)}</span>
+                        <span className="mono">{describeToolCall(e.name, e.input)}</span>
                       </summary>
                       <pre>{e.output || "(no output)"}</pre>
                     </details>
@@ -172,7 +177,9 @@ export function RunDetail({ runId, onBack }: { runId: string; onBack: () => void
                         ? "Stopped"
                         : "Didn't finish"}
                   </b>
-                  <p>{e.summary}</p>
+                  {e.summary && e.summary.trim() !== lastSaid ? (
+                    <Markdown text={e.summary} />
+                  ) : null}
                   {e.error ? <pre>{e.error}</pre> : null}
                 </li>
               );
@@ -197,10 +204,11 @@ export function RunDetail({ runId, onBack }: { runId: string; onBack: () => void
                   ? "What the agent did"
                   : "What happened"}
             </h3>
-            <p>
-              {run.summary ??
-                (run.active ? "The summary appears when the agent finishes." : "No summary.")}
-            </p>
+            {run.summary ? (
+              <Markdown text={run.summary} />
+            ) : (
+              <p>{run.active ? "The summary appears when the agent finishes." : "No summary."}</p>
+            )}
             {run.error ? <pre className="err">{run.error}</pre> : null}
             {errors.length ? <h3>Problems along the way</h3> : null}
             {errors.map((err, i) => (

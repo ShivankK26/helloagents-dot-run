@@ -56,11 +56,17 @@ const oneLine = (s: string, max = 160) => {
   return first.length > max ? `${first.slice(0, max - 1)}…` : first;
 };
 
+/** Tools that run shell commands: the built-in harness's and Claude Code's. */
+export const isCommandTool = (name: string) => name === "run_command" || name === "Bash";
+
 export function describeToolCall(name: string, input: unknown): string {
   const i = (input ?? {}) as Record<string, unknown>;
   if (name === "run_command") return [i.command, ...((i.args as unknown[]) ?? [])].join(" ");
+  if (name === "Bash") return String(i.command ?? "Bash");
   if (name === "finish") return "finish";
-  return `${name} ${typeof i.path === "string" ? i.path : ""}`.trim();
+  // Claude Code names the target file_path or pattern; the harness uses path.
+  const target = [i.path, i.file_path, i.pattern, i.url].find((v) => typeof v === "string");
+  return `${name} ${typeof target === "string" ? target : ""}`.trim();
 }
 
 /** Turns events into readable log lines, oldest first. */
@@ -72,25 +78,25 @@ export function toLogLines(events: WithAgent[]): LogLine[] {
         lines.push({ at: e.at, level: "INFO", source, message: `started on ${e.model}` });
         break;
       case "model.response": {
-        const tokens =
-          e.usage.inputTokens +
-          e.usage.outputTokens +
-          e.usage.cacheReadTokens +
-          e.usage.cacheWriteTokens;
+        // New tokens; the cache re-read of the conversation is listed separately.
+        const tokens = e.usage.inputTokens + e.usage.outputTokens + e.usage.cacheWriteTokens;
+        const cached = e.usage.cacheReadTokens
+          ? ` (+${e.usage.cacheReadTokens.toLocaleString("en-US")} cached)`
+          : "";
         const said = e.text ? ` · "${oneLine(e.text, 100)}"` : "";
         const fallback = e.stopReason === "refusal" ? "ERROR" : "INFO";
         lines.push({
           at: e.at,
           level: fallback,
           source,
-          message: `turn ${e.turn} · ${tokens.toLocaleString("en-US")} tokens · ${(e.durationMs / 1000).toFixed(1)}s${said}`,
+          message: `turn ${e.turn} · ${tokens.toLocaleString("en-US")} tokens${cached} · ${(e.durationMs / 1000).toFixed(1)}s${said}`,
         });
         break;
       }
       case "tool.result":
         lines.push({
           at: e.at,
-          level: e.ok ? "INFO" : e.name === "run_command" ? "ERROR" : "WARN",
+          level: e.ok ? "INFO" : isCommandTool(e.name) ? "ERROR" : "WARN",
           source,
           message: `${describeToolCall(e.name, e.input)}${e.ok ? "" : ` → ${oneLine(e.output)}`}`,
         });
@@ -117,7 +123,7 @@ export function toLogLines(events: WithAgent[]): LogLine[] {
 export function toErrors(events: WithAgent[]): RunError[] {
   const errors: RunError[] = [];
   for (const { agentId: source, event: e } of events) {
-    if (e.type === "tool.result" && !e.ok && e.name === "run_command") {
+    if (e.type === "tool.result" && !e.ok && isCommandTool(e.name)) {
       errors.push({
         at: e.at,
         source,

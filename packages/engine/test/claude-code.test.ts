@@ -44,6 +44,15 @@ describe("claudeArgs", () => {
     expect(args).not.toContain("--bare"); // bare mode would skip the user's Claude login
   });
 
+  test("starts lean by default: no MCP servers, user plugins or skills, only coding tools", () => {
+    const args = claudeArgs({ task: "Fix it" });
+    expect(args).toContain("--strict-mcp-config");
+    expect(args).toContain("--disable-slash-commands");
+    expect(args[args.indexOf("--setting-sources") + 1]).toBe("project,local");
+    expect(args[args.indexOf("--tools") + 1]).toBe("Read,Edit,Write,Glob,Grep,Bash");
+    expect(claudeArgs({ task: "Fix it", lean: false })).not.toContain("--strict-mcp-config");
+  });
+
   test("resumes a session to send feedback, and can cap turns", () => {
     const args = claudeArgs({ task: "2 tests failed", resumeSessionId: "abc", maxTurns: 20 });
     expect(args.slice(-4)).toEqual(["--max-turns", "20", "--resume", "abc"]);
