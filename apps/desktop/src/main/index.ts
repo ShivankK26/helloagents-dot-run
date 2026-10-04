@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { access, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -155,6 +156,7 @@ app.whenReady().then(async () => {
     ...run,
     active: manager.isActive(run.id),
     devRunning: manager.devRunning(run.id),
+    branchGone: Boolean(run.worktree && !existsSync(run.worktree.path)),
     digest: digestRun(store.events(run.id)),
   });
 
@@ -291,6 +293,8 @@ app.whenReady().then(async () => {
   ipcMain.handle(IPC.openIn, async (_e, openerId: string, dir: string) => {
     const o = OPENERS.find((x) => x.id === openerId);
     if (!o) return;
+    if (!existsSync(dir))
+      throw new Error("This run's folder no longer exists. It was discarded or removed.");
     if (o.id === "finder") return void (await shell.openPath(dir));
     const { execFile } = await import("node:child_process");
     await new Promise<void>((resolve, reject) =>

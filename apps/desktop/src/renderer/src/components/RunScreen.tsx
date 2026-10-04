@@ -202,7 +202,9 @@ export function RunScreen({
         ) : null}
       </div>
 
-      {worktree ? <Dock runId={runId} enabled={canFollowUp} active={run.active} /> : null}
+      {worktree && !run.branchGone ? (
+        <Dock runId={runId} enabled={canFollowUp} active={run.active} />
+      ) : null}
     </div>
   );
 }
@@ -558,9 +560,17 @@ function RunActions({
     );
   }
   const base = run.settings.baseBranch ?? "main";
+  if (run.branchGone) {
+    return (
+      <div className="run-actions">
+        <span className="gone">Branch discarded</span>
+      </div>
+    );
+  }
+  const canResume = run.status === "cancelled" || run.status === "error" || run.status === "budget";
   return (
     <div className="run-actions">
-      {run.status === "cancelled" || run.status === "error" || run.status === "budget" ? (
+      {canResume ? (
         <button
           className="btn btn-primary"
           disabled={Boolean(busy)}
@@ -569,41 +579,43 @@ function RunActions({
           <Icon name="resume" size={13} /> Resume
         </button>
       ) : null}
-      {actions?.checks.length ? (
-        <button
-          className="btn btn-ghost"
-          disabled={Boolean(busy)}
-          title={actions.checks.join(" · ")}
-          onClick={() => void act("checks", () => api.runChecks(run.id))}
-        >
-          <Icon name="play" size={12} /> Run checks
-        </button>
-      ) : null}
-      {actions?.dev ? (
-        run.devRunning ? (
-          <button
-            className="btn btn-ghost"
-            onClick={() => void api.stopDev(run.id)}
-            title={actions.dev.url}
-          >
-            <Icon name="stop" size={12} /> Stop server
-          </button>
-        ) : (
-          <button
-            className="btn btn-ghost"
-            disabled={Boolean(busy)}
-            title={`${actions.dev.command} → ${actions.dev.url}`}
-            onClick={() =>
-              void act(
-                "dev",
-                () => api.startDev(run.id),
-                (url) => showToast(`Dev server starting at ${String(url)}`),
-              )
-            }
-          >
-            <Icon name="globe" size={13} /> Dev server
-          </button>
-        )
+      {actions?.checks.length || actions?.dev ? (
+        <div className="tool-group" role="group" aria-label="Project actions">
+          {actions.checks.length ? (
+            <button
+              disabled={Boolean(busy)}
+              title={actions.checks.join(" · ")}
+              onClick={() => void act("checks", () => api.runChecks(run.id))}
+            >
+              {busy === "checks" ? <span className="spinner" /> : <Icon name="play" size={12} />}{" "}
+              Run checks
+            </button>
+          ) : null}
+          {actions.dev ? (
+            run.devRunning ? (
+              <button
+                onClick={() => void api.stopDev(run.id)}
+                title={`Running at ${actions.dev.url}`}
+              >
+                <i className="dot live" /> Stop server
+              </button>
+            ) : (
+              <button
+                disabled={Boolean(busy)}
+                title={`${actions.dev.command} → ${actions.dev.url}`}
+                onClick={() =>
+                  void act(
+                    "dev",
+                    () => api.startDev(run.id),
+                    (url) => showToast(`Dev server starting at ${String(url)}`),
+                  )
+                }
+              >
+                <Icon name="globe" size={13} /> Dev server
+              </button>
+            )
+          ) : null}
+        </div>
       ) : null}
       <Menu
         className="btn"
@@ -624,7 +636,7 @@ function RunActions({
         }))}
       />
       <Menu
-        className={`btn ${o.tone === "ok" ? "btn-primary" : ""}`}
+        className={`btn ${o.tone === "ok" && !canResume ? "btn-primary" : ""}`}
         align="right"
         width={320}
         trigger={
@@ -675,16 +687,42 @@ function RunActions({
               ]),
         ]}
       />
-      {inPlace ? null : (
-        <button
-          className="icon-btn"
-          title="Discard this run's branch"
-          aria-label="Discard"
-          onClick={() => setConfirmDiscard(true)}
-        >
-          <Icon name="trash" size={14} />
-        </button>
-      )}
+      <Menu
+        className="icon-btn more"
+        align="right"
+        width={250}
+        title="More"
+        trigger={<Icon name="dots" size={16} />}
+        items={[
+          {
+            id: "copy",
+            label: "Copy branch name",
+            hint: worktree.branch,
+            icon: <Icon name="branch" size={13} />,
+            onSelect: () =>
+              void navigator.clipboard
+                .writeText(worktree.branch)
+                .then(() => showToast("Branch name copied")),
+          },
+          {
+            id: "finder",
+            label: "Show in Finder",
+            icon: <Icon name="folder" size={13} />,
+            onSelect: () => void api.revealInFinder(worktree.path),
+          },
+          ...(inPlace
+            ? []
+            : [
+                {
+                  id: "discard",
+                  label: "Discard this run's branch",
+                  hint: "Deletes its folder and branch. History stays.",
+                  icon: <Icon name="trash" size={13} />,
+                  onSelect: () => setConfirmDiscard(true),
+                },
+              ]),
+        ]}
+      />
     </div>
   );
 }

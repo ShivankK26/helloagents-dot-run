@@ -67,6 +67,8 @@ export interface RunListItem extends RunRecord {
   active: boolean;
   /** A dev server is running on this run's branch. */
   devRunning: boolean;
+  /** The run had a branch, but its folder is gone (discarded or removed). */
+  branchGone: boolean;
   /** Files read and changed, commands, the last test result and the current stage. */
   digest: RunDigest;
 }

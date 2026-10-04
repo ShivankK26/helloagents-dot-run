@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export type MenuItem =
   | { header: string }
@@ -33,7 +33,23 @@ export function Menu({
   title?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [place, setPlace] = useState<{ up: boolean; maxHeight: number }>({ up, maxHeight: 380 });
   const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+
+  // Open on the side with more room, and cap the height to what fits in the window.
+  useLayoutEffect(() => {
+    if (!open || !ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    const above = r.top - 56; // below the title bar
+    const below = window.innerHeight - r.bottom - 12;
+    // The menu's full height, so it opens where it fits without scrolling.
+    const natural = Math.min(420, popRef.current?.scrollHeight ?? 300);
+    const goUp = up
+      ? above >= natural || (below < natural && above > below)
+      : below < natural && above > below;
+    setPlace({ up: goUp, maxHeight: Math.max(160, Math.min(420, goUp ? above : below)) });
+  }, [open, up]);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -62,9 +78,10 @@ export function Menu({
       </button>
       {open ? (
         <div
-          className={`pop ${up ? "up" : ""}`}
+          ref={popRef}
+          className={`pop ${place.up ? "up" : ""}`}
           role="menu"
-          style={{ width, [align === "left" ? "left" : "right"]: 0 }}
+          style={{ width, maxHeight: place.maxHeight, [align === "left" ? "left" : "right"]: 0 }}
         >
           {items.map((it, i) =>
             "header" in it ? (
