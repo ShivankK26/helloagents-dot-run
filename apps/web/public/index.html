@@ -6,24 +6,24 @@
     <title>helloagents: hand off the task, merge the result</title>
     <meta
       name="description"
-      content="A free Mac app that gives your coding tasks to Claude Code. Each task runs on its own branch, you see every step, and you merge when it looks right."
+      content="A free Mac app that runs Claude Code (and soon Codex) on your tasks, each on its own branch. Your tests decide when it's done, and you ship with one click."
     />
     <link rel="canonical" href="https://www.helloagents.run/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <meta name="theme-color" content="#f6f6f2" />
+    <meta name="theme-color" content="#000000" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="helloagents" />
     <meta property="og:title" content="helloagents: hand off the task, merge the result" />
     <meta
       property="og:description"
-      content="A free Mac app that gives your coding tasks to Claude Code. Each task runs on its own branch, you see every step, and you merge when it looks right."
+      content="A free Mac app that runs Claude Code (and soon Codex) on your tasks, each on its own branch. Your tests decide when it's done, and you ship with one click."
     />
     <meta property="og:url" content="https://www.helloagents.run/" />
-    <meta property="og:image" content="https://www.helloagents.run/og-image.png?v=2" />
+    <meta property="og:image" content="https://www.helloagents.run/og-image.png?v=3" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://www.helloagents.run/og-image.png?v=2" />
+    <meta name="twitter:image" content="https://www.helloagents.run/og-image.png?v=3" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -31,22 +31,28 @@
       href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600;700&display=swap"
     />
     <style>
-      /* One light look on purpose: warm paper, near-black ink, coral only for "the result". */
+      /* Dark only, like the app: pure black, quiet greys, orange for the one thing to do. */
       :root {
-        --paper: #f6f6f2;
-        --panel: #ffffff;
-        --ink: #101214;
-        --muted: #5b6068;
-        --faint: #8d929a;
-        --line: #e4e4de;
-        --coral: #f25a24;
-        --coral-soft: #fde6dc;
-        --ok: #1b8a4b;
-        --ok-soft: #e3f3e9;
-        --app-bg: #f3f4f6;
-        --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --bg: #000;
+        --surface: #0b0b0b;
+        --raised: #141414;
+        --sunk: #070707;
+        --line: #1f1f1f;
+        --line-2: #2f2f2f;
+        --ink: #fafafa;
+        --muted: #a3a3a3;
+        --faint: #6b6b6b;
+        --accent: #ff7a3d;
+        --accent-soft: #24140c;
+        --on-accent: #1a0b04;
+        --ok: #4ade80;
+        --ok-soft: #0e2416;
+        --bad: #f87171;
+        --bad-soft: #2a1111;
+        --warn: #facc15;
+        --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
         --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-        color-scheme: light;
+        color-scheme: dark;
       }
       * {
         box-sizing: border-box;
@@ -56,7 +62,7 @@
       }
       body {
         margin: 0;
-        background: var(--paper);
+        background: var(--bg);
         color: var(--ink);
         font: 17px/1.6 var(--sans);
         -webkit-font-smoothing: antialiased;
@@ -65,7 +71,7 @@
         color: inherit;
       }
       :focus-visible {
-        outline: 2px solid var(--coral);
+        outline: 2px solid var(--accent);
         outline-offset: 3px;
         border-radius: 6px;
       }
@@ -76,18 +82,21 @@
         margin: 0;
       }
       .wrap {
-        max-width: 1120px;
+        max-width: 1140px;
         margin: 0 auto;
         padding-inline: 24px;
       }
-
-      /* Nav */
+      code {
+        font: 0.88em var(--mono);
+      }
       .nav {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 16px;
         padding-block: 20px;
+        position: relative;
+        z-index: 2;
       }
       .brand {
         display: flex;
@@ -115,8 +124,6 @@
       .nav-links a:hover {
         color: var(--ink);
       }
-
-      /* Buttons */
       .btn {
         display: inline-flex;
         align-items: center;
@@ -137,15 +144,21 @@
         width: 18px;
         height: 18px;
       }
-      .btn-dark,
-      .nav-links a.btn-dark {
-        background: var(--ink);
-        color: var(--paper);
+      .btn svg.apple {
+        width: 17px;
+        height: 17px;
+        margin-top: -3px;
+      }
+      .nav-links a.btn-accent,
+      .btn-accent {
+        background: var(--accent);
+        color: var(--on-accent);
+        box-shadow: 0 10px 30px -12px rgb(255 122 61 / 0.6);
       }
       .btn-ghost {
         color: var(--ink);
-        border: 1px solid var(--line);
-        background: var(--panel);
+        border: 1px solid var(--line-2);
+        background: var(--surface);
       }
       .nav .btn {
         height: 38px;
@@ -153,15 +166,88 @@
         font-size: 14.5px;
         border-radius: 10px;
       }
-
-      /* Hero */
       .hero {
+        position: relative;
         text-align: center;
-        padding-block: 72px 56px;
+        padding-block: 96px 56px;
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 22px;
+      }
+      .hero > :not(.lamp) {
+        position: relative;
+        z-index: 1;
+      }
+      .lamp {
+        position: absolute;
+        top: 30px;
+        left: 50%;
+        width: min(1000px, 100%);
+        height: 360px;
+        transform: translateX(-50%);
+        pointer-events: none;
+      }
+      .lamp .halo {
+        position: absolute;
+        top: -50px;
+        left: 50%;
+        width: 520px;
+        max-width: 90%;
+        height: 100px;
+        transform: translateX(-50%);
+        border-radius: 50%;
+        background: rgb(255 122 61 / 0.3);
+        filter: blur(50px);
+      }
+      .lamp .cone {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(38% 62% at 50% 0%, rgb(255 122 61 / 0.16), transparent 72%),
+          conic-gradient(
+            from 156deg at 50% 0%,
+            transparent 0deg,
+            rgb(255 122 61 / 0.1) 24deg,
+            transparent 48deg
+          );
+        -webkit-mask-image: linear-gradient(to bottom, #000, transparent 85%);
+        mask-image: linear-gradient(to bottom, #000, transparent 85%);
+        filter: blur(24px);
+        animation: lamp-open 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+      }
+      .lamp .bar {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: 440px;
+        max-width: 80%;
+        height: 1.5px;
+        transform: translateX(-50%);
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgb(255 122 61 / 0.8) 25%,
+          #ffe4d2 50%,
+          rgb(255 122 61 / 0.8) 75%,
+          transparent
+        );
+        box-shadow:
+          0 0 10px rgb(255 122 61 / 0.7),
+          0 2px 28px 1px rgb(255 122 61 / 0.28);
+        animation: lamp-bar 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+      }
+      @keyframes lamp-open {
+        from {
+          opacity: 0;
+          transform: scaleX(0.6);
+        }
+      }
+      @keyframes lamp-bar {
+        from {
+          width: 120px;
+          opacity: 0;
+        }
       }
       .eyebrow {
         display: inline-flex;
@@ -169,19 +255,24 @@
         gap: 8px;
         font-size: 14px;
         color: var(--muted);
-        background: var(--panel);
-        border: 1px solid var(--line);
+        background: var(--surface);
+        border: 1px solid var(--line-2);
         border-radius: 999px;
         padding: 5px 14px 5px 10px;
+        text-decoration: none;
       }
       .eyebrow i {
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: var(--coral);
+        background: var(--accent);
+      }
+      .eyebrow b {
+        color: var(--ink);
+        font-weight: 500;
       }
       h1 {
-        font-size: clamp(44px, 7.4vw, 84px);
+        font-size: clamp(44px, 7.4vw, 86px);
         line-height: 1;
         letter-spacing: -0.045em;
         font-weight: 600;
@@ -190,7 +281,7 @@
       }
       h1 em {
         font-style: normal;
-        color: var(--coral);
+        color: var(--accent);
       }
       .lede {
         font-size: clamp(18px, 2.1vw, 21px);
@@ -205,392 +296,212 @@
         gap: 12px;
         margin-top: 6px;
       }
-      .fine {
+      .agents {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+      }
+      .agent-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+        padding: 0 12px;
+        border: 1px solid var(--line-2);
+        border-radius: 999px;
+        background: var(--surface);
         font-size: 14px;
-        color: var(--faint);
-      }
-      .first-open {
-        max-width: 44em;
-        text-wrap: balance;
-      }
-      .first-open b {
-        font-weight: 500;
-        color: var(--muted);
-      }
-
-      /* App picture */
-      .shot {
-        padding-bottom: 96px;
-      }
-      .window {
-        border-radius: 16px;
-        border: 1px solid #d9d9d2;
-        background: var(--app-bg);
-        box-shadow:
-          0 1px 0 rgb(255 255 255 / 0.8) inset,
-          0 40px 80px -30px rgb(16 18 20 / 0.28),
-          0 10px 24px -12px rgb(16 18 20 / 0.12);
-        overflow: hidden;
-        font-size: 13.5px;
-        line-height: 1.5;
-        text-align: left;
-      }
-      .titlebar {
-        height: 40px;
-        background: var(--panel);
-        border-bottom: 1px solid var(--line);
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 0 14px;
-      }
-      .lights {
-        display: flex;
-        gap: 7px;
-        margin-right: 14px;
-      }
-      .lights i {
-        width: 11px;
-        height: 11px;
-        border-radius: 50%;
-        background: #e4e4df;
-      }
-      .titlebar b {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        font-weight: 600;
-        font-size: 13px;
-      }
-      .titlebar svg {
-        width: 17px;
-        height: 17px;
-      }
-      .app {
-        display: grid;
-        grid-template-columns: 200px 1fr;
-        min-height: 480px;
-      }
-      .side {
-        background: var(--panel);
-        border-right: 1px solid var(--line);
-        padding: 14px 10px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-      .side-label {
-        font: 500 10.5px var(--mono);
-        letter-spacing: 0.07em;
-        text-transform: uppercase;
-        color: var(--faint);
-        padding: 0 8px 4px;
-      }
-      .proj {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 8px;
-        border-radius: 7px;
-        color: var(--muted);
-      }
-      .proj.on {
-        background: var(--app-bg);
-        color: var(--ink);
         font-weight: 500;
       }
-      .proj svg {
-        width: 15px;
-        height: 15px;
-        flex-shrink: 0;
+      .agent-chip small {
+        font-size: 12px;
+        font-weight: 400;
+        color: var(--faint);
       }
-      .side-foot {
-        margin-top: auto;
-        border-top: 1px solid var(--line);
-        padding: 12px 8px 0;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-      .agent {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 12.5px;
-      }
-      .dot {
+      .agent-chip .dot {
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: #d6d9de;
-        flex-shrink: 0;
+        display: inline-block;
       }
-      .dot.ok {
+      .agent-chip .dot.ok {
         background: var(--ok);
       }
-      .dot.live {
-        background: var(--coral);
-        animation: pulse 1.4s ease-in-out infinite;
+      .agent-chip .dot.soon {
+        background: transparent;
+        box-shadow: inset 0 0 0 1.5px var(--faint);
       }
-      @keyframes pulse {
-        50% {
-          opacity: 0.35;
-        }
-      }
-      .main {
-        padding: 18px 20px 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        min-width: 0;
-      }
-      .main h3 {
-        font-size: 17px;
-        font-weight: 600;
-        letter-spacing: -0.01em;
-      }
-      .composer {
-        background: var(--panel);
-        border: 1px solid #cfd3d9;
-        border-radius: 11px;
-        padding: 11px 12px 10px 14px;
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 12px;
-      }
-      .typed::after {
-        content: "";
-        display: inline-block;
-        width: 2px;
-        height: 1.1em;
-        background: var(--coral);
-        vertical-align: -3px;
-        margin-left: 2px;
-        animation: blink 1s steps(1) infinite;
-      }
-      @keyframes blink {
-        50% {
-          opacity: 0;
-        }
-      }
-      .run-btn {
-        background: var(--ink);
-        color: var(--panel);
-        border-radius: 8px;
-        padding: 4px 12px;
-        font-weight: 500;
-        font-size: 12.5px;
-        flex-shrink: 0;
-      }
-      .split {
-        display: grid;
-        grid-template-columns: 230px 1fr;
-        gap: 14px;
-        flex: 1;
-      }
-      .runs {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-      .run {
-        display: grid;
-        grid-template-columns: 8px 1fr auto;
-        align-items: center;
-        gap: 9px;
-        padding: 7px 8px;
-        border-radius: 8px;
-      }
-      .run.on {
-        background: var(--panel);
-        box-shadow: 0 0 0 1px var(--line);
-      }
-      .run span:nth-child(2) {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .run small {
-        font: 11px var(--mono);
-        color: var(--faint);
-      }
-      .detail {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 11px;
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-      }
-      .detail-head {
-        padding: 13px 15px 8px;
-      }
-      .detail-head b {
-        font-weight: 600;
+      .fine {
         font-size: 14px;
-      }
-      .meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 12px;
-        align-items: center;
-        margin-top: 4px;
-        font: 11.5px var(--mono);
         color: var(--faint);
+        text-wrap: balance;
       }
-      .pill {
-        font: 500 11px var(--mono);
-        border-radius: 999px;
-        padding: 1px 8px;
-        background: var(--coral-soft);
-        color: var(--coral);
-      }
-      .tabs {
-        display: flex;
-        gap: 16px;
-        padding: 0 15px;
-        border-bottom: 1px solid var(--line);
+      .fine b {
+        color: var(--muted);
         font-weight: 500;
-        font-size: 12.5px;
-        color: var(--muted);
       }
-      .tabs span {
-        padding: 6px 0 8px;
+      .shot {
+        padding-bottom: 110px;
       }
-      .tabs .on {
-        color: var(--ink);
-        box-shadow: inset 0 -2px 0 var(--ink);
-      }
-      .activity {
-        list-style: none;
+      .shot-frame {
+        position: relative;
         margin: 0;
-        padding: 12px 15px 15px;
+        border-radius: 14px;
+        border: 1px solid var(--line-2);
+        overflow: hidden;
+        background: var(--bg);
+        box-shadow:
+          0 1px 0 rgb(255 255 255 / 0.05) inset,
+          0 60px 120px -40px rgb(255 122 61 / 0.18),
+          0 40px 80px -30px rgb(0 0 0 / 0.9);
+      }
+      .shot-link {
+        display: block;
+      }
+      .shot-frame iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 1280px;
+        height: 820px;
+        border: 0;
+        transform-origin: 0 0;
+        background: #000;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+      }
+      .shot-frame.live iframe {
+        opacity: 1;
+      }
+      .shot-frame img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      /* The window buttons, placed where macOS draws them in the app (16px in, on a 1280×820 window). */
+      .shot-frame .lights {
+        position: absolute;
+        left: 1.25%;
+        top: 1.95%;
         display: flex;
-        flex-direction: column;
-        gap: 8px;
+        gap: 0.625cqw;
+        width: 4.06%;
       }
-      .say {
-        max-width: 60ch;
+      .shot-frame {
+        container-type: inline-size;
       }
-      .step {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font: 12px var(--mono);
-        color: var(--muted);
-      }
-      .tick {
-        width: 17px;
-        height: 17px;
+      .shot-frame .lights i {
+        flex: 1;
+        aspect-ratio: 1;
         border-radius: 50%;
-        display: grid;
-        place-items: center;
-        background: var(--ok-soft);
-        color: var(--ok);
-        font-size: 10px;
-        flex-shrink: 0;
       }
-      .step em {
-        font-style: normal;
-        color: var(--ok);
-        margin-left: auto;
+      .shot-frame .lights i:nth-child(1) {
+        background: #ff5f57;
       }
-      .working {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        color: var(--faint);
-        font-size: 12.5px;
+      .shot-frame .lights i:nth-child(2) {
+        background: #febc2e;
       }
-      .spin {
-        width: 13px;
-        height: 13px;
-        border: 2px solid #cfd3d9;
-        border-top-color: var(--coral);
-        border-radius: 50%;
-        animation: spin 0.9s linear infinite;
+      .shot-frame .lights i:nth-child(3) {
+        background: #28c840;
       }
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      /* Sections */
       section {
-        padding-block: 96px;
+        padding-block: 110px;
         border-top: 1px solid var(--line);
       }
       .section-head {
         display: flex;
         flex-direction: column;
         gap: 12px;
-        margin-bottom: 44px;
-        max-width: 640px;
+        margin-bottom: 48px;
+        max-width: 660px;
       }
       .kicker {
         font: 500 13px var(--mono);
-        color: var(--coral);
-        letter-spacing: 0.02em;
+        color: var(--accent);
       }
       h2 {
-        font-size: clamp(32px, 4.4vw, 48px);
+        font-size: clamp(32px, 4.4vw, 50px);
         line-height: 1.05;
         letter-spacing: -0.035em;
         font-weight: 600;
         text-wrap: balance;
       }
-      .steps,
-      .reasons {
+      .steps-3 {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 18px;
+        gap: 16px;
         list-style: none;
         margin: 0;
         padding: 0;
       }
-      .steps li {
-        background: var(--panel);
+      .steps-3 li {
+        background: var(--surface);
         border: 1px solid var(--line);
         border-radius: 16px;
         padding: 26px;
         display: flex;
         flex-direction: column;
         gap: 10px;
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
       }
       .num {
-        width: 34px;
-        height: 34px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         display: grid;
         place-items: center;
-        font: 600 15px var(--sans);
-        background: var(--ink);
-        color: var(--paper);
+        font: 600 14px var(--sans);
+        background: var(--raised);
+        border: 1px solid var(--line-2);
         margin-bottom: 8px;
       }
-      .steps li:last-child .num {
-        background: var(--coral);
+      .steps-3 li:last-child .num {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--on-accent);
       }
       h3 {
-        font-size: 21px;
+        font-size: 20px;
         font-weight: 600;
         letter-spacing: -0.02em;
       }
-      .steps p,
-      .reasons p {
+      .steps-3 p,
+      .feat p {
         color: var(--muted);
+        font-size: 16px;
       }
-      .reasons li {
+      .feats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: var(--line);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .feat {
+        background: var(--bg);
+        padding: 28px 26px;
         display: flex;
         flex-direction: column;
         gap: 10px;
-        padding-top: 22px;
-        border-top: 2px solid var(--ink);
       }
-
-      /* Closing */
+      .feat .icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        background: var(--surface);
+        border: 1px solid var(--line-2);
+        color: var(--accent);
+        margin-bottom: 6px;
+      }
+      .feat .icon svg {
+        width: 17px;
+        height: 17px;
+      }
       .closing {
         text-align: center;
         display: flex;
@@ -615,6 +526,10 @@
         gap: 16px;
         flex-wrap: wrap;
       }
+      footer nav {
+        display: flex;
+        gap: 18px;
+      }
       footer a {
         color: var(--muted);
         text-decoration: none;
@@ -622,34 +537,22 @@
       footer a:hover {
         color: var(--ink);
       }
-
-      @media (max-width: 860px) {
-        .app {
-          grid-template-columns: 1fr;
-          min-height: 0;
-        }
-        .side,
-        .runs {
-          display: none;
-        }
-        .split {
-          grid-template-columns: 1fr;
-        }
-        .steps,
-        .reasons {
+      @media (max-width: 900px) {
+        .steps-3,
+        .feats {
           grid-template-columns: 1fr;
         }
         .nav-links .text-link {
           display: none;
         }
         .hero {
-          padding-block: 48px 40px;
+          padding-block: 64px 40px;
         }
         section {
-          padding-block: 64px;
+          padding-block: 72px;
         }
         .shot {
-          padding-bottom: 64px;
+          padding-bottom: 72px;
         }
       }
       @media (prefers-reduced-motion: reduce) {
@@ -674,12 +577,12 @@
           stroke-linecap="round"
           stroke-linejoin="round"
         />
-        <circle cx="24.5" cy="16" r="4.2" fill="#f25a24" />
+        <circle cx="24.5" cy="16" r="4.2" fill="#ff7a3d" />
       </symbol>
-      <symbol id="github" viewBox="0 0 24 24">
+      <symbol id="apple" viewBox="0 0 24 24">
         <path
           fill="currentColor"
-          d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.7 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"
+          d="M12.15 6.9c-.95 0-2.42-1.08-3.96-1.04-2.04.03-3.91 1.18-4.96 3.01-2.12 3.68-.55 9.1 1.52 12.09 1.01 1.45 2.21 3.09 3.79 3.04 1.52-.07 2.09-.99 3.94-.99 1.83 0 2.35.99 3.96.95 1.64-.03 2.68-1.48 3.68-2.95 1.16-1.69 1.64-3.33 1.66-3.42-.04-.01-3.18-1.22-3.22-4.86-.03-3.04 2.48-4.49 2.6-4.56-1.43-2.09-3.62-2.32-4.39-2.38-2-.16-3.68 1.09-4.62 1.09zm3.38-3.07c.84-1.01 1.4-2.43 1.25-3.83-1.21.05-2.66.8-3.53 1.82-.78.9-1.46 2.34-1.27 3.71 1.34.1 2.71-.69 3.55-1.7z"
         />
       </symbol>
       <symbol id="download" viewBox="0 0 24 24">
@@ -692,12 +595,78 @@
           stroke-linejoin="round"
         />
       </symbol>
-      <symbol id="folder" viewBox="0 0 24 24">
+      <symbol id="github" viewBox="0 0 24 24">
         <path
-          d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+          fill="currentColor"
+          d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.7 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"
+        />
+      </symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24">
+        <path
+          d="m12 3 9 5-9 5-9-5zM3 13l9 5 9-5"
           fill="none"
           stroke="currentColor"
           stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-trace" viewBox="0 0 24 24">
+        <path
+          d="M4 5h7M7 10h9M10 15h10M5 20h6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+        />
+      </symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24">
+        <path
+          d="M12 4 2.5 20h19L12 4zM12 10v4M12 17.5v.01"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path
+          d="m5 12 5 5 9-11"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-branch" viewBox="0 0 24 24">
+        <path
+          d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9c0 6-12 3-12 9"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-ship" viewBox="0 0 24 24">
+        <path
+          d="M12 3v13M7 8l5-5 5 5M5 21h14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-key" viewBox="0 0 24 24">
+        <path
+          d="M15 7a4 4 0 1 1-3.4 6.1L4 20.5V17h3v-3h3l1.6-1.6A4 4 0 0 1 15 7zM16 10h.01"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
           stroke-linejoin="round"
         />
       </symbol>
@@ -710,121 +679,69 @@
       </a>
       <nav class="nav-links" aria-label="Main">
         <a class="text-link" href="#how">How it works</a>
-        <a class="text-link" href="#why">Why it's different</a>
+        <a class="text-link" href="#features">Features</a>
         <a class="text-link" href="https://github.com/ShivankK26/helloagents-dot-run" rel="noopener"
           >GitHub</a
         >
         <a
-          class="btn btn-dark"
+          class="btn btn-accent"
           href="https://github.com/ShivankK26/helloagents-dot-run/releases/latest/download/helloagents-mac.dmg"
         >
-          <svg><use href="#download" /></svg> Download
+          <svg class="apple"><use href="#apple" /></svg> Download
         </a>
       </nav>
     </header>
 
     <main>
       <div class="wrap hero">
-        <span class="eyebrow"><i></i> Free and open source · for Mac</span>
+        <div class="lamp" aria-hidden="true">
+          <div class="halo"></div>
+          <div class="cone"></div>
+          <div class="bar"></div>
+        </div>
+        <a
+          class="eyebrow"
+          href="https://github.com/ShivankK26/helloagents-dot-run/releases/latest"
+          rel="noopener"
+          ><i></i> <b>New in 0.2</b> · checks, ship, many projects at once</a
+        >
         <h1>Hand off the task. Merge the <em>result.</em></h1>
         <p class="lede">
-          Tell Claude Code what to build. It works on its own copy of your project, and you merge
-          the result once it looks right.
+          Hand the task to Claude Code or Codex. It works on its own branch, your tests decide when
+          it's done, and you ship it in one click.
         </p>
         <div class="ctas">
           <a
-            class="btn btn-dark"
+            class="btn btn-accent"
             href="https://github.com/ShivankK26/helloagents-dot-run/releases/latest/download/helloagents-mac.dmg"
           >
-            <svg><use href="#download" /></svg> Download for Mac
+            <svg class="apple"><use href="#apple" /></svg> Download for Mac
           </a>
           <a class="btn btn-ghost" href="#how">See how it works</a>
         </div>
-        <p class="fine">
-          Apple silicon and Intel · Uses the Claude plan you already have. No API key needed.
-        </p>
+        <div class="agents" aria-label="Works with">
+          <span class="agent-chip"><i class="dot ok"></i> Claude Code <small>ready</small></span>
+          <span class="agent-chip"><i class="dot soon"></i> Codex <small>coming soon</small></span>
+        </div>
       </div>
 
       <div class="wrap shot">
-        <div
-          class="window"
-          role="img"
-          aria-label="The helloagents app: a task is running on the stats-lib project, with each step the agent took listed as it works."
-        >
-          <div class="titlebar" aria-hidden="true">
-            <span class="lights"><i></i><i></i><i></i></span>
-            <b
-              ><svg><use href="#mark" /></svg> helloagents</b
-            >
-          </div>
-          <div class="app" aria-hidden="true">
-            <aside class="side">
-              <div class="side-label">Projects</div>
-              <div class="proj on">
-                <svg><use href="#folder" /></svg> stats-lib
-              </div>
-              <div class="proj">
-                <svg><use href="#folder" /></svg> marketing-site
-              </div>
-              <div class="proj">
-                <svg><use href="#folder" /></svg> api-server
-              </div>
-              <div class="side-foot">
-                <div class="side-label" style="padding: 0">Agents</div>
-                <div class="agent"><span class="dot ok"></span> Claude Code</div>
-                <div class="agent" style="color: var(--faint)">
-                  <span class="dot"></span> Codex · soon
-                </div>
-              </div>
-            </aside>
-            <div class="main">
-              <h3>stats-lib</h3>
-              <div class="composer">
-                <span class="typed">Add a median() function with tests</span>
-                <span class="run-btn">Run ⌘↵</span>
-              </div>
-              <div class="split">
-                <div class="runs">
-                  <div class="side-label" style="padding: 0 8px 4px">Runs</div>
-                  <div class="run on">
-                    <span class="dot live"></span><span>Add rate limiting to uploads</span
-                    ><small>now</small>
-                  </div>
-                  <div class="run">
-                    <span class="dot ok"></span><span>Fix the failing date tests</span
-                    ><small>2h</small>
-                  </div>
-                  <div class="run">
-                    <span class="dot ok"></span><span>Rename user to account</span><small>1d</small>
-                  </div>
-                </div>
-                <div class="detail">
-                  <div class="detail-head">
-                    <b>Add rate limiting to uploads</b>
-                    <div class="meta">
-                      <span class="pill">Working</span><span>Claude Code</span><span>1m 42s</span>
-                    </div>
-                  </div>
-                  <div class="tabs">
-                    <span class="on">Activity</span><span>Changes</span><span>Summary</span>
-                  </div>
-                  <ul class="activity">
-                    <li class="say">
-                      I'll add a limit of 10 uploads a minute per user, then cover it with a test.
-                    </li>
-                    <li class="step"><span class="tick">✓</span> Read src/upload.ts</li>
-                    <li class="step"><span class="tick">✓</span> Edit src/upload.ts</li>
-                    <li class="step"><span class="tick">✓</span> Write test/upload.test.ts</li>
-                    <li class="step"><span class="tick">✓</span> npm test <em>14 passed</em></li>
-                    <li class="working">
-                      <span class="spin"></span> Checking the change one more time…
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <figure class="shot-frame" id="demo">
+          <a
+            class="shot-link"
+            href="/demo/"
+            target="_blank"
+            rel="noopener"
+            aria-label="Open the live demo"
+          >
+            <img
+              src="/app-screenshot.png"
+              width="2560"
+              height="1640"
+              alt="The helloagents app: runs from two projects in the sidebar, grouped into needs you, working and done, and a run adding rate limiting to uploads while it runs the tests."
+            />
+          </a>
+        </figure>
       </div>
 
       <section id="how" aria-labelledby="how-title">
@@ -833,54 +750,102 @@
             <span class="kicker">How it works</span>
             <h2 id="how-title">Three steps. No setup.</h2>
           </div>
-          <ol class="steps">
+          <ol class="steps-3">
             <li>
               <span class="num">1</span>
               <h3>Add your project</h3>
-              <p>Pick a folder on your Mac. helloagents finds Claude Code on its own.</p>
+              <p>
+                Pick a folder. helloagents finds the coding agents on your Mac and reads how to
+                install and test your project.
+              </p>
             </li>
             <li>
               <span class="num">2</span>
               <h3>Describe the task</h3>
-              <p>Write what you want in plain words, the way you'd ask a teammate.</p>
+              <p>
+                Pick the agent and model, then write what you want, the way you'd ask a teammate.
+              </p>
             </li>
             <li>
               <span class="num">3</span>
-              <h3>Review and merge</h3>
-              <p>See what changed, line by line. Keep it, or throw it away.</p>
+              <h3>Review and ship</h3>
+              <p>
+                See every change, line by line. Commit, push, open a pull request, or merge, in one
+                click.
+              </p>
             </li>
           </ol>
         </div>
       </section>
 
-      <section id="why" aria-labelledby="why-title">
+      <section id="features" aria-labelledby="feat-title">
         <div class="wrap">
           <div class="section-head">
             <span class="kicker">Why it's different</span>
-            <h2 id="why-title">You stay in charge of your code.</h2>
+            <h2 id="feat-title">You stay in charge of your code.</h2>
           </div>
-          <ul class="reasons">
-            <li>
+          <div class="feats">
+            <div class="feat">
+              <span class="icon"
+                ><svg><use href="#i-check" /></svg
+              ></span>
+              <h3>Tests decide “done”</h3>
+              <p>
+                Your project's own checks run after every change. If they fail, the agent gets the
+                failure and tries again.
+              </p>
+            </div>
+            <div class="feat">
+              <span class="icon"
+                ><svg><use href="#i-branch" /></svg
+              ></span>
               <h3>Your files stay safe</h3>
               <p>
-                Every task gets its own copy of the project. Nothing touches your work until you say
-                so.
+                Every task gets its own branch and folder. Nothing touches your work until you merge
+                it.
               </p>
-            </li>
-            <li>
+            </div>
+            <div class="feat">
+              <span class="icon"
+                ><svg><use href="#i-ship" /></svg
+              ></span>
+              <h3>Ship in one click</h3>
+              <p>
+                Commit, push, open a pull request written from the run's summary, or merge. Open it
+                in Zed, Cursor or VS Code.
+              </p>
+            </div>
+            <div class="feat">
+              <span class="icon"
+                ><svg><use href="#i-layers" /></svg
+              ></span>
+              <h3>Many projects at once</h3>
+              <p>
+                Runs grouped by what needs you, what's working and what's done, across every
+                project, with a notification when one finishes.
+              </p>
+            </div>
+            <div class="feat">
+              <span class="icon"
+                ><svg><use href="#i-trace" /></svg
+              ></span>
               <h3>Nothing is hidden</h3>
               <p>
-                Watch each step as it happens: what the agent read, what it changed, which tests
-                passed.
+                Watch each step live. Traces show where the time and tokens went, and Errors
+                collects every failure in one place.
               </p>
-            </li>
-            <li>
-              <h3>Free to use</h3>
+            </div>
+            <div class="feat">
+              <span class="icon"
+                ><svg><use href="#i-key" /></svg
+              ></span>
+              <h3>Your agent, your plan</h3>
               <p>
-                It runs on your Mac with the Claude plan you already pay for. No extra subscription.
+                Claude Code runs on your Claude plan today; Codex on your ChatGPT plan is next. No
+                API key, no extra subscription.
               </p>
-            </li>
-          </ul>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -890,10 +855,10 @@
           <h2 id="end-title">Give your next task to an agent.</h2>
           <div class="ctas">
             <a
-              class="btn btn-dark"
+              class="btn btn-accent"
               href="https://github.com/ShivankK26/helloagents-dot-run/releases/latest/download/helloagents-mac.dmg"
             >
-              <svg><use href="#download" /></svg> Download for Mac
+              <svg class="apple"><use href="#apple" /></svg> Download for Mac
             </a>
             <a
               class="btn btn-ghost"
@@ -903,9 +868,10 @@
               <svg><use href="#github" /></svg> View the code
             </a>
           </div>
-          <p class="fine first-open">
-            Opening it the first time? macOS asks you to confirm because the app isn't notarized
-            yet. Open <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b>.
+          <p class="fine">
+            Opening it the first time? The app isn't notarized yet, so macOS asks you to confirm:
+            open
+            <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b>.
           </p>
         </div>
       </section>
@@ -914,8 +880,43 @@
     <footer>
       <div class="wrap">
         <span>© 2026 helloagents · open source</span>
-        <a href="https://github.com/ShivankK26/helloagents-dot-run" rel="noopener">GitHub</a>
+        <nav aria-label="Footer">
+          <a href="https://github.com/ShivankK26/helloagents-dot-run/releases" rel="noopener"
+            >Releases</a
+          >
+          <a href="https://github.com/ShivankK26/helloagents-dot-run" rel="noopener">GitHub</a>
+        </nav>
       </div>
     </footer>
+    <script>
+      // The screenshot is the first frame; once it scrolls into view, the real app
+      // (with sample data) loads over it at its true size, scaled to fit.
+      (() => {
+        const frame = document.getElementById("demo");
+        if (!frame || window.innerWidth < 900) return; // phones: the picture links to the demo
+        let iframe;
+        const fit = () => {
+          if (iframe) iframe.style.transform = `scale(${frame.clientWidth / 1280})`;
+        };
+        const load = () => {
+          iframe = document.createElement("iframe");
+          iframe.src = "/demo/?embed";
+          iframe.title = "helloagents, running live with sample data";
+          iframe.addEventListener("load", () => setTimeout(() => frame.classList.add("live"), 250));
+          frame.appendChild(iframe);
+          fit();
+          new ResizeObserver(fit).observe(frame);
+        };
+        new IntersectionObserver(
+          (entries, obs) => {
+            if (entries.some((e) => e.isIntersecting)) {
+              obs.disconnect();
+              load();
+            }
+          },
+          { rootMargin: "300px" },
+        ).observe(frame);
+      })();
+    </script>
   </body>
 </html>

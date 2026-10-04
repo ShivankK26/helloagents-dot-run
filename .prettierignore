@@ -4,3 +4,4 @@ dist
 release
 pnpm-lock.yaml
 docs/brand
+apps/web/public/demo

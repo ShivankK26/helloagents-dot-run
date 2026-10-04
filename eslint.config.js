@@ -6,7 +6,15 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["**/node_modules/**", "**/out/**", "**/dist/**", "**/release/**"] },
+  {
+    ignores: [
+      "**/node_modules/**",
+      "**/out/**",
+      "**/dist/**",
+      "**/release/**",
+      "apps/web/public/demo/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.strict,
   {

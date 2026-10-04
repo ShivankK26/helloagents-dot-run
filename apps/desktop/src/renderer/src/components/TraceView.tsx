@@ -40,7 +40,11 @@ export function TraceView({
         const last = fresh.at(-1);
         if (!last) return;
         lastSeq.current = last.seq;
-        setEvents((prev) => [...prev, ...fresh]);
+        // Two refreshes can overlap (and React runs effects twice in development); keep each event once.
+        setEvents((prev) => {
+          const seen = prev.at(-1)?.seq ?? 0;
+          return [...prev, ...fresh.filter((e) => e.seq > seen)];
+        });
       }),
     [api, runId],
   );

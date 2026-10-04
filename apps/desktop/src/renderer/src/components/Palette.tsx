@@ -16,7 +16,7 @@ export function Palette({ commands, onClose }: { commands: Command[]; onClose: (
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => input.current?.focus(), []);
+  useEffect(() => input.current?.focus({ preventScroll: true }), []);
 
   const shown = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);

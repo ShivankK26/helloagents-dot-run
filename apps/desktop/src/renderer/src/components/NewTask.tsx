@@ -32,7 +32,7 @@ export function NewTask({
   const isClaude = project.workerAgent === "claude-code";
   const branchMode = settings.workspace !== "checkout";
 
-  useEffect(() => box.current?.focus(), []);
+  useEffect(() => box.current?.focus({ preventScroll: true }), []);
 
   const update = (patch: Partial<RunSettings>) => {
     const next = { ...settings, ...patch };

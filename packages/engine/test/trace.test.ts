@@ -347,9 +347,9 @@ describe("digestRun", () => {
   });
 
   test("firstParagraph skips headings and lists", () => {
-    expect(
-      firstParagraph("## Overview\n\n**UGC Engine** makes videos.\nOne user.\n\n- a\n- b"),
-    ).toBe("**UGC Engine** makes videos. One user.");
+    expect(firstParagraph("## Overview\n\n**Orbit** shares photos.\nOne user.\n\n- a\n- b")).toBe(
+      "**Orbit** shares photos. One user.",
+    );
   });
 });
 
@@ -364,5 +364,28 @@ describe("closeInterruptedRuns", () => {
     });
     expect(store.closeInterruptedRuns()).toBe(0);
     store.close();
+  });
+});
+
+describe("digestRun stage", () => {
+  test("moves to testing as soon as the agent asks to run the tests", () => {
+    const d = digestRun([
+      {
+        agentId: "main",
+        event: {
+          type: "model.response",
+          at: 1,
+          turn: 1,
+          durationMs: 1,
+          model: "m",
+          stopReason: null,
+          text: "",
+          toolCalls: [{ id: "t", name: "Bash", input: { command: "npm test" } }],
+          usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+          costUsd: 0,
+        },
+      },
+    ]);
+    expect(d.stage).toBe("test");
   });
 });

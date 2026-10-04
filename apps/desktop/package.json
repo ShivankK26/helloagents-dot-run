@@ -11,7 +11,8 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run --passWithNoTests",
-    "dist": "electron-vite build && electron-builder --mac --universal"
+    "dist": "electron-vite build && electron-builder --mac --universal",
+    "demo": "vite build --config vite.demo.config.ts"
   },
   "devDependencies": {
     "@fontsource/geist-mono": "^5.3.0",

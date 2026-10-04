@@ -220,6 +220,14 @@ export function digestRun(events: WithAgent[]): RunDigest {
   for (const { event: e } of events) {
     if (e.type === "agent.start") stage = "read"; // a follow-up starts over
     if (e.type === "model.response" && e.text.trim()) answer = e.text.trim();
+    if (e.type === "model.response") {
+      for (const call of e.toolCalls) {
+        const kind = toolKind(call.name);
+        if (kind === "edit") reach("edit");
+        if (kind === "command" && TEST_COMMAND.test(describeToolCall(call.name, call.input)))
+          reach("test");
+      }
+    }
     if (e.type !== "tool.result") continue;
     const kind = toolKind(e.name);
     const file = toolPath(e.input);

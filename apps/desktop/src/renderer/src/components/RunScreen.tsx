@@ -53,7 +53,11 @@ export function RunScreen({
         const last = fresh.at(-1);
         if (!last) return;
         lastSeq.current = last.seq;
-        setEvents((prev) => [...prev, ...fresh]);
+        // Two refreshes can overlap (and React runs effects twice in development); keep each event once.
+        setEvents((prev) => {
+          const seen = prev.at(-1)?.seq ?? 0;
+          return [...prev, ...fresh.filter((e) => e.seq > seen)];
+        });
       }),
     [api, runId],
   );
@@ -77,7 +81,10 @@ export function RunScreen({
   }, [api, runId, tab, run?.status, run?.digest.filesChanged.length]);
 
   useEffect(() => {
-    if (tab === "activity" && run?.active) feedEnd.current?.scrollIntoView({ block: "end" });
+    // Follow the newest step by scrolling only the feed itself. scrollIntoView would also
+    // scroll every container around it, including a web page embedding the app.
+    const feed = feedEnd.current?.closest(".feed");
+    if (tab === "activity" && run?.active && feed) feed.scrollTop = feed.scrollHeight;
   }, [events.length, tab, run?.active]);
 
   if (!run) return <div className="run-screen" />;

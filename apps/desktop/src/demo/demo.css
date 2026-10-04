@@ -1,0 +1,62 @@
+/* The demo strip sits above the app; the app takes the rest of the window. */
+#root {
+  height: calc(100% - 34px);
+}
+.demo-strip {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 12px;
+  background: var(--sunk);
+  border-bottom: 1px solid var(--line);
+  font: 12.5px var(--sans);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.demo-strip i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.demo-strip b {
+  color: var(--ink);
+  font-weight: 500;
+}
+.demo-strip a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+.demo-strip a:hover {
+  text-decoration: underline;
+}
+/* The browser has no macOS window buttons: draw them where the app has them. */
+.titlebar::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: 52px;
+  height: 12px;
+  background:
+    radial-gradient(circle at 6px 6px, #ff5f57 5.5px, transparent 6px),
+    radial-gradient(circle at 26px 6px, #febc2e 5.5px, transparent 6px),
+    radial-gradient(circle at 46px 6px, #28c840 5.5px, transparent 6px);
+}
+@media (max-width: 760px) {
+  .demo-strip .hint {
+    display: none;
+  }
+}
+
+.embed .demo-strip {
+  display: none;
+}
+.embed #root {
+  height: 100%;
+}

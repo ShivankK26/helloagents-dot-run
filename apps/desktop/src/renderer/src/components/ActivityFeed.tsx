@@ -140,7 +140,13 @@ function Step({ e }: { e: ToolResult }) {
             )}
           </span>
           <span className={`r ${isTest ? (e.ok ? "okc" : "badc") : ""}`}>
-            {isTest ? testResultLine(e.output, e.ok) : e.ok ? ms(e.durationMs) : "failed"}
+            {isTest
+              ? testResultLine(e.output, e.ok)
+              : e.ok
+                ? e.durationMs >= 50
+                  ? ms(e.durationMs)
+                  : ""
+                : "failed"}
           </span>
         </summary>
         <pre className="tail">{tail(e.output) || "(no output)"}</pre>
@@ -156,7 +162,7 @@ function Step({ e }: { e: ToolResult }) {
         <span>
           <code>{describeToolCall(e.name, e.input)}</code>
         </span>
-        <span className="r">{ms(e.durationMs)}</span>
+        <span className="r">{e.durationMs >= 50 ? ms(e.durationMs) : ""}</span>
       </summary>
       <pre className="tail">{tail(e.output) || "(no output)"}</pre>
     </details>
@@ -209,7 +215,7 @@ export function ActivityFeed({
                           </>
                         )}
                       </span>
-                      <span className="r">{ms(it.ms)}</span>
+                      <span className="r">{it.ms >= 50 ? ms(it.ms) : ""}</span>
                     </summary>
                     {it.files.length > 1 ? (
                       <ul className="sub">
