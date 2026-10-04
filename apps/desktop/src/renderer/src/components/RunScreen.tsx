@@ -611,7 +611,10 @@ function RunActions({
         width={210}
         trigger={
           <>
-            <Icon name="open" size={13} /> Open <span className="caret">▾</span>
+            <Icon name="open" size={13} /> Open{" "}
+            <span className="caret">
+              <Icon name="chevronDown" size={14} />
+            </span>
           </>
         }
         items={openers.map((op) => ({
@@ -631,7 +634,10 @@ function RunActions({
             ) : (
               <Icon name="ship" size={13} />
             )}{" "}
-            Ship <span className="caret">▾</span>
+            Ship{" "}
+            <span className="caret">
+              <Icon name="chevronDown" size={14} />
+            </span>
           </>
         }
         items={[

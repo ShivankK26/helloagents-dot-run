@@ -401,7 +401,10 @@ export function App() {
               width={260}
               trigger={
                 <>
-                  {project.name} <span className="caret">▾</span>
+                  {project.name}{" "}
+                  <span className="caret">
+                    <Icon name="chevronDown" size={14} />
+                  </span>
                 </>
               }
               items={[

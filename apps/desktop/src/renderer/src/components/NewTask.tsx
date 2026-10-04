@@ -122,7 +122,10 @@ export function NewTask({
             trigger={
               <>
                 <span className="agent-mark">✳</span> {worker?.name ?? "Agent"}
-                {isClaude ? ` · ${modelName(settings.model)}` : ""} <span className="caret">▾</span>
+                {isClaude ? ` · ${modelName(settings.model)}` : ""}{" "}
+                <span className="caret">
+                  <Icon name="chevronDown" size={14} />
+                </span>
               </>
             }
             items={[
@@ -161,7 +164,9 @@ export function NewTask({
             trigger={
               <>
                 {EFFORTS.find((e) => e.id === settings.effort)?.name ?? "Default"} effort{" "}
-                <span className="caret">▾</span>
+                <span className="caret">
+                  <Icon name="chevronDown" size={14} />
+                </span>
               </>
             }
             items={[
@@ -183,7 +188,9 @@ export function NewTask({
               <>
                 <Icon name="lock" size={13} />{" "}
                 {settings.access === "full" ? "Full access" : "Edits only"}{" "}
-                <span className="caret">▾</span>
+                <span className="caret">
+                  <Icon name="chevronDown" size={14} />
+                </span>
               </>
             }
             items={[
@@ -235,7 +242,10 @@ export function NewTask({
           trigger={
             <>
               <Icon name={branchMode ? "branch" : "folder"} size={13} />{" "}
-              {branchMode ? "New branch" : "Current checkout"} <span className="caret">▾</span>
+              {branchMode ? "New branch" : "Current checkout"}{" "}
+              <span className="caret">
+                <Icon name="chevronDown" size={14} />
+              </span>
             </>
           }
           items={[
@@ -271,7 +281,10 @@ export function NewTask({
             width={240}
             trigger={
               <>
-                <Icon name="branch" size={13} /> from {base} <span className="caret">▾</span>
+                <Icon name="branch" size={13} /> from {base}{" "}
+                <span className="caret">
+                  <Icon name="chevronDown" size={14} />
+                </span>
               </>
             }
             items={[

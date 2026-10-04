@@ -1900,8 +1900,13 @@ summary.step::-webkit-details-marker {
   max-width: 360px;
 }
 .caret {
-  opacity: 0.5;
-  font-size: 10px;
+  display: inline-grid;
+  place-items: center;
+  margin: 0 -3px 0 1px;
+  opacity: 0.65;
+}
+.btn-primary .caret {
+  opacity: 0.85;
 }
 .tb-search {
   display: inline-flex;
