@@ -390,6 +390,7 @@ export function App() {
   return (
     <div className="app">
       <header className="titlebar">
+        <span className="tb-divider" aria-hidden="true" />
         <div className="brand">
           <Logo size={18} /> helloagents
         </div>

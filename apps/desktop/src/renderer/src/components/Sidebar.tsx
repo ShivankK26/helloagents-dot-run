@@ -9,6 +9,17 @@ type Grouping = "status" | "project";
 
 const GROUPING_KEY = "helloagents.sidebarGrouping";
 
+const CLOSED_KEY = "helloagents.closedProjects";
+
+function readClosed(): string[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(CLOSED_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function readGrouping(): Grouping {
   try {
     return localStorage.getItem(GROUPING_KEY) === "project" ? "project" : "status";
@@ -51,6 +62,16 @@ export function Sidebar({
 }) {
   const [query, setQuery] = useState("");
   const [grouping, setGrouping] = useState<Grouping>(readGrouping);
+  const [closed, setClosed] = useState<string[]>(readClosed);
+  const toggleProject = (id: string) => {
+    const next = closed.includes(id) ? closed.filter((x) => x !== id) : [...closed, id];
+    setClosed(next);
+    try {
+      localStorage.setItem(CLOSED_KEY, JSON.stringify(next));
+    } catch {
+      // not remembered
+    }
+  };
   const projectName = (id: string | null) => projects.find((p) => p.id === id)?.name ?? "";
   const q = query.trim().toLowerCase();
   const visible = runs.filter(
@@ -197,18 +218,33 @@ export function Sidebar({
           </>
         ) : (
           <>
-            {projects.map((p, i) => {
+            {projects.map((p) => {
               const mine = visible.filter((r) => r.projectId === p.id);
+              const open = !closed.includes(p.id);
               return (
-                <div key={p.id} className="pgrp">
-                  <div className="pgrp-head">
-                    <button className="pgrp-name" onClick={() => onOpenProject(p.id)}>
-                      <Icon name="folder" size={14} />
-                      <span>{p.name}</span>
-                    </button>
-                    {i < 9 ? <span className="kbd">⌘{i + 1}</span> : null}
+                <div key={p.id} className="tree">
+                  <div className="tree-head">
                     <button
-                      className="icon-btn sm"
+                      className="tree-toggle"
+                      aria-expanded={open}
+                      aria-label={`${open ? "Collapse" : "Expand"} ${p.name}`}
+                      onClick={() => toggleProject(p.id)}
+                    >
+                      <Icon name="chevronDown" size={12} />
+                    </button>
+                    <button
+                      className="tree-name"
+                      aria-current={
+                        currentProjectId === p.id && !openRunId && !section ? "true" : undefined
+                      }
+                      onClick={() => onOpenProject(p.id)}
+                      title={p.name}
+                    >
+                      {p.name}
+                    </button>
+                    <span className="tree-count">{mine.length}</span>
+                    <button
+                      className="tree-new"
                       onClick={() => onNewTask(p.id)}
                       title={`New task in ${p.name}`}
                       aria-label={`New task in ${p.name}`}
@@ -216,13 +252,40 @@ export function Sidebar({
                       <Icon name="plus" size={13} />
                     </button>
                   </div>
-                  {mine.slice(0, 8).map((r) => row(r, false))}
+                  {open ? (
+                    <div className="tree-runs">
+                      {mine.length ? (
+                        mine.slice(0, 12).map((r) => {
+                          const o = outcomeOf(r);
+                          return (
+                            <button
+                              key={r.id}
+                              className="tree-run"
+                              aria-current={openRunId === r.id ? "true" : undefined}
+                              onClick={() => onOpenRun(r.id)}
+                              title={`${r.title} · ${o.line}`}
+                            >
+                              <i className={`dot ${o.tone}`} aria-hidden="true" />
+                              <span>{r.title}</span>
+                              <time>{r.active ? "now" : ago(r.startedAt).replace(" ago", "")}</time>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <p className="tree-empty">
+                          No runs yet ·{" "}
+                          <button className="link-btn" onClick={() => onNewTask(p.id)}>
+                            New task
+                          </button>
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
-            <button className="pj" onClick={onAddProject}>
-              <Icon name="plus" size={14} />
-              <span>Add a project</span>
+            <button className="add-project" onClick={onAddProject}>
+              <Icon name="plus" size={13} /> Add a project
             </button>
           </>
         )}

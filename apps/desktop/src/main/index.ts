@@ -61,7 +61,7 @@ function createWindow(): BrowserWindow {
     ...(!app.isPackaged && { icon: APP_ICON }),
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#000000" : "#ffffff",
-    ...(isMac && { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 18 } }),
+    ...(isMac && { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 16 } }),
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.js"),
       // The window shows text written by AI agents. Keep it away from Node.

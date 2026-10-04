@@ -2914,6 +2914,167 @@ code {
     display: none;
   }
 }
+
+/* Title bar: 44px, with the window buttons centred on the same line as the text. */
+.titlebar {
+  height: 44px;
+  padding-left: 76px;
+}
+.tb-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--line-2);
+  margin-right: 4px;
+}
+
+/* Sidebar by project: a tree, one line per run. */
+.tree {
+  padding-top: 4px;
+}
+.tree-head {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding-right: 4px;
+  border-radius: 7px;
+}
+.tree-head:hover {
+  background: var(--sunk);
+}
+.tree-toggle {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--faint);
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.tree-toggle svg {
+  transition: transform 0.15s ease;
+}
+.tree-toggle[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+.tree-name {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-count {
+  font-size: 11.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  min-width: 22px;
+  text-align: center;
+}
+.tree-new {
+  display: none;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--muted);
+}
+.tree-new:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+.tree-head:hover .tree-new,
+.tree-new:focus-visible {
+  display: grid;
+}
+.tree-head:hover .tree-count {
+  display: none;
+}
+.tree-runs {
+  margin: 0 0 6px 11px;
+  padding-left: 9px;
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+}
+.tree-run {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  color: var(--muted);
+}
+.tree-run .dot {
+  width: 7px;
+  height: 7px;
+}
+.tree-run span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-run time {
+  font-size: 11px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.tree-run:hover {
+  background: var(--sunk);
+  color: var(--ink);
+}
+.tree-run[aria-current] {
+  background: var(--sunk);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.tree-name[aria-current] {
+  color: var(--accent);
+}
+.tree-empty {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 6px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.add-project {
+  width: 100%;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 30px;
+  border: 1px dashed var(--line-2);
+  border-radius: 8px;
+  background: none;
+  color: var(--faint);
+  font-size: 13px;
+}
+.add-project:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
 @media (max-width: 860px) {
   .activity-layout {
     grid-template-columns: minmax(0, 1fr);
