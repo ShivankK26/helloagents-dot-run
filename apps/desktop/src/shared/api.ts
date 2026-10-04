@@ -48,6 +48,8 @@ export interface ProjectInfo {
   actions: ProjectActions;
 }
 
+export type ProjectMenuChoice = "new" | "actions" | "reveal" | "remove";
+
 export type ShipKind = "commit" | "push" | "pr" | "merge";
 
 export interface ShipResult {
@@ -103,6 +105,8 @@ export interface HelloagentsApi {
     agents: { workerAgent: AgentId; plannerAgent: AgentId },
   ): Promise<void>;
   removeProject(id: string): Promise<void>;
+  /** Shows the project's right-click menu; resolves with what the user picked. */
+  projectMenu(id: string): Promise<ProjectMenuChoice | null>;
   listRuns(projectId: string): Promise<RunListItem[]>;
   /** Recent runs across every project, newest first. */
   listAllRuns(limit?: number): Promise<RunListItem[]>;
@@ -149,6 +153,7 @@ export const IPC = {
   addProject: "projects:add",
   updateProjectAgents: "projects:update-agents",
   removeProject: "projects:remove",
+  projectMenu: "projects:menu",
   listRuns: "runs:list",
   listAllRuns: "runs:list-all",
   listErrors: "runs:errors",

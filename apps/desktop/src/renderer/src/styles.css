@@ -24,12 +24,10 @@
   --lamp: 0.6;
   --lamp-core: #f59a6b;
   --sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Geist Sans", "Segoe UI", system-ui,
-    sans-serif;
+    "Geist Sans", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --display:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Geist Sans", "Segoe UI", system-ui,
-    sans-serif;
-  --mono: "SF Mono", SFMono-Regular, ui-monospace, "Geist Mono", Menlo, monospace;
+    "Geist Sans", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
@@ -3164,6 +3162,89 @@ code {
 .dock-hint {
   text-align: center;
 }
+/* Project "⋯" on hover, and the remove dialog */
+.pj-more {
+  display: none;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  border-radius: 6px;
+  place-items: center;
+  color: var(--muted);
+}
+.pj:hover .pj-more,
+.pj-more:focus-visible {
+  display: grid;
+}
+.pj:hover .kbd {
+  display: none;
+}
+.pj-more:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+.remove-dialog {
+  width: min(400px, 100%);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.remove-dialog h2 {
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.lose {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bad-soft);
+  border: 1px solid color-mix(in srgb, var(--bad) 28%, transparent);
+  font-size: 13px;
+}
+.lose-h {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bad);
+  margin-bottom: 4px;
+}
+.lose ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lose li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lose li::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--bad);
+  flex-shrink: 0;
+}
+.keep {
+  font-size: 13px;
+  color: var(--muted);
+}
+.keep code {
+  font: 12px var(--mono);
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.remove-dialog .dialog-actions {
+  padding-top: 2px;
+}
+
 @media (max-width: 860px) {
   .activity-layout {
     grid-template-columns: minmax(0, 1fr);

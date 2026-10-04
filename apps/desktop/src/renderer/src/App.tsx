@@ -20,6 +20,7 @@ import { Menu } from "./components/Menu";
 import { NewTask } from "./components/NewTask";
 import { Overview } from "./components/Overview";
 import { Palette, type Command } from "./components/Palette";
+import { RemoveProject } from "./components/RemoveProject";
 import { RunScreen, type RunTab } from "./components/RunScreen";
 import { Sidebar, type Section } from "./components/Sidebar";
 import { Toasts } from "./components/Toasts";
@@ -60,6 +61,8 @@ export function App() {
   const [palette, setPalette] = useState(false);
   const [editingActions, setEditingActions] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState<string>();
+  const [projectErrors, setProjectErrors] = useState<Record<string, number>>({});
   const [theme, setTheme] = useState<ThemeMode>(savedTheme);
   const [resolved, setResolved] = useState<"light" | "dark">(() => applyTheme(savedTheme()));
 
@@ -75,7 +78,13 @@ export function App() {
   );
   const loadRuns = useCallback(() => {
     void api.listAllRuns(200).then(setRuns);
-    void api.listErrors().then((l) => setErrorCount(l.length));
+    void api.listErrors().then((l) => {
+      setErrorCount(l.length);
+      const byProject: Record<string, number> = {};
+      for (const e of l)
+        if (e.projectId) byProject[e.projectId] = (byProject[e.projectId] ?? 0) + 1;
+      setProjectErrors(byProject);
+    });
   }, [api]);
 
   useEffect(() => {
@@ -319,6 +328,22 @@ export function App() {
         icon: <Icon name="play" size={14} />,
         run: () => setEditingActions(true),
       });
+    if (project)
+      list.push({
+        id: "remove",
+        group: "Settings",
+        label: `Remove ${project.name}…`,
+        icon: <Icon name="trash" size={14} />,
+        run: () => setRemoving(project.id),
+      });
+    if (project)
+      list.push({
+        id: "remove",
+        group: "Settings",
+        label: `Remove ${project.name}…`,
+        icon: <Icon name="trash" size={14} />,
+        run: () => setRemoving(project.id),
+      });
     list.push({
       id: "add",
       group: "Settings",
@@ -384,6 +409,19 @@ export function App() {
         onOpenProject={openProject}
         onNewTask={(id) => (id ? openProject(id) : setScreen({ kind: "home" }))}
         onAddProject={() => setAdding(true)}
+        onProjectMenu={(id) =>
+          void api.projectMenu(id).then((choice) => {
+            const p = projects.find((x) => x.id === id);
+            if (!p || !choice) return;
+            if (choice === "reveal") void api.revealInFinder(p.path);
+            if (choice === "remove") setRemoving(id);
+            if (choice === "new") openProject(id);
+            if (choice === "actions") {
+              openProject(id);
+              setEditingActions(true);
+            }
+          })
+        }
       />
     ) : null;
 
@@ -530,6 +568,22 @@ export function App() {
             void loadProjects().then(() => {
               if (added[0]) openProject(added[0].id);
             });
+          }}
+        />
+      ) : null}
+      {removing && projects?.some((p) => p.id === removing) ? (
+        <RemoveProject
+          project={projects.find((p) => p.id === removing) as ProjectRecord}
+          runs={projectRuns.filter((r) => r.projectId === removing)}
+          errorCount={projectErrors[removing] ?? 0}
+          onCancel={() => setRemoving(undefined)}
+          onRemoved={() => {
+            const name = projects.find((p) => p.id === removing)?.name ?? "project";
+            setRemoving(undefined);
+            if (screen.kind === "run" && currentRun?.projectId === removing)
+              setScreen({ kind: "home" });
+            void loadProjects().then(() => loadRuns());
+            showToast(`Removed ${name}`, { tone: "ok" });
           }}
         />
       ) : null}

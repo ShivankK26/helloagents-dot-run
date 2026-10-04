@@ -20,13 +20,23 @@ import {
   type ProjectActions,
   type RunSettings,
 } from "@helloagents/engine";
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  nativeTheme,
+  Notification,
+  shell,
+} from "electron";
 import {
   IPC,
   type AppInfo,
   type ErrorListItem,
   type FolderInfo,
   type Opener,
+  type ProjectMenuChoice,
   type RunListItem,
   type ShipKind,
   type ThemeMode,
@@ -213,7 +223,20 @@ app.whenReady().then(async () => {
     (_e, id: string, agents: { workerAgent: AgentId; plannerAgent: AgentId }) =>
       store.updateProjectAgents(id, agents),
   );
-  ipcMain.handle(IPC.removeProject, (_e, id: string) => store.removeProject(id));
+  ipcMain.handle(IPC.removeProject, (_e, id: string) => manager.removeProject(id));
+  ipcMain.handle(
+    IPC.projectMenu,
+    () =>
+      new Promise<ProjectMenuChoice | null>((resolve) => {
+        let picked: ProjectMenuChoice | null = null;
+        const pick = (choice: ProjectMenuChoice) => () => (picked = choice);
+        Menu.buildFromTemplate([
+          { label: "Show in Finder", click: pick("reveal") },
+          { type: "separator" },
+          { label: "Remove…", click: pick("remove") },
+        ]).popup({ ...(win && { window: win }), callback: () => resolve(picked) });
+      }),
+  );
   ipcMain.handle(IPC.listRuns, (_e, projectId: string) =>
     store.listProjectRuns(projectId).map(listItem),
   );

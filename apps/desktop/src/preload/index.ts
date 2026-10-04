@@ -15,6 +15,7 @@ const api: HelloagentsApi = {
   addProject: (input) => invoke(IPC.addProject, input),
   updateProjectAgents: (id, agents) => invoke(IPC.updateProjectAgents, id, agents),
   removeProject: (id) => invoke(IPC.removeProject, id),
+  projectMenu: (id) => invoke(IPC.projectMenu, id),
   listRuns: (projectId) => invoke(IPC.listRuns, projectId),
   followUp: (runId, message) => invoke(IPC.followUp, runId, message),
   projectInfo: (projectId) => invoke(IPC.projectInfo, projectId),

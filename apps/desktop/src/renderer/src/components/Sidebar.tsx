@@ -44,6 +44,7 @@ export function Sidebar({
   onOpenProject,
   onNewTask,
   onAddProject,
+  onProjectMenu,
 }: {
   runs: RunListItem[];
   projects: ProjectRecord[];
@@ -59,6 +60,7 @@ export function Sidebar({
   onOpenProject: (projectId: string) => void;
   onNewTask: (projectId?: string) => void;
   onAddProject: () => void;
+  onProjectMenu: (projectId: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [grouping, setGrouping] = useState<Grouping>(readGrouping);
@@ -204,10 +206,34 @@ export function Sidebar({
                     currentProjectId === p.id && !openRunId && !section ? "true" : undefined
                   }
                   onClick={() => onOpenProject(p.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    onProjectMenu(p.id);
+                  }}
                 >
                   <Icon name="folder" size={14} />
                   <span>{p.name}</span>
                   {i < 9 ? <span className="kbd">⌘{i + 1}</span> : null}
+                  <span
+                    className="pj-more"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`More for ${p.name}`}
+                    title="More"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onProjectMenu(p.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onProjectMenu(p.id);
+                      }
+                    }}
+                  >
+                    <Icon name="dots" size={14} />
+                  </span>
                 </button>
               ))}
               <button className="pj" onClick={onAddProject}>
@@ -223,7 +249,13 @@ export function Sidebar({
               const open = !closed.includes(p.id);
               return (
                 <div key={p.id} className="tree">
-                  <div className="tree-head">
+                  <div
+                    className="tree-head"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      onProjectMenu(p.id);
+                    }}
+                  >
                     <button
                       className="tree-toggle"
                       aria-expanded={open}
@@ -250,6 +282,14 @@ export function Sidebar({
                       aria-label={`New task in ${p.name}`}
                     >
                       <Icon name="plus" size={13} />
+                    </button>
+                    <button
+                      className="tree-new"
+                      onClick={() => onProjectMenu(p.id)}
+                      title="More"
+                      aria-label={`More for ${p.name}`}
+                    >
+                      <Icon name="dots" size={13} />
                     </button>
                   </div>
                   {open ? (

@@ -185,4 +185,25 @@ describe("runs with actions", () => {
     expect(args).toContain("--resume");
     expect(args[1]).toMatch(/Continue where you left off/);
   });
+
+  test("removing a project keeps its folder and saves unsaved agent work to the branch", async () => {
+    const dir = await repo(MATH);
+    const { store, m, project } = await manager(dir, {
+      setup: null,
+      checks: [],
+      dev: null,
+      sendBackFailures: false,
+    });
+    const runId = await m.start(project.id, "Fix add()");
+    await m.settled(runId);
+    const branch = store.getRun(runId)?.worktree?.branch ?? "";
+    const wtPath = store.getRun(runId)?.worktree?.path ?? "";
+    await m.removeProject(project.id);
+    expect(store.getProject(project.id)).toBeUndefined();
+    expect(store.getRun(runId)).toBeUndefined();
+    // The user's project is untouched; the run's folder is gone; its work is on the branch.
+    expect(await readFile(path.join(dir, "math.js"), "utf8")).not.toContain("fixed by fake claude");
+    await expect(readFile(path.join(wtPath, "math.js"))).rejects.toThrow();
+    expect(await git(dir, ["show", `${branch}:math.js`])).toContain("fixed by fake claude");
+  });
 });

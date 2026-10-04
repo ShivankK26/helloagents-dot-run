@@ -256,6 +256,35 @@ export class RunManager {
     await removeWorktree(project.path, run.worktree, { deleteBranch: true });
   }
 
+  /**
+   * Removes a project from helloagents. Its own folder is never touched. Each run's
+   * separate folder is cleaned up, but unsaved work is committed to the run's branch
+   * first, so nothing an agent wrote is lost; the branches stay in the repo.
+   */
+  async removeProject(projectId: string): Promise<void> {
+    const { store } = this.opts;
+    const project = this.requireProject(projectId);
+    const runs = store.listProjectRuns(projectId, 10_000);
+    for (const run of runs) this.cancel(run.id);
+    for (const run of runs) {
+      await this.settled(run.id);
+      this.stopDev(run.id);
+      const wt = run.worktree;
+      if (!wt || run.settings.workspace === "checkout" || wt.path === project.path) continue;
+      try {
+        await commitAll(wt.path, `Unsaved work from helloagents: ${commitMessage(run.title)}`);
+      } catch {
+        // folder already gone, or nothing to save
+      }
+      try {
+        await removeWorktree(project.path, wt);
+      } catch {
+        // already removed
+      }
+    }
+    store.removeProject(projectId);
+  }
+
   // ---- Ship ----
 
   async commit(runId: string): Promise<ShipResult> {

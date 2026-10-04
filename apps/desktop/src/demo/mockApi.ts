@@ -708,6 +708,11 @@ export const demoApi: HelloagentsApi = {
   removeProject: async (id) => {
     const i = projects.findIndex((p) => p.id === id);
     if (i >= 0) projects.splice(i, 1);
+    for (const [runId, r] of runs) {
+      if (r.rec.projectId !== id) continue;
+      stop(r);
+      runs.delete(runId);
+    }
   },
   listRuns: async (projectId) =>
     byNewest()
@@ -787,6 +792,7 @@ export const demoApi: HelloagentsApi = {
     { id: "terminal", name: "Terminal" },
   ],
   openIn: () => fail(),
+  projectMenu: async () => "remove",
   setTheme: async () => undefined,
   followUp: async (id, message) => continueLive(need(id), message),
   cancelRun: async (id) => stop(need(id)),
