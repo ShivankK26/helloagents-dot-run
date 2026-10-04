@@ -41,6 +41,8 @@ const paths = {
   trace: "M4 5h7M7 10h9M10 15h10M5 20h6",
   alert: "M12 4 2.5 20h19L12 4zM12 10v4M12 17.5v.01",
   gauge: "M4.5 17a8 8 0 1 1 15 0M12 14l4-5",
+  image:
+    "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM21 15l-5-5L5 20",
 } as const;
 
 export function Icon({ name, size = 16 }: { name: keyof typeof paths; size?: number }) {

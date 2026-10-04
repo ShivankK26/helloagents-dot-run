@@ -85,6 +85,31 @@ describe("RunManager", () => {
     ]);
   });
 
+  test("attached images reach the agent, and slash commands run with the full setup", async () => {
+    const { manager, project } = await setup();
+    const argsFile = path.join(await tempDir(), "args.json");
+    process.env.FAKE_CLAUDE_ARGS_FILE = argsFile;
+    const shot = path.join(await tempDir(), "shot.png");
+    const runId = await manager.start(project.id, "/security-review the upload code", {
+      attachments: [shot],
+    });
+    await manager.settled(runId);
+
+    const args = JSON.parse(await readFile(argsFile, "utf8")) as string[];
+    expect(args[1]).toContain("/security-review the upload code\n\n[Attached images]");
+    expect(args[1]).toContain(`- ${shot}`);
+    expect(args[args.indexOf("--add-dir") + 1]).toBe(path.dirname(shot));
+    expect(args).not.toContain("--disable-slash-commands");
+
+    // A follow-up without images is a plain, lean turn.
+    await manager.followUp(runId, "Thanks");
+    await manager.settled(runId);
+    const next = JSON.parse(await readFile(argsFile, "utf8")) as string[];
+    expect(next[1]).toBe("Thanks");
+    expect(next).not.toContain("--add-dir");
+    expect(next).toContain("--disable-slash-commands");
+  });
+
   test("can be cancelled mid-run", async () => {
     process.env.FAKE_CLAUDE_MODE = "slow";
     const { store, manager, project } = await setup();

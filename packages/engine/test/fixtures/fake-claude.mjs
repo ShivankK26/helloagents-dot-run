@@ -30,6 +30,10 @@ out({
   session_id: session,
   model: "claude-opus-5-5[1m]",
   tools: ["Read", "Edit", "Bash"],
+  slash_commands: ["init", "security-review", "model", "clear", "doctor", "my-skill", "__internal"],
+  terminal_slash_commands: ["doctor"],
+  skills: ["my-skill"],
+  plugins: [],
 });
 out({ type: "system", subtype: "commands_changed", commands: [] });
 if (mode === "slow") await new Promise((r) => setTimeout(r, 20000));

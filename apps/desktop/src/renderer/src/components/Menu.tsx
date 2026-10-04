@@ -22,6 +22,7 @@ export function Menu({
   up = false,
   width = 280,
   title,
+  openSignal = 0,
 }: {
   trigger: ReactNode;
   items: MenuItem[];
@@ -31,11 +32,18 @@ export function Menu({
   up?: boolean;
   width?: number;
   title?: string;
+  /** Opens the menu whenever this number changes (e.g. from a typed "/model"). */
+  openSignal?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [place, setPlace] = useState<{ up: boolean; maxHeight: number }>({ up, maxHeight: 380 });
   const ref = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
+  const [signal, setSignal] = useState(openSignal);
+  if (signal !== openSignal) {
+    setSignal(openSignal);
+    setOpen(true);
+  }
 
   // Open on the side with more room, and cap the height to what fits in the window.
   useLayoutEffect(() => {

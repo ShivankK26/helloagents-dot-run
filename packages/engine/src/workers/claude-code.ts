@@ -23,6 +23,8 @@ export interface ClaudeCodeOptions {
   effort?: RunEffort;
   /** "edits": edit freely, only listed commands. "full": no permission checks (still on its own branch). */
   access?: Access;
+  /** Extra folders Claude Code may read, e.g. where attached images are saved. */
+  addDirs?: readonly string[];
   signal?: AbortSignal;
   onEvent?: (event: AgentEvent) => void;
   /** Path to the claude executable (tests point this at a fake). */
@@ -78,6 +80,7 @@ export function claudeArgs(
     | "model"
     | "effort"
     | "access"
+    | "addDirs"
   >,
 ): string[] {
   const args = [
@@ -107,6 +110,7 @@ export function claudeArgs(
       LEAN_CLAUDE_TOOLS.join(","),
     );
   }
+  if (opts.addDirs?.length) args.push("--add-dir", ...opts.addDirs);
   if (opts.model) args.push("--model", opts.model);
   if (opts.effort) args.push("--effort", opts.effort);
   if (opts.maxTurns) args.push("--max-turns", String(opts.maxTurns));

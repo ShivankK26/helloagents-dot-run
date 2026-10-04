@@ -242,10 +242,7 @@ export function ActivityFeed({
             })}
           </div>
         ) : b.item?.kind === "you" ? (
-          <div key={b.key} className="you">
-            <small>You</small>
-            {b.item.text}
-          </div>
+          <YouSaid key={b.key} text={b.item.text} />
         ) : b.item?.kind === "say" ? (
           <div key={b.key} className="say">
             <Markdown text={b.item.text} />
@@ -256,6 +253,40 @@ export function ActivityFeed({
           </p>
         ) : null,
       )}
+    </div>
+  );
+}
+
+/** Must match ATTACHMENTS_HEADER in the engine, which adds this note to the prompt. */
+const ATTACHED = "\n\n[Attached images]\n";
+
+/** What you asked, with attached images shown as chips instead of the note the agent sees. */
+function YouSaid({ text }: { text: string }) {
+  const at = text.indexOf(ATTACHED);
+  const asked = at < 0 ? text : text.slice(0, at);
+  const images =
+    at < 0
+      ? []
+      : text
+          .slice(at)
+          .split("\n")
+          .filter((l) => l.startsWith("- "))
+          .map((l) => l.slice(2));
+  return (
+    <div className="you">
+      <small>You</small>
+      {asked}
+      {images.length ? (
+        <div className="you-images">
+          {images.map((p) => (
+            <span key={p} className="you-image" title={p}>
+              <Icon name="image" size={12} />
+              {/* Saved as "<id>-<name>"; show the name. */}
+              {(p.split("/").pop() ?? p).replace(/^[0-9a-f]{8}-/, "")}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { access, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   AnthropicModel,
@@ -10,6 +11,7 @@ import {
   findChildRepos,
   git,
   isGitRepo,
+  listSlashCommands,
   loadShellPath,
   detectActions,
   digestRun,
@@ -39,6 +41,7 @@ import {
   type ProjectMenuChoice,
   type RunListItem,
   type ShipKind,
+  type SlashCommand,
   type ThemeMode,
 } from "../shared/api";
 
@@ -260,9 +263,37 @@ app.whenReady().then(async () => {
     const run = store.getRun(runId);
     return run ? listItem(run) : null;
   });
-  ipcMain.handle(IPC.followUp, (_e, runId: string, message: string) =>
-    manager.followUp(runId, message),
+  ipcMain.handle(IPC.followUp, (_e, runId: string, message: string, attachments?: string[]) =>
+    manager.followUp(runId, message, attachments),
   );
+  // Asking Claude Code for its commands takes a couple of seconds, so once per project per launch.
+  const slashCommands = new Map<string, Promise<SlashCommand[]>>();
+  ipcMain.handle(IPC.listSlashCommands, (_e, projectId: string) => {
+    const project = store.getProject(projectId);
+    if (!project) return [];
+    let list = slashCommands.get(projectId);
+    if (!list) {
+      list = listSlashCommands(project.path, process.env.HELLOAGENTS_CLAUDE_PATH);
+      list.catch(() => slashCommands.delete(projectId));
+      slashCommands.set(projectId, list);
+    }
+    return list;
+  });
+  const attachmentsDir = path.join(dataDir, "attachments");
+  ipcMain.handle(IPC.saveAttachment, async (_e, name: string, bytes: Uint8Array) => {
+    const ext = path.extname(name).toLowerCase();
+    if (![".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext))
+      throw new Error("Only images can be attached.");
+    if (bytes.byteLength > 10 * 1024 * 1024) throw new Error("Images must be under 10 MB.");
+    await mkdir(attachmentsDir, { recursive: true });
+    const safe = path
+      .basename(name)
+      .replace(/[^\w.-]+/g, "-")
+      .slice(-60);
+    const file = path.join(attachmentsDir, `${randomUUID().slice(0, 8)}-${safe}`);
+    await writeFile(file, bytes);
+    return file;
+  });
   ipcMain.handle(IPC.startRun, (_e, projectId: string, task: string, settings?: RunSettings) =>
     manager.start(projectId, task, settings ?? {}),
   );

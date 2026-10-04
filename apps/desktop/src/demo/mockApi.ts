@@ -579,11 +579,17 @@ function stop(run: DemoRun): void {
 function startLive(project: ProjectRecord, task: string, settings: RunSettings = {}): string {
   const run = newRun(project, task, settings, Date.now());
   notify(run.rec.id);
-  play(run, task, script(task, project), { live: true });
+  play(run, withImages(task, settings.attachments), script(task, project), { live: true });
   return run.rec.id;
 }
 
-function continueLive(run: DemoRun, message: string): void {
+/** The note the engine adds to a prompt for attached images (the feed shows it as chips). */
+const withImages = (task: string, images: string[] = []) =>
+  images.length
+    ? `${task}\n\n[Attached images]\nThe user attached these images for reference.\n${images.map((p) => `- ${p}`).join("\n")}`
+    : task;
+
+function continueLive(run: DemoRun, message: string, images?: string[]): void {
   const project = projectOf(run);
   run.timers.forEach((t) => clearTimeout(t));
   run.timers = [];
@@ -591,7 +597,9 @@ function continueLive(run: DemoRun, message: string): void {
   run.rec.status = "running";
   run.rec.endedAt = null;
   notify(run.rec.id);
-  play(run, message, script(message, project, { followUp: true }), { live: true });
+  play(run, withImages(message, images), script(message, project, { followUp: true }), {
+    live: true,
+  });
 }
 
 // ---- Seed the sample history ----
@@ -794,7 +802,35 @@ export const demoApi: HelloagentsApi = {
   openIn: () => fail(),
   projectMenu: async () => "remove",
   setTheme: async () => undefined,
-  followUp: async (id, message) => continueLive(need(id), message),
+  followUp: async (id, message, images) => continueLive(need(id), message, images),
+  listSlashCommands: async () =>
+    later(
+      [
+        {
+          name: "init",
+          description: "Write a CLAUDE.md that explains this project to Claude",
+          kind: "command",
+        },
+        {
+          name: "security-review",
+          description: "Review the changes for security issues",
+          kind: "command",
+        },
+        { name: "code-review", description: "Review the code changes", kind: "skill" },
+        { name: "debug", description: "Track down a bug", kind: "skill" },
+        { name: "simplify", description: "Simplify recently changed code", kind: "skill" },
+        { name: "verify", description: "Check that a change actually works", kind: "skill" },
+        { name: "design", description: "Design UI screens and components", kind: "skill" },
+        {
+          name: "supabase:supabase",
+          description: "Work with Supabase: database, auth, storage",
+          kind: "skill",
+        },
+      ],
+      400,
+    ),
+  saveAttachment: async (name) =>
+    `/tmp/helloagents/attachments/${Math.random().toString(16).slice(2, 10)}-${name}`,
   cancelRun: async (id) => stop(need(id)),
   discardRun: async (id) => {
     const r = need(id);

@@ -63,6 +63,13 @@ export interface Opener {
   name: string;
 }
 
+/** A Claude Code slash command or skill, for the composer's "/" menu. */
+export interface SlashCommand {
+  name: string;
+  description: string;
+  kind: "skill" | "command";
+}
+
 export type ThemeMode = "light" | "dark" | "system";
 
 export interface RunListItem extends RunRecord {
@@ -128,7 +135,11 @@ export interface HelloagentsApi {
   openIn(openerId: string, path: string): Promise<void>;
   setTheme(mode: ThemeMode): Promise<void>;
   /** Continues a finished run on the same branch (and Claude Code session). */
-  followUp(runId: string, message: string): Promise<void>;
+  followUp(runId: string, message: string, attachments?: string[]): Promise<void>;
+  /** Claude Code's commands and skills in this project (cached after the first call). */
+  listSlashCommands(projectId: string): Promise<SlashCommand[]>;
+  /** Saves an attached image where the agent can read it; resolves with its path. */
+  saveAttachment(name: string, bytes: Uint8Array): Promise<string>;
   cancelRun(runId: string): Promise<void>;
   discardRun(runId: string): Promise<void>;
   runEvents(runId: string, afterSeq: number): Promise<StoredEvent[]>;
@@ -171,6 +182,8 @@ export const IPC = {
   openIn: "openers:open",
   setTheme: "app:set-theme",
   followUp: "runs:follow-up",
+  listSlashCommands: "projects:slash-commands",
+  saveAttachment: "attachments:save",
   cancelRun: "runs:cancel",
   discardRun: "runs:discard",
   runEvents: "runs:events",

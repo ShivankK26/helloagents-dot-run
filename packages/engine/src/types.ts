@@ -122,6 +122,8 @@ export interface RunSettings {
   base?: string;
   /** Branch the work came from, for merging back. Set by the app. */
   baseBranch?: string;
+  /** Images attached to the task (absolute paths the agent can read). */
+  attachments?: string[];
 }
 
 /** A coding-agent CLI the user can connect, detected on this machine. */

@@ -1,5 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { runAgent } from "../harness/agent";
 import type { ModelClient } from "../harness/model";
 import {
@@ -18,6 +19,7 @@ import { failureExcerpt } from "../trace/views";
 import type { TraceStore } from "../trace/store";
 import type { AgentEvent, AgentId, ProjectActions, ProjectRecord, RunSettings } from "../types";
 import { runClaudeCode } from "../workers/claude-code";
+import { isSlashTask } from "../workers/slash";
 import {
   detectActions,
   openPullRequest,
@@ -157,7 +159,7 @@ export class RunManager {
    * Sends a follow-up to a finished run: same branch, and for Claude Code the
    * same conversation, so the agent remembers what it already did.
    */
-  async followUp(runId: string, message: string): Promise<void> {
+  async followUp(runId: string, message: string, attachments?: string[]): Promise<void> {
     const { store } = this.opts;
     const run = store.getRun(runId);
     if (!run?.worktree) throw new Error("This run has no branch to continue on.");
@@ -170,7 +172,8 @@ export class RunManager {
       agent: run.agent ?? "claude-code",
       task: message,
       workspace: run.worktree.path,
-      settings: run.settings,
+      // Images belong to the message they came with.
+      settings: { ...run.settings, attachments: attachments ?? [] },
       actions: project ? await this.projectActions(project) : undefined,
       resumeSessionId: this.sessionOf(runId),
     });
@@ -487,8 +490,14 @@ export class RunManager {
     },
   ): Promise<string> {
     if (agent === "claude-code") {
+      const attachments = t.settings.attachments ?? [];
       const r = await runClaudeCode({
-        task: t.task,
+        task: withAttachments(t.task, attachments),
+        // Slash commands and skills need the user's full Claude Code setup.
+        lean: !isSlashTask(t.task),
+        ...(attachments.length && {
+          addDirs: [...new Set(attachments.map((a) => path.dirname(a)))],
+        }),
         workspace: t.workspace,
         signal: t.signal,
         onEvent: t.onEvent,
@@ -568,6 +577,16 @@ export class RunManager {
     this.opts.onChange?.(runId);
     return ok;
   }
+}
+
+/** Marks where attached images are listed in a prompt; the app hides this part. */
+export const ATTACHMENTS_HEADER = "[Attached images]";
+
+/** Adds attached images to the prompt so the agent knows to look at them. */
+export function withAttachments(task: string, attachments: readonly string[]): string {
+  if (!attachments.length) return task;
+  const list = attachments.map((a) => `- ${a}`).join("\n");
+  return `${task}\n\n${ATTACHMENTS_HEADER}\nThe user attached these images for reference. Read them with the Read tool:\n${list}`;
 }
 
 function commitMessage(title: string): string {

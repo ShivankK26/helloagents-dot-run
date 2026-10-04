@@ -3,8 +3,10 @@ import type { AgentId, ProjectInfo, ProjectRecord, RunSettings } from "../../../
 import { type AgentOption } from "../agents";
 import { EFFORTS, loadSettings, MODELS, modelName, saveSettings } from "../composer";
 import { errorText } from "../toast";
+import { AttachButton, AttachmentStrip, DropOverlay, useAttachments } from "./Attachments";
 import { Icon } from "./Icons";
 import { Menu } from "./Menu";
+import { useSlashMenu } from "./SlashMenu";
 
 /** The start screen for a project: one question, one box, every choice in reach. */
 export function NewTask({
@@ -31,6 +33,20 @@ export function NewTask({
   const worker = options.find((o) => o.id === project.workerAgent);
   const isClaude = project.workerAgent === "claude-code";
   const branchMode = settings.workspace !== "checkout";
+  const images = useAttachments(setError);
+  // Bumped to open the model or effort picker from "/model" or "/effort".
+  const [openModel, setOpenModel] = useState(0);
+  const [openEffort, setOpenEffort] = useState(0);
+  const slash = useSlashMenu({
+    projectId: project.id,
+    text: task,
+    enabled: isClaude,
+    onInsert: (text) => {
+      setTask(text);
+      box.current?.focus();
+    },
+    onLocal: (cmd) => (cmd === "model" ? setOpenModel : setOpenEffort)((n) => n + 1),
+  });
 
   useEffect(() => box.current?.focus({ preventScroll: true }), []);
 
@@ -42,14 +58,17 @@ export function NewTask({
 
   async function start() {
     const text = task.trim();
-    if (!text || worker?.unavailable || starting) return;
+    if (!text || worker?.unavailable || starting || images.saving) return;
     setStarting(true);
     setError(undefined);
     try {
       const runSettings: RunSettings = { ...settings };
       if (!runSettings.model) delete runSettings.model;
+      const attachments = images.paths();
+      if (attachments.length) runSettings.attachments = attachments;
       const id = await api.startRun(project.id, text, runSettings);
       setTask("");
+      images.clear();
       onStarted(id);
     } catch (e) {
       setError(errorText(e));
@@ -92,12 +111,16 @@ export function NewTask({
       </p>
 
       <form
-        className="composer"
+        className={`composer ${images.dragging ? "dragging" : ""}`}
+        {...images.handlers}
         onSubmit={(e) => {
           e.preventDefault();
           void start();
         }}
       >
+        {images.dragging ? <DropOverlay /> : null}
+        {slash.menu}
+        <AttachmentStrip items={images.items} onRemove={images.remove} />
         <label htmlFor="task" className="sr">
           Task
         </label>
@@ -105,10 +128,15 @@ export function NewTask({
           id="task"
           ref={box}
           rows={3}
-          placeholder="Describe a task, or ask a question about the code…"
+          placeholder={
+            isClaude
+              ? "Describe a task, ask about the code, or type / for commands and skills…"
+              : "Describe a task, or ask a question about the code…"
+          }
           value={task}
           onChange={(e) => setTask(e.target.value)}
           onKeyDown={(e) => {
+            if (slash.onKeyDown(e)) return;
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
               void start();
@@ -116,9 +144,11 @@ export function NewTask({
           }}
         />
         <div className="c-row">
+          <AttachButton onFiles={images.add} />
           <Menu
             up
             width={330}
+            openSignal={openModel}
             trigger={
               <>
                 <span className="agent-mark">✳</span> {worker?.name ?? "Agent"}
@@ -161,6 +191,7 @@ export function NewTask({
           <Menu
             up
             width={260}
+            openSignal={openEffort}
             trigger={
               <>
                 {EFFORTS.find((e) => e.id === settings.effort)?.name ?? "Default"} effort{" "}
@@ -227,7 +258,7 @@ export function NewTask({
           <button
             className="send"
             type="submit"
-            disabled={!task.trim() || starting || Boolean(worker?.unavailable)}
+            disabled={!task.trim() || starting || images.saving || Boolean(worker?.unavailable)}
             aria-label="Run"
             title="Run (⌘↵)"
           >

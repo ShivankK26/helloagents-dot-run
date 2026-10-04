@@ -2,7 +2,13 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
-import { claudeArgs, runClaudeCode, type AgentEvent } from "../src/index";
+import {
+  claudeArgs,
+  isSlashTask,
+  listSlashCommands,
+  runClaudeCode,
+  type AgentEvent,
+} from "../src/index";
 import { tempDir, workspace } from "./helpers";
 
 const FAKE = fileURLToPath(new URL("./fixtures/fake-claude.mjs", import.meta.url));
@@ -156,5 +162,19 @@ describe("runClaudeCode", () => {
     expect(events.filter((e) => e.type === "agent.end")).toHaveLength(1);
     expect(events[0]?.type).toBe("agent.start");
     expect(JSON.parse(await readFile(argsFile, "utf8"))).not.toContain("--strict-mcp-config");
+  });
+});
+
+describe("slash commands", () => {
+  test("lists what Claude Code offers, minus session-only commands, without running a turn", async () => {
+    const commands = await listSlashCommands(await tempDir(), FAKE);
+    expect(commands.map((c) => c.name)).toEqual(["init", "security-review", "my-skill"]);
+    expect(commands.find((c) => c.name === "my-skill")?.kind).toBe("skill");
+    expect(commands[0]?.description).toMatch(/CLAUDE\.md/);
+  });
+
+  test("spots a slash task", () => {
+    expect(isSlashTask("  /security-review now")).toBe(true);
+    expect(isSlashTask("fix the /api route")).toBe(false);
   });
 });

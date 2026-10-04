@@ -69,3 +69,5 @@ export {
   pushBranch,
 } from "./git/worktree";
 export type { ProjectInfo, ShipResult } from "./runs/manager";
+export { isSlashTask, listSlashCommands, readClaudeInit, type SlashCommand } from "./workers/slash";
+export { ATTACHMENTS_HEADER, withAttachments } from "./runs/manager";

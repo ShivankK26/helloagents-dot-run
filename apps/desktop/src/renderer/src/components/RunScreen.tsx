@@ -13,6 +13,7 @@ import { outcomeOf, STAGES } from "../outcome";
 import { elapsed } from "../time";
 import { ActivityFeed } from "./ActivityFeed";
 import { ChangesView } from "./ChangesView";
+import { AttachButton, AttachmentStrip, DropOverlay, useAttachments } from "./Attachments";
 import { Icon } from "./Icons";
 import { Markdown } from "./Markdown";
 import { errorText, showToast } from "../toast";
@@ -440,15 +441,17 @@ function Dock({ runId, enabled, active }: { runId: string; enabled: boolean; act
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
+  const images = useAttachments(setError);
 
   async function send() {
     const message = text.trim();
-    if (!message || !enabled || sending) return;
+    if (!message || !enabled || sending || images.saving) return;
     setSending(true);
     setError(undefined);
     try {
-      await api.followUp(runId, message);
+      await api.followUp(runId, message, images.paths());
       setText("");
+      images.clear();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -464,7 +467,12 @@ function Dock({ runId, enabled, active }: { runId: string; enabled: boolean; act
         void send();
       }}
     >
-      <div className={`dock-box ${text ? "has-text" : ""}`}>
+      <AttachmentStrip items={images.items} onRemove={images.remove} />
+      <div
+        className={`dock-box ${text || images.items.length ? "has-text" : ""} ${images.dragging ? "dragging" : ""}`}
+        {...images.handlers}
+      >
+        {images.dragging ? <DropOverlay /> : null}
         <label htmlFor={`follow-${runId}`} className="sr">
           Follow-up
         </label>
@@ -483,17 +491,19 @@ function Dock({ runId, enabled, active }: { runId: string; enabled: boolean; act
             }
           }}
         />
+        {enabled ? <AttachButton onFiles={images.add} /> : null}
         <button
           className="icon-btn send"
           type="submit"
-          disabled={!enabled || !text.trim() || sending}
+          disabled={!enabled || !text.trim() || sending || images.saving}
           aria-label="Send"
         >
           <Icon name="send" size={15} />
         </button>
       </div>
       <p className="dock-hint">
-        {error ?? "Follow-ups continue this conversation on the same branch · ⌘↵ to send"}
+        {error ??
+          "Follow-ups continue this conversation on the same branch · drop images to attach · ⌘↵ to send"}
       </p>
     </form>
   );
