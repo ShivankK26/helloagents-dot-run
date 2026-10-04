@@ -8,7 +8,8 @@ const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig({
   root: here("./src/demo"),
-  base: "./",
+  // Absolute, so the demo works at /demo and /demo/ alike.
+  base: "/demo/",
   plugins: [react()],
   build: { outDir: here("../web/public/demo"), emptyOutDir: true },
 });
