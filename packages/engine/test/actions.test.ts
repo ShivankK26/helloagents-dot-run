@@ -247,6 +247,30 @@ describe("runs with actions", () => {
     await expect(m.discard(runId)).rejects.toThrow(/own checkout/);
   });
 
+  test("shipping is recorded in the run, and the agent is told helloagents does it", async () => {
+    const dir = await repo(MATH);
+    const { store, m, project } = await manager(dir, {
+      setup: null,
+      checks: [],
+      dev: null,
+      sendBackFailures: false,
+    });
+    const runId = await m.start(project.id, "fix add() in math.js");
+    await m.settled(runId);
+    await m.ship(runId, "commit");
+    await expect(m.ship(runId, "push")).rejects.toThrow(); // no remote
+    const shipped = store
+      .events(runId)
+      .flatMap((e) => (e.event.type === "tool.result" && e.event.name === "ship" ? [e.event] : []));
+    expect(shipped.map((e) => [(e.input as { kind: string }).kind, e.ok])).toEqual([
+      ["commit", true],
+      ["push", false],
+    ]);
+    expect(claudeArgs({ task: "x" }).join(" ")).toMatch(
+      /--append-system-prompt .*Don't run git commit/,
+    );
+  });
+
   test("merge commits the run's work and merges it into the branch it came from", async () => {
     const dir = await repo(MATH);
     const { m, project } = await manager(dir, {

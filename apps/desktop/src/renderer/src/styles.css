@@ -3464,3 +3464,57 @@ code {
   font: 12.5px var(--mono);
   color: var(--ink);
 }
+
+/* The line that closes each turn: Done, what changed, the checks, how long. */
+.turn-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 4px 4px 0;
+  font-size: 13.5px;
+}
+.turn-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  flex-shrink: 0;
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+}
+.turn-end.bad .turn-mark {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 14%, transparent);
+}
+.turn-end b {
+  font-weight: 600;
+}
+.turn-facts {
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.turn-ship {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.btn.btn-sm {
+  height: 28px;
+  padding: 0 11px;
+  font-size: 12.5px;
+  gap: 6px;
+}
+.dock-hint.ship-hint {
+  color: var(--ink);
+}
+.dock-hint.ship-hint svg {
+  vertical-align: -2px;
+  color: var(--accent);
+}

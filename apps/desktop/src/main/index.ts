@@ -310,15 +310,7 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle(IPC.resumeRun, (_e, runId: string) => manager.resume(runId));
   ipcMain.handle(IPC.runChecks, (_e, runId: string) => manager.runChecks(runId));
-  ipcMain.handle(IPC.ship, (_e, runId: string, kind: ShipKind) =>
-    kind === "commit"
-      ? manager.commit(runId)
-      : kind === "push"
-        ? manager.push(runId)
-        : kind === "pr"
-          ? manager.openPullRequest(runId)
-          : manager.merge(runId),
-  );
+  ipcMain.handle(IPC.ship, (_e, runId: string, kind: ShipKind) => manager.ship(runId, kind));
   ipcMain.handle(IPC.startDev, async (_e, runId: string) => {
     const url = await manager.startDev(runId);
     win?.webContents.send(IPC.runChanged, runId);

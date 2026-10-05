@@ -108,6 +108,8 @@ export function claudeArgs(
       "--disable-slash-commands",
       "--tools",
       LEAN_CLAUDE_TOOLS.join(","),
+      "--append-system-prompt",
+      SHIPPING_NOTE,
     );
   }
   if (opts.addDirs?.length) args.push("--add-dir", ...opts.addDirs);
@@ -117,6 +119,16 @@ export function claudeArgs(
   if (opts.resumeSessionId) args.push("--resume", opts.resumeSessionId);
   return args;
 }
+
+/**
+ * helloagents commits, pushes and opens pull requests itself (its Ship menu),
+ * so the agent shouldn't try: in "edits" access those commands are blocked anyway.
+ */
+export const SHIPPING_NOTE =
+  "You are running inside helloagents, on a branch of your own. Don't run git commit, git push, " +
+  "or gh pr commands: helloagents does that itself. If the user asks you to commit, push, or open " +
+  'a pull request, don\'t try; tell them to use the Ship button (or type "push" / "open a PR" ' +
+  "in the follow-up box). Leave your changes uncommitted.";
 
 /** What Claude Code prints when it doesn't know a flag (e.g. an older version). */
 const REJECTED_FLAG = /unknown option|unknown argument|invalid option|error: option/i;

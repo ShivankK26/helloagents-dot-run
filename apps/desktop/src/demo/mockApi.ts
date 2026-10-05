@@ -777,11 +777,28 @@ export const demoApi: HelloagentsApi = {
     const r = need(id);
     const branch = r.rec.worktree?.branch ?? "";
     await later(null, 700);
-    if (kind === "commit") return { message: `Committed 4f9c2ab on ${branch} (demo)` };
-    if (kind === "push") return { message: `Pushed ${branch} (demo)` };
-    if (kind === "pr")
-      return { message: "Opened a pull request (demo: nothing was pushed)", url: REPO };
-    return { message: "Merged into main (demo)" };
+    const result =
+      kind === "commit"
+        ? { message: `Committed 4f9c2ab on ${branch} (demo)` }
+        : kind === "push"
+          ? { message: `Pushed ${branch} (demo)` }
+          : kind === "pr"
+            ? { message: "Opened a pull request (demo: nothing was pushed)", url: REPO }
+            : { message: "Merged into main (demo)" };
+    // Like the engine, record it in the run's activity.
+    push(r, {
+      type: "tool.result",
+      at: Date.now(),
+      turn: 0,
+      id: `ship-${Date.now()}`,
+      name: "ship",
+      input: { kind, ...("url" in result && { url: result.url }) },
+      ok: true,
+      output: result.message,
+      durationMs: 700,
+    });
+    notify(id);
+    return result;
   },
   startDev: async (id) => {
     need(id).dev = true;

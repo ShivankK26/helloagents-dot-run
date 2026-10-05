@@ -56,6 +56,8 @@ export interface ProjectInfo {
   actions: ProjectActions;
 }
 
+export type ShipKind = "commit" | "push" | "pr" | "merge";
+
 export interface ShipResult {
   message: string;
   url?: string;
@@ -295,6 +297,40 @@ export class RunManager {
   }
 
   // ---- Ship ----
+
+  /** Commit, push, open a PR or merge, recorded in the run's activity either way. */
+  async ship(runId: string, kind: ShipKind): Promise<ShipResult> {
+    const started = Date.now();
+    const record = (ok: boolean, output: string, url?: string) => {
+      this.opts.store.record(runId, "main", {
+        type: "tool.result",
+        at: Date.now(),
+        turn: 0,
+        id: randomUUID(),
+        name: "ship",
+        input: { kind, ...(url && { url }) },
+        ok,
+        output,
+        durationMs: Date.now() - started,
+      });
+      this.opts.onChange?.(runId);
+    };
+    try {
+      const result =
+        kind === "commit"
+          ? await this.commit(runId)
+          : kind === "push"
+            ? await this.push(runId)
+            : kind === "pr"
+              ? await this.openPullRequest(runId)
+              : await this.merge(runId);
+      record(true, result.message, result.url);
+      return result;
+    } catch (e) {
+      record(false, e instanceof Error ? e.message : String(e));
+      throw e;
+    }
+  }
 
   async commit(runId: string): Promise<ShipResult> {
     const { run } = this.shippable(runId);

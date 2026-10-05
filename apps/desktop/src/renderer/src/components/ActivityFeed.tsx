@@ -5,8 +5,9 @@ import {
   toolKind,
   toolPath,
 } from "@helloagents/engine/views";
-import type { StoredEvent } from "../../../shared/api";
+import type { ShipKind, StoredEvent } from "../../../shared/api";
 import { ms } from "../format";
+import { SHIP_LABEL, shortPath } from "../ship";
 import { Icon } from "./Icons";
 import { Markdown } from "./Markdown";
 
@@ -18,7 +19,14 @@ type Item =
   | { kind: "reads"; key: number; files: string[]; ms: number }
   | { kind: "tool"; key: number; event: ToolResult }
   | { kind: "pending"; key: number; label: string }
-  | { kind: "note"; key: number; text: string };
+  | { kind: "note"; key: number; text: string }
+  | {
+      kind: "end";
+      key: number;
+      files: number;
+      checks?: { ok: boolean; cantStart: boolean };
+      ms: number;
+    };
 
 const lines = (v: unknown) => (typeof v === "string" && v ? v.split("\n").length : 0);
 
@@ -42,19 +50,55 @@ export function editStats(input: unknown): { add: number; del: number } {
 const TEST = /\b(test|tests|jest|vitest|pytest|mocha|playwright|rspec)\b|go test|cargo test/i;
 const tail = (text: string, n = 30) => text.trimEnd().split("\n").slice(-n).join("\n");
 
-function build(events: StoredEvent[], active: boolean, hideAnswer: string): Item[] {
+function build(events: StoredEvent[], active: boolean, hideAnswer: string, root?: string): Item[] {
   const items: Item[] = [];
   const results = new Set<string>();
   for (const { event } of events) if (event.type === "tool.result") results.add(event.id);
 
+  // Each turn (your message, the agent's work, the checks) closes with a "Done" line.
+  let turn: {
+    startAt: number;
+    lastAt: number;
+    files: Set<string>;
+    checks?: { ok: boolean; cantStart: boolean };
+    done: boolean;
+  } | null = null;
+  const closeTurn = (key: number) => {
+    if (turn?.done)
+      items.push({
+        kind: "end",
+        key,
+        files: turn.files.size,
+        ...(turn.checks && { checks: turn.checks }),
+        ms: turn.lastAt - turn.startAt,
+      });
+    turn = null;
+  };
+
   for (const { seq, event: e } of events) {
-    if (e.type === "agent.start") items.push({ kind: "you", key: seq, text: e.task });
-    else if (e.type === "model.response" && e.text.trim()) {
+    if (turn && e.type !== "agent.start" && !(e.type === "tool.result" && e.name === "ship"))
+      turn.lastAt = e.at;
+    if (e.type === "agent.start" || (e.type === "tool.result" && e.name === "ship"))
+      closeTurn(seq - 0.5);
+    if (e.type === "agent.start") {
+      turn = { startAt: e.at, lastAt: e.at, files: new Set(), done: false };
+      items.push({ kind: "you", key: seq, text: e.task });
+    } else if (e.type === "agent.end" && turn) turn.done = e.status === "done";
+    if (turn && e.type === "tool.result") {
+      if (toolKind(e.name) === "edit" && e.ok) turn.files.add(toolPath(e.input) ?? e.name);
+      if (e.name === "checks")
+        turn.checks = {
+          ok: e.ok,
+          cantStart: Boolean((e.input as { cantStart?: string }).cantStart),
+        };
+    }
+    if (e.type === "agent.start") continue;
+    if (e.type === "model.response" && e.text.trim()) {
       items.push({ kind: "say", key: seq, text: e.text });
     } else if (e.type === "tool.result") {
       if (toolKind(e.name) === "read") {
         const last = items.at(-1);
-        const file = toolPath(e.input) ?? describeToolCall(e.name, e.input);
+        const file = shortPath(toolPath(e.input) ?? describeToolCall(e.name, e.input), root);
         if (last?.kind === "reads") {
           if (!last.files.includes(file)) last.files.push(file);
           last.ms += e.durationMs;
@@ -80,6 +124,8 @@ function build(events: StoredEvent[], active: boolean, hideAnswer: string): Item
     }
   }
 
+  if (!active) closeTurn(Number.MAX_SAFE_INTEGER);
+
   if (active) {
     // A tool the model asked for that hasn't returned yet is what's running now.
     const lastAsk = [...events].reverse().find((s) => s.event.type === "model.response");
@@ -96,7 +142,8 @@ function build(events: StoredEvent[], active: boolean, hideAnswer: string): Item
   return items;
 }
 
-function Step({ e }: { e: ToolResult }) {
+function Step({ e, root }: { e: ToolResult; root?: string }) {
+  if (e.name === "ship") return <Shipped e={e} />;
   const kind = toolKind(e.name);
   if (kind === "edit") {
     const { add, del } = editStats(e.input);
@@ -108,7 +155,7 @@ function Step({ e }: { e: ToolResult }) {
         </span>
         <span>
           {created ? "Wrote " : "Edited "}
-          <code>{toolPath(e.input) ?? e.name}</code>
+          <code>{shortPath(toolPath(e.input) ?? e.name, root)}</code>
           {e.ok ? null : <span className="bad-text"> · failed</span>}
         </span>
         <span className="r">
@@ -174,13 +221,42 @@ export function ActivityFeed({
   events,
   active,
   hideAnswer = "",
+  root,
+  shipKinds = [],
+  shipping,
+  onShip,
 }: {
   events: StoredEvent[];
   active: boolean;
   /** The final answer, already shown in the summary card. */
   hideAnswer?: string;
+  /** The run's folder, so paths can be shown relative to it. */
+  root?: string;
+  /** Ship buttons offered on the last "Done" line. */
+  shipKinds?: ShipKind[];
+  shipping?: ShipKind;
+  onShip?: (kind: ShipKind) => void;
 }) {
-  const items = build(events, active, hideAnswer);
+  const items = build(events, active, hideAnswer, root);
+  // Ship buttons go on the last "Done", minus what was already shipped after it.
+  const endAt = items.findLastIndex((it) => it.kind === "end");
+  const lastEnd =
+    endAt >= 0 && endAt >= items.findLastIndex((it) => it.kind === "you")
+      ? items[endAt]?.key
+      : undefined;
+  const shippedAfter = new Set(
+    items
+      .slice(endAt + 1)
+      .flatMap((it) =>
+        it.kind === "tool" && it.event.name === "ship" && it.event.ok
+          ? [(it.event.input as { kind?: ShipKind }).kind]
+          : [],
+      ),
+  );
+  const offer =
+    shippedAfter.has("pr") || shippedAfter.has("merge")
+      ? []
+      : shipKinds.filter((k) => !shippedAfter.has(k));
   // Consecutive steps share one indented track; messages sit between them.
   const blocks: Array<{ key: number; steps?: Item[]; item?: Item }> = [];
   for (const it of items) {
@@ -238,7 +314,7 @@ export function ActivityFeed({
                   </div>
                 );
               }
-              return it.kind === "tool" ? <Step key={it.key} e={it.event} /> : null;
+              return it.kind === "tool" ? <Step key={it.key} e={it.event} root={root} /> : null;
             })}
           </div>
         ) : b.item?.kind === "you" ? (
@@ -247,6 +323,14 @@ export function ActivityFeed({
           <div key={b.key} className="say">
             <Markdown text={b.item.text} />
           </div>
+        ) : b.item?.kind === "end" ? (
+          <TurnEnd
+            key={b.key}
+            item={b.item}
+            ship={b.key === lastEnd && b.item.files ? offer : []}
+            shipping={shipping}
+            onShip={onShip}
+          />
         ) : b.item?.kind === "note" ? (
           <p key={b.key} className="note">
             {b.item.text}
@@ -287,6 +371,81 @@ function YouSaid({ text }: { text: string }) {
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** The line that closes a turn: "Done", what changed, the checks, how long; and Ship buttons on the last. */
+function TurnEnd({
+  item,
+  ship,
+  shipping,
+  onShip,
+}: {
+  item: Extract<Item, { kind: "end" }>;
+  ship: ShipKind[];
+  shipping?: ShipKind;
+  onShip?: (kind: ShipKind) => void;
+}) {
+  const bad = item.checks && !item.checks.ok;
+  const facts = [
+    item.files ? `${item.files} file${item.files === 1 ? "" : "s"} changed` : "no changes",
+    item.checks
+      ? item.checks.ok
+        ? "checks pass"
+        : item.checks.cantStart
+          ? "checks couldn't run"
+          : "checks failing"
+      : null,
+    item.ms >= 1000 ? ms(item.ms) : null,
+  ].filter(Boolean);
+  return (
+    <div className={`turn-end ${bad ? "bad" : "ok"}`}>
+      <span className="turn-mark" aria-hidden="true">
+        {bad ? "✗" : "✓"}
+      </span>
+      <b>Done</b>
+      <span className="turn-facts">{facts.join(" · ")}</span>
+      {ship.length ? (
+        <span className="turn-ship">
+          {ship.map((k, i) => (
+            <button
+              key={k}
+              type="button"
+              className={`btn btn-sm ${i === ship.length - 1 ? "btn-primary" : ""}`}
+              disabled={Boolean(shipping)}
+              onClick={() => onShip?.(k)}
+            >
+              {shipping === k ? <span className="spinner" /> : null}
+              {k === "pr" ? "Open PR" : k === "push" ? "Push" : SHIP_LABEL[k]}
+            </button>
+          ))}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/** A commit, push, PR or merge helloagents did for this run. */
+function Shipped({ e }: { e: ToolResult }) {
+  const { kind, url } = e.input as { kind?: ShipKind; url?: string };
+  return (
+    <div className={`step ${e.ok ? "ok" : "bad"}`}>
+      <span className="k">
+        <Icon name={kind === "pr" ? "pr" : kind === "merge" ? "merge" : "ship"} size={12} />
+      </span>
+      <span>
+        {e.ok ? e.output : `${kind ? SHIP_LABEL[kind] : "Ship"} failed: ${e.output}`}
+        {url ? (
+          <>
+            {" · "}
+            <button className="link-btn" onClick={() => void window.helloagents.openExternal(url)}>
+              View on GitHub
+            </button>
+          </>
+        ) : null}
+      </span>
+      <span className="r">{e.ok ? "by helloagents" : "failed"}</span>
     </div>
   );
 }

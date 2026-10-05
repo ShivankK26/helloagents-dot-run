@@ -10,6 +10,7 @@ import type {
 import { agentName } from "../agents";
 import { compact, ms, tokenParts } from "../format";
 import { outcomeOf, STAGES } from "../outcome";
+import { SHIP_LABEL, shipIntent, shortPath } from "../ship";
 import { elapsed } from "../time";
 import { ActivityFeed } from "./ActivityFeed";
 import { ChangesView } from "./ChangesView";
@@ -44,6 +45,7 @@ export function RunScreen({
   const [diffLoaded, setDiffLoaded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [shipping, setShipping] = useState<ShipKind>();
   const lastSeq = useRef(0);
   const feedEnd = useRef<HTMLDivElement>(null);
 
@@ -85,8 +87,27 @@ export function RunScreen({
     // Follow the newest step by scrolling only the feed itself. scrollIntoView would also
     // scroll every container around it, including a web page embedding the app.
     const feed = feedEnd.current?.closest(".feed");
-    if (tab === "activity" && run?.active && feed) feed.scrollTop = feed.scrollHeight;
-  }, [events.length, tab, run?.active]);
+    const shipped = events.at(-1)?.event;
+    const justShipped = shipped?.type === "tool.result" && shipped.name === "ship";
+    if (tab === "activity" && (run?.active || justShipped) && feed)
+      feed.scrollTop = feed.scrollHeight;
+  }, [events, tab, run?.active]);
+
+  /** Commit, push, PR or merge, done by helloagents (the agent can't push). */
+  const ship = useCallback(
+    async (kind: ShipKind) => {
+      setShipping(kind);
+      try {
+        const r = await api.ship(runId, kind);
+        showToast(r.message, { tone: "ok", ...(r.url && { url: r.url }) });
+      } catch (e) {
+        showToast(errorText(e), { tone: "bad" });
+      } finally {
+        setShipping(undefined);
+      }
+    },
+    [api, runId],
+  );
 
   if (!run) return <div className="run-screen" />;
 
@@ -96,6 +117,9 @@ export function RunScreen({
   const took = elapsed(run.startedAt, run.endedAt ?? now);
   const worktree = run.worktree;
   const canFollowUp = Boolean(worktree) && !run.active;
+  const inPlace = run.settings.workspace === "checkout";
+  const shipKinds: ShipKind[] =
+    worktree && !run.branchGone && !run.active ? (inPlace ? ["push"] : ["push", "pr"]) : [];
 
   async function discard() {
     await api.discardRun(runId);
@@ -187,13 +211,22 @@ export function RunScreen({
                     <summary>
                       <Icon name="chevron" size={12} /> How the agent got there
                     </summary>
-                    <ActivityFeed events={events} active={false} hideAnswer={d.answer} />
+                    <ActivityFeed
+                      events={events}
+                      active={false}
+                      hideAnswer={d.answer}
+                      root={worktree?.path}
+                    />
                   </details>
                 ) : (
                   <ActivityFeed
                     events={events}
                     active={run.active}
                     hideAnswer={run.active ? "" : d.answer}
+                    root={worktree?.path}
+                    shipKinds={shipKinds}
+                    shipping={shipping}
+                    onShip={(k) => void ship(k)}
                   />
                 )}
                 <div ref={feedEnd} />
@@ -211,7 +244,15 @@ export function RunScreen({
       </div>
 
       {worktree && !run.branchGone ? (
-        <Dock runId={runId} enabled={canFollowUp} active={run.active} />
+        <Dock
+          runId={runId}
+          enabled={canFollowUp}
+          active={run.active}
+          inPlace={inPlace}
+          branch={worktree.branch}
+          shipping={shipping}
+          onShip={(k) => ship(k)}
+        />
       ) : null}
     </div>
   );
@@ -409,7 +450,7 @@ function SidePanel({
             {d.filesChanged.map((f) => (
               <li key={f} title={f}>
                 <Icon name="file" size={13} />
-                <span>{f}</span>
+                <span>{shortPath(f, run.worktree?.path)}</span>
               </li>
             ))}
           </ul>
@@ -449,21 +490,47 @@ function SidePanel({
 }
 
 /** The follow-up box: one line until you click it. */
-function Dock({ runId, enabled, active }: { runId: string; enabled: boolean; active: boolean }) {
+function Dock({
+  runId,
+  enabled,
+  active,
+  inPlace,
+  branch,
+  shipping,
+  onShip,
+}: {
+  runId: string;
+  enabled: boolean;
+  active: boolean;
+  inPlace: boolean;
+  branch: string;
+  shipping?: ShipKind;
+  onShip: (kind: ShipKind) => Promise<void>;
+}) {
   const api = window.helloagents;
   const [text, setText] = useState("");
+  const [toAgent, setToAgent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
   const images = useAttachments(setError);
 
+  // "push it", "open a PR": helloagents does that itself, since the agent can't.
+  const intent = enabled && !toAgent && !images.items.length ? shipIntent(text, inPlace) : null;
+
   async function send() {
     const message = text.trim();
-    if (!message || !enabled || sending || images.saving) return;
+    if (!message || !enabled || sending || images.saving || shipping) return;
+    if (intent) {
+      setText("");
+      await onShip(intent);
+      return;
+    }
     setSending(true);
     setError(undefined);
     try {
       await api.followUp(runId, message, images.paths());
       setText("");
+      setToAgent(false);
       images.clear();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -496,7 +563,10 @@ function Dock({ runId, enabled, active }: { runId: string; enabled: boolean; act
           placeholder={
             active ? "You can follow up when it finishes…" : "Ask a follow-up, or ask for a change…"
           }
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (!e.target.value) setToAgent(false);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
@@ -514,9 +584,26 @@ function Dock({ runId, enabled, active }: { runId: string; enabled: boolean; act
           <Icon name="send" size={15} />
         </button>
       </div>
-      <p className="dock-hint">
+      <p className={`dock-hint ${intent ? "ship-hint" : ""}`}>
         {error ??
-          "Follow-ups continue this conversation on the same branch · drop images to attach · ⌘↵ to send"}
+          (intent ? (
+            <>
+              <Icon name={intent === "pr" ? "pr" : "ship"} size={12} />{" "}
+              <span title={branch}>
+                {intent === "pr"
+                  ? "Sending opens a pull request"
+                  : intent === "push"
+                    ? "Sending pushes this branch to GitHub"
+                    : `Sending does this: ${SHIP_LABEL[intent]}`}
+              </span>{" "}
+              (helloagents does it; Claude can't push) ·{" "}
+              <button type="button" className="link-btn" onClick={() => setToAgent(true)}>
+                Ask Claude instead
+              </button>
+            </>
+          ) : (
+            "Follow-ups continue this conversation on the same branch · drop images to attach · ⌘↵ to send"
+          ))}
       </p>
     </form>
   );
