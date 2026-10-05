@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { chmod, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
@@ -10,6 +10,8 @@ import {
   RunManager,
   runShell,
   TraceStore,
+  whyItCouldNotStart,
+  withPackageManager,
 } from "../src/index";
 import { tempDir, workspace } from "./helpers";
 
@@ -69,6 +71,42 @@ describe("detectActions", () => {
     expect((await detectActions(await workspace({ "go.mod": "module x" }))).checks).toEqual([
       "go test ./...",
     ]);
+  });
+});
+
+describe("setup problems", () => {
+  test("package.json's packageManager wins over lockfiles", async () => {
+    const dir = await workspace({
+      "package.json": JSON.stringify({
+        packageManager: "yarn@1.22.22",
+        scripts: { lint: "eslint ." },
+      }),
+      "pnpm-lock.yaml": "",
+      "yarn.lock": "",
+    });
+    expect(await detectActions(dir)).toMatchObject({
+      setup: "yarn install",
+      checks: ["yarn lint"],
+    });
+  });
+
+  test("swaps package managers and spots tools that couldn't start", () => {
+    expect(withPackageManager("pnpm lint", "yarn")).toBe("yarn lint");
+    expect(withPackageManager("yarn lint", "npm")).toBe("npm run lint");
+    expect(withPackageManager("pnpm test", "npm")).toBe("npm test");
+    expect(withPackageManager("make test", "npm")).toBe("make test");
+    expect(
+      whyItCouldNotStart(
+        "warn: This version of pnpm requires at least Node.js v22.13\nThe current version of Node.js is v20.18.0",
+      ),
+    ).toBe("it needs Node 22.13 or newer");
+    expect(
+      whyItCouldNotStart(
+        "Error [ERR_UNKNOWN_BUILTIN_MODULE]: No such built-in module: node:sqlite",
+      ),
+    ).toMatch(/newer version of Node/);
+    expect(whyItCouldNotStart("/bin/sh: deno: command not found")).toBe("deno isn't installed");
+    expect(whyItCouldNotStart("1 test failed")).toBeNull();
   });
 });
 
@@ -132,6 +170,63 @@ describe("runs with actions", () => {
       /checks failed[\s\S]*1 test failed/,
     );
     expect(digestRun(store.events(runId)).tests).toMatchObject({ passed: false });
+  });
+
+  test("a check that can't start is fixed with the project's package manager, and saved", async () => {
+    // A "yarn" that's too new for this Node, like pnpm 11 on Node 20.
+    const bin = await tempDir();
+    await writeFile(
+      path.join(bin, "yarn"),
+      "#!/bin/sh\necho 'This version of yarn requires at least Node.js v99'\nexit 1\n",
+    );
+    await chmod(path.join(bin, "yarn"), 0o755);
+    const oldPath = process.env.PATH;
+    process.env.PATH = `${bin}:${oldPath ?? ""}`;
+    try {
+      const dir = await repo({
+        ...MATH,
+        "package.json": JSON.stringify({
+          packageManager: "npm@10.0.0",
+          scripts: { lint: "echo linted" },
+        }),
+        "node_modules/.keep": "",
+      });
+      const { store, m, project } = await manager(dir, {
+        setup: null,
+        checks: ["yarn lint"],
+        dev: null,
+        sendBackFailures: true,
+      });
+      const runId = await m.start(project.id, "Fix add()");
+      await m.settled(runId);
+      expect(digestRun(store.events(runId)).tests).toMatchObject({ passed: true });
+      expect(store.getProject(project.id)?.actions?.checks).toEqual(["npm run lint"]);
+      const checks = store
+        .events(runId)
+        .find((e) => e.event.type === "tool.result" && e.event.name === "checks");
+      expect(checks?.event.type === "tool.result" && checks.event.output).toMatch(
+        /Fixed the setup on its own: used npm/,
+      );
+    } finally {
+      process.env.PATH = oldPath;
+    }
+  });
+
+  test("a check that can't start, and can't be fixed, isn't sent to the agent", async () => {
+    const dir = await repo(MATH);
+    const { store, m, project } = await manager(dir, {
+      setup: null,
+      checks: ["definitely-not-a-tool lint"],
+      dev: null,
+      sendBackFailures: true,
+    });
+    const runId = await m.start(project.id, "Fix add()");
+    await m.settled(runId);
+    expect(store.events(runId).filter((e) => e.event.type === "agent.start")).toHaveLength(1);
+    expect(digestRun(store.events(runId)).tests).toMatchObject({
+      passed: false,
+      cantStart: "definitely-not-a-tool isn't installed",
+    });
   });
 
   test("a run in the current checkout works in place and can't be discarded", async () => {

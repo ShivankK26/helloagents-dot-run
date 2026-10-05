@@ -1,5 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { stat } from "node:fs/promises";
 import path from "node:path";
 import { runAgent } from "../harness/agent";
 import type { ModelClient } from "../harness/model";
@@ -21,11 +22,16 @@ import type { AgentEvent, AgentId, ProjectActions, ProjectRecord, RunSettings } 
 import { runClaudeCode } from "../workers/claude-code";
 import { isSlashTask } from "../workers/slash";
 import {
+  declaredPackageManager,
   detectActions,
+  installedNodes,
   openPullRequest,
   runShell,
   startBackground,
+  type CommandResult,
   stopBackground,
+  whyItCouldNotStart,
+  withPackageManager,
 } from "./actions";
 
 export interface RunManagerOptions {
@@ -357,7 +363,10 @@ export class RunManager {
         stopBackground(child); // one at a time: they usually share a port
         this.devServers.delete(id);
       }
-      this.devServers.set(runId, startBackground(actions.dev.command, run.worktree.path));
+      this.devServers.set(
+        runId,
+        startBackground(actions.dev.command, run.worktree.path, actions.nodeBin),
+      );
     }
     return actions.dev.url;
   }
@@ -439,7 +448,14 @@ export class RunManager {
 
     this.track(runId, async (signal) => {
       if (w.setup) {
-        const ok = await this.command(runId, "setup", [w.setup], w.workspace, signal);
+        const { ok } = await this.command(
+          runId,
+          "setup",
+          [w.setup],
+          w.workspace,
+          signal,
+          w.actions,
+        );
         if (!ok) {
           store.failRun(
             runId,
@@ -468,8 +484,15 @@ export class RunManager {
         });
         if (status !== "done" || signal.aborted || !w.actions?.checks.length) return;
 
-        const failure = await this.checks(runId, w.actions, w.workspace, signal);
-        if (!failure || !w.actions.sendBackFailures || round >= MAX_SEND_BACKS || signal.aborted)
+        const { failure, cantStart } = await this.checks(runId, w.actions, w.workspace, signal);
+        // A check that couldn't start says nothing about the code; the agent can't fix it.
+        if (
+          !failure ||
+          cantStart ||
+          !w.actions.sendBackFailures ||
+          round >= MAX_SEND_BACKS ||
+          signal.aborted
+        )
           return;
         task = `The project's checks failed after your changes:\n\n${failure}\n\nFix the cause, then summarize what you changed.`;
         session = this.sessionOf(runId);
@@ -532,12 +555,20 @@ export class RunManager {
     actions: ProjectActions,
     workspace: string,
     signal: AbortSignal,
-  ): Promise<string | null> {
+  ): Promise<{ failure: string | null; cantStart: boolean }> {
     let failure: string | null = null;
-    await this.command(runId, "checks", actions.checks, workspace, signal, (cmd, output) => {
-      failure ??= `$ ${cmd}\n${failureExcerpt(output, 40)}`;
-    });
-    return failure;
+    const { cantStart } = await this.command(
+      runId,
+      "checks",
+      actions.checks,
+      workspace,
+      signal,
+      actions,
+      (cmd, output) => {
+        failure ??= `$ ${cmd}\n${failureExcerpt(output, 40)}`;
+      },
+    );
+    return { failure, cantStart };
   }
 
   /** Runs commands one after another and records them as a single step named `name`. */
@@ -547,16 +578,30 @@ export class RunManager {
     commands: string[],
     workspace: string,
     signal: AbortSignal,
+    actions?: ProjectActions,
     onFail?: (command: string, output: string) => void,
-  ): Promise<boolean> {
+  ): Promise<{ ok: boolean; cantStart: boolean }> {
     const started = Date.now();
     let ok = true;
+    let cantStart: string | undefined;
     const parts: string[] = [];
-    for (const cmd of commands) {
+    for (const original of commands) {
       if (signal.aborted) break;
-      const r = await runShell(cmd, workspace, { signal });
+      let cmd = original;
+      let r = await runShell(cmd, workspace, { signal, nodeBin: actions?.nodeBin });
+      let note = "";
+      const why = r.ok ? null : whyItCouldNotStart(r.output);
+      if (why && actions) {
+        const fixed = await this.fixEnvironment(runId, cmd, workspace, actions, signal);
+        if (fixed) {
+          ({ command: cmd, result: r, note } = fixed);
+        } else {
+          cantStart ??= why;
+          note = `This couldn't start, so it says nothing about the code: ${why}.`;
+        }
+      }
       parts.push(
-        `$ ${cmd}\n${r.output || "(no output)"}${r.ok ? "" : `\n(exit code ${r.exitCode ?? "?"})`}`,
+        `$ ${cmd}\n${note ? `[helloagents] ${note}\n\n` : ""}${r.output || "(no output)"}${r.ok ? "" : `\n(exit code ${r.exitCode ?? "?"})`}`,
       );
       if (!r.ok) {
         ok = false;
@@ -569,13 +614,78 @@ export class RunManager {
       turn: 0,
       id: randomUUID(),
       name,
-      input: { commands },
+      input: { commands, ...(cantStart && { cantStart }) },
       ok,
       output: parts.join("\n\n"),
       durationMs: Date.now() - started,
     });
     this.opts.onChange?.(runId);
-    return ok;
+    return { ok, cantStart: Boolean(cantStart) };
+  }
+
+  /**
+   * A command couldn't start (wrong package manager, too old a Node). Tries the
+   * package manager package.json asks for and newer Nodes installed on this
+   * Mac. If one gets the command running, it's saved for the project.
+   */
+  private async fixEnvironment(
+    runId: string,
+    command: string,
+    workspace: string,
+    actions: ProjectActions,
+    signal: AbortSignal,
+  ): Promise<{ command: string; result: CommandResult; note: string } | null> {
+    const declared = await declaredPackageManager(workspace);
+    const commands = [
+      ...new Set([declared ? withPackageManager(command, declared) : command, command]),
+    ];
+    const nodes = [
+      actions.nodeBin ?? null,
+      ...(await installedNodes()).slice(0, 3).map((n) => n.bin),
+    ];
+    const versions = new Map((await installedNodes()).map((n) => [n.bin, n.version]));
+    const hasModules = await stat(path.join(workspace, "node_modules")).then(
+      () => true,
+      () => false,
+    );
+    for (const nodeBin of [...new Set(nodes)]) {
+      for (const cmd of commands) {
+        if (signal.aborted) return null;
+        if (cmd === command && nodeBin === (actions.nodeBin ?? null)) continue; // already failed
+        // Install first if the failed setup left nothing installed.
+        if (!hasModules && actions.setup && command !== actions.setup) {
+          const setup = declared ? withPackageManager(actions.setup, declared) : actions.setup;
+          const s = await runShell(setup, workspace, { signal, nodeBin });
+          if (!s.ok && whyItCouldNotStart(s.output)) continue;
+        }
+        const result = await runShell(cmd, workspace, { signal, nodeBin });
+        if (!result.ok && whyItCouldNotStart(result.output)) continue;
+
+        // It runs now. Remember what worked for this project.
+        const changes: string[] = [];
+        if (cmd !== command && declared) {
+          const swap = (c: string) => withPackageManager(c, declared);
+          actions.setup = actions.setup && swap(actions.setup);
+          actions.checks = actions.checks.map(swap);
+          if (actions.dev) actions.dev = { ...actions.dev, command: swap(actions.dev.command) };
+          changes.push(`used ${declared}, which package.json asks for`);
+        }
+        if (nodeBin !== (actions.nodeBin ?? null)) {
+          actions.nodeBin = nodeBin;
+          changes.push(
+            `used Node ${(nodeBin && versions.get(nodeBin)) ?? "default"}, since the default was too old`,
+          );
+        }
+        const projectId = this.opts.store.getRun(runId)?.projectId;
+        if (projectId) this.opts.store.setProjectActions(projectId, actions);
+        return {
+          command: cmd,
+          result,
+          note: `Fixed the setup on its own: ${changes.join(" and ")}. Saved for this project.`,
+        };
+      }
+    }
+    return null;
   }
 }
 

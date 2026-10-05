@@ -3453,3 +3453,14 @@ code {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* Checks that couldn't start: a setup problem, explained in words. */
+.cant-start {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.cant-start code {
+  font: 12.5px var(--mono);
+  color: var(--ink);
+}

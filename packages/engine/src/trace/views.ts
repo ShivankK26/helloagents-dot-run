@@ -197,7 +197,13 @@ export interface RunDigest {
   filesChanged: string[];
   commands: number;
   /** The last test command's result, if the agent ran tests. */
-  tests: { passed: boolean; line: string; command: string } | null;
+  tests: {
+    passed: boolean;
+    line: string;
+    command: string;
+    /** The checks couldn't even start (e.g. too old a Node): why, in plain words. */
+    cantStart?: string;
+  } | null;
   /** Where a running agent is now: the most advanced stage it has reached. */
   stage: RunStage;
   /** The agent's last message: for a question, the answer. */
@@ -241,10 +247,12 @@ export function digestRun(events: WithAgent[]): RunDigest {
       if (e.name === "checks") {
         // The project's own checks are the verdict, whatever the agent ran before.
         const counted = testResultLine(e.output, e.ok);
+        const cantStart = (e.input as { cantStart?: unknown }).cantStart;
         tests = {
           passed: e.ok,
           line: /\d/.test(counted) ? counted : e.ok ? "checks pass" : "checks fail",
           command,
+          ...(typeof cantStart === "string" && { cantStart }),
         };
         checked = true;
         reach("test");

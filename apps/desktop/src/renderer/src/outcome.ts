@@ -44,6 +44,13 @@ export function outcomeOf(run: RunListItem): Outcome {
       line: run.summary ?? run.error ?? "Didn't finish",
     };
   }
+  if (d.tests?.cantStart) {
+    return {
+      tone: "bad",
+      label: "Checks couldn't run",
+      line: `Checks couldn't run: ${d.tests.cantStart}`,
+    };
+  }
   if (d.tests && !d.tests.passed) {
     const counts = /\d/.test(d.tests.line) ? ` · ${d.tests.line}` : "";
     return { tone: "bad", label: "Checks failing", line: `Checks failing${counts}` };

@@ -91,6 +91,11 @@ export interface ProjectActions {
   dev: { command: string; url: string } | null;
   /** Send failing checks back to the agent automatically (at most twice). */
   sendBackFailures: boolean;
+  /**
+   * A Node.js bin folder put first on PATH for these commands. Set by
+   * helloagents when the default Node was too old for the project's tools.
+   */
+  nodeBin?: string | null;
 }
 
 export interface ProjectRecord {

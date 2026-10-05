@@ -53,8 +53,12 @@ export type { Worktree } from "./git/worktree";
 export { RunManager } from "./runs/manager";
 export type { RunManagerOptions } from "./runs/manager";
 export {
+  declaredPackageManager,
   detectActions,
+  installedNodes,
   openPullRequest,
+  whyItCouldNotStart,
+  withPackageManager,
   runShell,
   startBackground,
   stopBackground,

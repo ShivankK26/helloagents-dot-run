@@ -234,15 +234,18 @@ function SummaryCard({
   const [open, setOpen] = useState(false);
   const o = outcomeOf(run);
   const d = run.digest;
-  const failure = o.tone === "bad" ? toErrors(events).at(-1) : undefined;
+  const cantStart = d.tests?.cantStart;
+  const failure = o.tone === "bad" && !cantStart ? toErrors(events).at(-1) : undefined;
   const files = d.filesChanged.length;
   const title =
     run.status === "cancelled"
       ? "Stopped"
       : o.tone === "bad"
-        ? d.tests && !d.tests.passed
-          ? `Checks failing${/\d/.test(d.tests.line) ? ` · ${d.tests.line}` : ""}`
-          : "Didn't finish"
+        ? cantStart
+          ? "Checks couldn't run"
+          : d.tests && !d.tests.passed
+            ? `Checks failing${/\d/.test(d.tests.line) ? ` · ${d.tests.line}` : ""}`
+            : "Didn't finish"
         : files
           ? `Done in ${took}${d.tests ? " · checks pass" : ""}`
           : `Answered in ${took}`;
@@ -277,11 +280,21 @@ function SummaryCard({
               ? `Tests: ${d.tests.line}`
               : d.tests.passed
                 ? "Checks pass"
-                : "Checks fail"}
+                : cantStart
+                  ? "Couldn't run"
+                  : "Checks fail"}
           </span>
         ) : null}
       </div>
 
+      {cantStart ? (
+        <p className="cant-start">
+          <code>{d.tests?.command}</code> couldn't start: {cantStart}. That's your Mac's setup, not
+          the code, so nothing was sent to the agent. helloagents tried the fixes it knows (the
+          package manager in package.json, newer Node versions). Fix it, then click{" "}
+          <b>Run checks</b>.
+        </p>
+      ) : null}
       {failure ? <pre className="excerpt">{failure.excerpt || failure.title}</pre> : null}
       {run.status !== "done" && run.error && !failure ? (
         <pre className="excerpt">{run.error}</pre>
