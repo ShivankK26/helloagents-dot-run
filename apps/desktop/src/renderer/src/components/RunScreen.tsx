@@ -43,6 +43,7 @@ export function RunScreen({
   const [tab, setTab] = useState<RunTab>(initialTab);
   const [diff, setDiff] = useState("");
   const [diffLoaded, setDiffLoaded] = useState(false);
+  const [diffError, setDiffError] = useState<string>();
   const [now, setNow] = useState(() => Date.now());
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [shipping, setShipping] = useState<ShipKind>();
@@ -77,10 +78,17 @@ export function RunScreen({
 
   useEffect(() => {
     if (tab !== "changes") return;
-    void api.runDiff(runId).then((d) => {
-      setDiff(d);
-      setDiffLoaded(true);
-    });
+    void api.runDiff(runId).then(
+      (d) => {
+        setDiff(d);
+        setDiffError(undefined);
+        setDiffLoaded(true);
+      },
+      (e: unknown) => {
+        setDiffError(errorText(e));
+        setDiffLoaded(true);
+      },
+    );
   }, [api, runId, tab, run?.status, run?.digest.filesChanged.length]);
 
   useEffect(() => {
@@ -271,7 +279,9 @@ export function RunScreen({
             <SidePanel run={run} events={events} took={took} onTrace={() => setTab("trace")} />
           </div>
         ) : null}
-        {tab === "changes" ? <ChangesView diff={diff} loading={!diffLoaded} /> : null}
+        {tab === "changes" ? (
+          <ChangesView diff={diff} loading={!diffLoaded} {...(diffError && { error: diffError })} />
+        ) : null}
         {tab === "trace" ? (
           <div className="trace-tab">
             <TraceView runId={runId} project={project} embedded />
@@ -596,7 +606,8 @@ function Dock({
           }
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            // Enter sends; Shift+Enter adds a line.
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               void send();
             }
@@ -614,7 +625,7 @@ function Dock({
       </div>
       <p className="dock-hint">
         {error ??
-          "Follow-ups continue this conversation on the same branch · drop images to attach · ⌘↵ to send"}
+          "Follow-ups continue this conversation on the same branch · drop images to attach · ↵ to send, ⇧↵ for a new line"}
       </p>
     </form>
   );

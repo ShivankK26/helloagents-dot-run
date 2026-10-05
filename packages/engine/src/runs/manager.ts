@@ -328,14 +328,11 @@ export class RunManager {
     const run = this.opts.store.getRun(runId);
     if (!run?.worktree) return "";
     const project = run.projectId ? this.opts.store.getProject(run.projectId) : undefined;
-    try {
-      // After a push the folder is gone, but the branch has every change.
-      if (!existsSync(run.worktree.path) && project)
-        return await git(project.path, ["diff", `${run.worktree.base}...${run.worktree.branch}`]);
-      return await worktreeDiff(run.worktree);
-    } catch {
-      return "";
-    }
+    // After a push the folder is gone, but the branch has every change. A git error is
+    // reported, not shown as "no changes".
+    if (!existsSync(run.worktree.path) && project)
+      return git(project.path, ["diff", `${run.worktree.base}...${run.worktree.branch}`]);
+    return worktreeDiff(run.worktree);
   }
 
   /** Deletes the run's worktree and branch. The run's history is kept. */

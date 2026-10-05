@@ -101,7 +101,7 @@ export function useSlashMenu({
       } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         const n = entries.length || 1;
         setActive((active + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
-      } else if ((e.key === "Enter" && !e.metaKey && !e.ctrlKey) || e.key === "Tab") {
+      } else if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
         const entry = entries[active];
         if (!entry) return false;
         pick(entry);

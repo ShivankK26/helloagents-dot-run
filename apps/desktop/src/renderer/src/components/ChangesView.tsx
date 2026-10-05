@@ -3,7 +3,15 @@ import { parseDiff } from "./Diff";
 import { Icon } from "./Icons";
 
 /** Review view: changed files on the left, the selected file's diff at full width. */
-export function ChangesView({ diff, loading }: { diff: string; loading: boolean }) {
+export function ChangesView({
+  diff,
+  loading,
+  error,
+}: {
+  diff: string;
+  loading: boolean;
+  error?: string;
+}) {
   const files = parseDiff(diff);
   const [picked, setPicked] = useState<string>();
   const current = files.find((f) => f.path === picked) ?? files[0];
@@ -12,7 +20,13 @@ export function ChangesView({ diff, loading }: { diff: string; loading: boolean 
     return (
       <div className="changes-empty">
         <Icon name="file" size={20} />
-        <p>{loading ? "Loading changes…" : "No files changed in this run."}</p>
+        <p>
+          {loading
+            ? "Loading changes…"
+            : error
+              ? `Couldn't read the changes: ${error}`
+              : "No files changed in this run."}
+        </p>
       </div>
     );
   }

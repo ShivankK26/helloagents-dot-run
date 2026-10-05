@@ -11,6 +11,7 @@ import type {
   ThemeMode,
 } from "../../shared/api";
 import { agentOptions } from "./agents";
+import { copyOnSelect } from "./copyOnSelect";
 import { ActionsDialog } from "./components/ActionsDialog";
 import { AddProject } from "./components/AddProject";
 import { ErrorsPage } from "./components/ErrorsPage";
@@ -47,6 +48,7 @@ const readPinned = () => {
 
 export function App() {
   const api = window.helloagents;
+  useEffect(() => copyOnSelect(), []);
   const [info, setInfo] = useState<AppInfo>();
   const [agents, setAgents] = useState<AgentProvider[]>([]);
   const [openers, setOpeners] = useState<Opener[]>([]);

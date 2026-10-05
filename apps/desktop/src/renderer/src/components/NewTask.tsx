@@ -137,7 +137,8 @@ export function NewTask({
           onChange={(e) => setTask(e.target.value)}
           onKeyDown={(e) => {
             if (slash.onKeyDown(e)) return;
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            // Enter runs it; Shift+Enter adds a line.
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               void start();
             }
@@ -253,7 +254,7 @@ export function NewTask({
             type="submit"
             disabled={!task.trim() || starting || images.saving || Boolean(worker?.unavailable)}
             aria-label="Run"
-            title="Run (⌘↵)"
+            title="Run (↵)"
           >
             {starting ? <span className="spinner" /> : <Icon name="arrowUp" size={16} />}
           </button>

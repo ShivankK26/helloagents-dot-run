@@ -219,12 +219,19 @@ export function digestRun(events: WithAgent[]): RunDigest {
   let stage: RunStage = "read";
   let answer = "";
   let checked = false;
+  // Files the agent wrote outside the project (e.g. its own notes in ~/.claude) aren't changes.
+  let workspace = "";
+  const inProject = (file: string) =>
+    !file.startsWith("/") || !workspace || file.startsWith(`${workspace}/`);
   const rank: Record<RunStage, number> = { read: 0, edit: 1, test: 2, wrap: 3 };
   const reach = (s: RunStage) => {
     if (rank[s] > rank[stage]) stage = s;
   };
   for (const { event: e } of events) {
-    if (e.type === "agent.start") stage = "read"; // a follow-up starts over
+    if (e.type === "agent.start") {
+      stage = "read"; // a follow-up starts over
+      workspace = e.workspace;
+    }
     if (e.type === "model.response" && e.text.trim()) answer = e.text.trim();
     if (e.type === "model.response") {
       for (const call of e.toolCalls) {
@@ -239,7 +246,7 @@ export function digestRun(events: WithAgent[]): RunDigest {
     const file = toolPath(e.input);
     if (kind === "read" && file) read.add(file);
     if (kind === "edit") {
-      if (file && !changed.includes(file)) changed.push(file);
+      if (file && inProject(file) && !changed.includes(file)) changed.push(file);
       reach("edit");
     }
     if (kind === "command") {

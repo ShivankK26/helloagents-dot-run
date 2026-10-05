@@ -389,3 +389,33 @@ describe("digestRun stage", () => {
     expect(d.stage).toBe("test");
   });
 });
+
+describe("changed files", () => {
+  test("only files in the project count, not the agent's own notes elsewhere", () => {
+    const at = 1;
+    const edit = (file: string) => ({
+      agentId: "main",
+      event: {
+        type: "tool.result" as const,
+        at,
+        turn: 1,
+        id: file,
+        name: "Write",
+        input: { file_path: file },
+        ok: true,
+        output: "",
+        durationMs: 0,
+      },
+    });
+    const d = digestRun([
+      {
+        agentId: "main",
+        event: { type: "agent.start", at, task: "x", model: "m", workspace: "/wt/app" },
+      },
+      edit("/wt/app/src/a.ts"),
+      edit("src/b.ts"),
+      edit("/Users/me/.claude/projects/app/memory/notes.md"),
+    ]);
+    expect(d.filesChanged).toEqual(["/wt/app/src/a.ts", "src/b.ts"]);
+  });
+});
