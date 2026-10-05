@@ -13,6 +13,7 @@ import {
   isGitRepo,
   listSlashCommands,
   loadShellPath,
+  setUpRepo,
   detectActions,
   digestRun,
   RunManager,
@@ -218,8 +219,15 @@ app.whenReady().then(async () => {
   ipcMain.handle(IPC.listProjects, () => store.listProjects());
   ipcMain.handle(
     IPC.addProject,
-    (_e, input: { path: string; name: string; workerAgent: AgentId; plannerAgent: AgentId }) =>
-      store.addProject(input),
+    async (
+      _e,
+      input: { path: string; name: string; workerAgent: AgentId; plannerAgent: AgentId },
+    ) => {
+      // Branches need git. A plain folder (or a repo with no commits) gets it set up
+      // locally: git init, a .gitignore that keeps secrets out, and a first commit.
+      await setUpRepo(input.path);
+      return store.addProject(input);
+    },
   );
   ipcMain.handle(
     IPC.updateProjectAgents,

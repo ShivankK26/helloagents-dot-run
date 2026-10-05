@@ -44,6 +44,7 @@ export {
   cloneRepo,
   createWorktree,
   findChildRepos,
+  setUpRepo,
   git,
   isGitRepo,
   removeWorktree,

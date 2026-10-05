@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 /** Runs git and returns stdout. Throws with git's own message on failure. */
@@ -18,6 +18,70 @@ export async function isGitRepo(dir: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** What a new .gitignore keeps out: secrets first, then installs and build output. */
+export const DEFAULT_GITIGNORE = `# Added by helloagents. Secrets and build files stay out of git.
+.env
+.env.*
+!.env.example
+*secret*
+*Secret*
+*.pem
+*.key
+*.p12
+*.mobileprovision
+GoogleService-Info.plist
+
+.DS_Store
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+.venv/
+__pycache__/
+target/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+`;
+
+/**
+ * Makes a plain folder usable by helloagents: \`git init\` if needed, a
+ * .gitignore if there isn't one, and a first commit of the current files.
+ * Nothing leaves the Mac. Returns the first commit.
+ */
+export async function setUpRepo(dir: string): Promise<string> {
+  if (!(await isGitRepo(dir))) await git(dir, ["init", "--quiet", "--initial-branch", "main"]);
+  const ignore = path.join(dir, ".gitignore");
+  if (!(await stat(ignore).catch(() => null))) await writeFile(ignore, DEFAULT_GITIGNORE);
+  if (
+    await git(dir, ["rev-parse", "HEAD"]).then(
+      () => true,
+      () => false,
+    )
+  )
+    return headCommit(dir);
+  // Use the user's git name and email; without them, commit as helloagents.
+  const named = await git(dir, ["config", "user.email"]).then(
+    (v) => Boolean(v.trim()),
+    () => false,
+  );
+  const who = named
+    ? []
+    : ["-c", "user.name=helloagents", "-c", "user.email=helloagents@localhost"];
+  await git(dir, ["add", "--all"]);
+  await git(dir, [
+    ...who,
+    "commit",
+    "--quiet",
+    "--allow-empty",
+    "-m",
+    "First commit (set up by helloagents)",
+  ]);
+  return headCommit(dir);
 }
 
 /** Git repos directly inside a folder, for importing a folder of several projects. */

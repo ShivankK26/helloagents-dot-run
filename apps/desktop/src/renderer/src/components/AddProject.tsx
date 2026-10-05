@@ -28,6 +28,7 @@ export function AddProject({
   const [planner, setPlanner] = useState<AgentId>(firstAvailable);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string>();
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -64,20 +65,30 @@ export function AddProject({
   }
 
   async function add(folder: FolderInfo) {
-    const targets = folder.isRepo
+    // A plain folder is added as is; the main process sets up git for it.
+    const single = folder.isRepo || !folder.childRepos.length;
+    const targets = single
       ? [{ path: folder.path, name: name.trim() || folder.name }]
       : folder.childRepos.filter((r) => picked.has(r.path));
     const added: ProjectRecord[] = [];
-    for (const t of targets)
-      added.push(
-        await api.addProject({
-          path: t.path,
-          name: t.name,
-          workerAgent: worker,
-          plannerAgent: planner,
-        }),
-      );
-    onAdded(added);
+    setError(undefined);
+    setAdding(true);
+    try {
+      for (const t of targets)
+        added.push(
+          await api.addProject({
+            path: t.path,
+            name: t.name,
+            workerAgent: worker,
+            plannerAgent: planner,
+          }),
+        );
+      onAdded(added);
+    } catch (e) {
+      setError(`Couldn't add it: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setAdding(false);
+    }
   }
 
   return (
@@ -176,13 +187,8 @@ export function AddProject({
               </button>
             </div>
 
-            {step.folder.isRepo ? (
+            {step.folder.isRepo || !step.folder.childRepos.length ? (
               <>
-                {!step.folder.hasCommits ? (
-                  <p className="warn-text">
-                    This repository has no commits yet. Make a first commit before running agents.
-                  </p>
-                ) : null}
                 <div className="field">
                   <label htmlFor="project-name">Name</label>
                   <input id="project-name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -211,50 +217,53 @@ export function AddProject({
                   ))}
                 </div>
               </div>
-            ) : (
-              <p className="error-text">
-                This folder isn't a git repository and doesn't contain any. helloagents needs git to
-                give each agent its own branch. Run <code>git init</code> there, or choose another
-                folder.
-              </p>
-            )}
-
-            {step.folder.isRepo || step.folder.childRepos.length ? (
-              <>
-                <div className="field-pair">
-                  <AgentSelect
-                    id="worker"
-                    label="Worker agent"
-                    value={worker}
-                    options={options}
-                    onChange={setWorker}
-                    hint="Does the coding."
-                  />
-                  <AgentSelect
-                    id="planner"
-                    label="Planner agent"
-                    value={planner}
-                    options={options}
-                    onChange={setPlanner}
-                    hint="Splits big tasks across agents."
-                  />
-                </div>
-                <div className="dialog-actions">
-                  <button className="btn" onClick={onClose}>
-                    Cancel
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => void add(step.folder)}
-                    disabled={!step.folder.isRepo && picked.size === 0}
-                  >
-                    {step.folder.isRepo
-                      ? "Add project"
-                      : `Add ${picked.size} project${picked.size === 1 ? "" : "s"}`}
-                  </button>
-                </div>
-              </>
             ) : null}
+
+            {!step.folder.isRepo && !step.folder.childRepos.length ? (
+              <p className="note-text">
+                Not using git yet. helloagents will set it up here, on this Mac only, so each agent
+                gets its own branch. Secrets like <code>.env</code> stay out.
+              </p>
+            ) : null}
+
+            <>
+              <div className="field-pair">
+                <AgentSelect
+                  id="worker"
+                  label="Worker agent"
+                  value={worker}
+                  options={options}
+                  onChange={setWorker}
+                  hint="Does the coding."
+                />
+                <AgentSelect
+                  id="planner"
+                  label="Planner agent"
+                  value={planner}
+                  options={options}
+                  onChange={setPlanner}
+                  hint="Splits big tasks across agents."
+                />
+              </div>
+              {error ? <p className="error-text">{error}</p> : null}
+              <div className="dialog-actions">
+                <button className="btn" onClick={onClose}>
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => void add(step.folder)}
+                  disabled={
+                    adding ||
+                    (!step.folder.isRepo && step.folder.childRepos.length > 0 && picked.size === 0)
+                  }
+                >
+                  {step.folder.isRepo || !step.folder.childRepos.length
+                    ? "Add project"
+                    : `Add ${picked.size} project${picked.size === 1 ? "" : "s"}`}
+                </button>
+              </div>
+            </>
           </div>
         ) : null}
       </div>

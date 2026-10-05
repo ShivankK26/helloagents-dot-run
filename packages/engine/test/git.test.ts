@@ -8,6 +8,7 @@ import {
   git,
   isGitRepo,
   removeWorktree,
+  setUpRepo,
   worktreeDiff,
   type RunCommand,
 } from "../src/index";
@@ -71,5 +72,22 @@ describe("detectAgents", () => {
       ["codex", false, undefined],
     ]);
     expect(agents[1]!.installHint).toMatch(/npm install -g @openai\/codex/);
+  });
+});
+
+describe("setUpRepo", () => {
+  test("turns a plain folder into a repo with a first commit, keeping secrets out", async () => {
+    const dir = await workspace({
+      "App/main.swift": "print(1)\n",
+      "Secrets.xcconfig": "API_KEY = x\n",
+      ".env": "TOKEN=x\n",
+      "node_modules/x/index.js": "",
+    });
+    const sha = await setUpRepo(dir);
+    expect(sha).toMatch(/^[0-9a-f]{7,}$/);
+    const tracked = (await git(dir, ["ls-files"])).trim().split("\n").sort();
+    expect(tracked).toEqual([".gitignore", "App/main.swift"]);
+    // Running it again on a set-up repo changes nothing.
+    expect(await setUpRepo(dir)).toBe(sha);
   });
 });

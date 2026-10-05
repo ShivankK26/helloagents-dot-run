@@ -3518,3 +3518,14 @@ code {
   vertical-align: -2px;
   color: var(--accent);
 }
+
+/* A quiet note in a dialog. */
+.note-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.note-text code {
+  font: 12px var(--mono);
+  color: var(--ink);
+}
