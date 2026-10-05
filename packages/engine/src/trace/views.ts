@@ -208,6 +208,8 @@ export interface RunDigest {
   stage: RunStage;
   /** The agent's last message: for a question, the answer. */
   answer: string;
+  /** Commands still running in the background, and since when. */
+  background: { tasks: string[]; since: number } | null;
 }
 
 /** A small summary of a run, built from its events. */
@@ -219,6 +221,7 @@ export function digestRun(events: WithAgent[]): RunDigest {
   let stage: RunStage = "read";
   let answer = "";
   let checked = false;
+  let background: RunDigest["background"] = null;
   // Files the agent wrote outside the project (e.g. its own notes in ~/.claude) aren't changes.
   let workspace = "";
   const inProject = (file: string) =>
@@ -228,6 +231,14 @@ export function digestRun(events: WithAgent[]): RunDigest {
     if (rank[s] > rank[stage]) stage = s;
   };
   for (const { event: e } of events) {
+    if (e.type === "agent.background")
+      background = e.tasks.length
+        ? {
+            tasks: e.tasks.map((t) => t.description),
+            since: (background as RunDigest["background"])?.since ?? e.at,
+          }
+        : null;
+    if (e.type === "agent.end") background = null;
     if (e.type === "agent.start") {
       stage = "read"; // a follow-up starts over
       workspace = e.workspace;
@@ -273,7 +284,15 @@ export function digestRun(events: WithAgent[]): RunDigest {
       }
     }
   }
-  return { filesRead: read.size, filesChanged: changed, commands, tests, stage, answer };
+  return {
+    filesRead: read.size,
+    filesChanged: changed,
+    commands,
+    tests,
+    stage,
+    answer,
+    background,
+  };
 }
 
 /** The first paragraph of an answer, without Markdown headings: what a summary shows first. */

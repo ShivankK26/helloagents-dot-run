@@ -593,6 +593,11 @@ export class RunManager {
     if (!into) throw new Error("Couldn't tell which branch this run started from.");
     await commitAll(run.worktree.path, commitMessage(run.title));
     await mergeInto(project.path, run.worktree.branch, into);
+    // "In main" should mean on GitHub too, when the project is there.
+    if (await originUrl(project.path)) {
+      await git(project.path, ["push", "origin", into]);
+      return { message: `Merged into ${into} and pushed it to GitHub` };
+    }
     return { message: `Merged into ${into}` };
   }
 

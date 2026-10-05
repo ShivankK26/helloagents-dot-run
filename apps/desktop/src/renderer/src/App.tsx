@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AgentId,
   AgentProvider,
@@ -148,6 +148,16 @@ export function App() {
       setScreen({ kind: "run", runId, tab });
     });
   }
+  // Peeking: open on the left edge, close a moment after the mouse leaves (no flicker).
+  const peekTimer = useRef<number>(undefined);
+  const openPeek = useCallback(() => {
+    window.clearTimeout(peekTimer.current);
+    setPeek(true);
+  }, []);
+  const closePeekSoon = useCallback(() => {
+    window.clearTimeout(peekTimer.current);
+    peekTimer.current = window.setTimeout(() => setPeek(false), 180);
+  }, []);
   const togglePin = useCallback(() => {
     setPinned((p) => {
       try {
@@ -490,15 +500,20 @@ export function App() {
       </header>
 
       <div className="body">
-        {sidebar && pinned ? sidebar : null}
-        {sidebar && !pinned ? (
+        {sidebar ? (
           <>
-            <div className="hot-edge" onMouseEnter={() => setPeek(true)} aria-hidden="true" />
-            {peek ? (
-              <div className="peek" onMouseLeave={() => setPeek(false)}>
-                {sidebar}
-              </div>
+            {/* The space eases open and shut while the panel slides, so nothing jumps. */}
+            <div className={`sb-space ${pinned ? "" : "closed"}`} aria-hidden="true" />
+            {!pinned ? (
+              <div className="hot-edge" onMouseEnter={openPeek} aria-hidden="true" />
             ) : null}
+            <div
+              className={`sb-panel ${pinned ? "" : peek ? "floating" : "hidden"}`}
+              onMouseEnter={pinned ? undefined : openPeek}
+              onMouseLeave={pinned ? undefined : closePeekSoon}
+            >
+              {sidebar}
+            </div>
           </>
         ) : null}
 

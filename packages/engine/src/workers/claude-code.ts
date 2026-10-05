@@ -102,12 +102,17 @@ export function claudeArgs(
     | "effort"
     | "access"
     | "addDirs"
-  > & { ask?: boolean },
+  > & {
+    /** The task goes in over stdin, which stays open (for prompts and background work). */
+    streamed?: boolean;
+    /** helloagents answers permission prompts. */
+    ask?: boolean;
+  },
 ): string[] {
   const args = [
     "-p",
-    // When the app answers permission prompts, the task goes in over stdin instead.
-    ...(opts.ask ? [] : [opts.task]),
+    // Streamed, the task goes in over stdin instead.
+    ...(opts.streamed ? [] : [opts.task]),
     "--output-format",
     "stream-json",
     "--verbose",
@@ -116,16 +121,10 @@ export function claudeArgs(
     opts.access === "full" ? "bypassPermissions" : "acceptEdits",
     "--allowedTools",
     (opts.allowedTools ?? DEFAULT_CLAUDE_TOOLS).join(","),
+    ...(opts.streamed ? ["--input-format", "stream-json"] : []),
     ...(opts.ask
       ? // Anything else is asked of helloagents over stdin/stdout, which asks the user.
-        [
-          "--input-format",
-          "stream-json",
-          "--permission-prompts",
-          "host",
-          "--permission-prompt-tool",
-          "stdio",
-        ]
+        ["--permission-prompts", "host", "--permission-prompt-tool", "stdio"]
       : // Nobody is there to answer a prompt: deny instead of waiting forever.
         ["--permission-prompts", "none"]),
   ];
@@ -252,8 +251,13 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
 
   return new Promise((resolve) => {
     let result: ClaudeCodeResult | undefined;
-    const ask = Boolean(opts.onPermission) && opts.access !== "full";
-    const child = spawn(opts.claudePath ?? "claude", claudeArgs({ ...opts, ask }), {
+    // Kept open, stdin lets helloagents answer prompts, and keeps Claude Code alive while
+    // commands it started in the background finish (it then carries on by itself).
+    const streamed = Boolean(opts.onPermission);
+    const ask = streamed && opts.access !== "full";
+    const background = new Map<string, string>();
+    let started = false;
+    const child = spawn(opts.claudePath ?? "claude", claudeArgs({ ...opts, ask, streamed }), {
       cwd: opts.workspace,
       stdio: ["pipe", "pipe", "pipe"],
       signal: opts.signal,
@@ -263,7 +267,7 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
     };
     // Unanswered prompts would keep the process alive; stdin errors after exit are harmless.
     child.stdin.on("error", () => undefined);
-    if (ask) send({ type: "user", message: { role: "user", content: opts.task } });
+    if (streamed) send({ type: "user", message: { role: "user", content: opts.task } });
     // Without prompts, closing stdin stops Claude Code from waiting for piped input.
     else child.stdin.end();
 
@@ -293,8 +297,22 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
         void answerControl(msg);
         return;
       }
+      if (msg.type === "system" && msg.subtype === "background_tasks_changed") {
+        background.clear();
+        for (const t of (msg.tasks ?? []) as Array<{ task_id?: unknown; description?: unknown }>)
+          background.set(String(t.task_id), String(t.description ?? "a background command"));
+        emit({
+          type: "agent.background",
+          at,
+          tasks: [...background].map(([id, description]) => ({ id, description })),
+        });
+        return;
+      }
       if (msg.type === "system" && msg.subtype === "init") {
         sessionId = msg.session_id as string;
+        // Claude Code starts a fresh turn when a background command finishes: same run.
+        if (started) return;
+        started = true;
         emit({
           type: "agent.start",
           at,
@@ -379,6 +397,8 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
           typeof msg.result === "string" && msg.result.trim()
             ? msg.result.trim()
             : lastText || "Claude Code finished without a summary.";
+        // Something still running in the background: Claude Code continues when it ends.
+        if (ok && background.size && streamed) return;
         child.stdin.end();
         const cost = typeof msg.total_cost_usd === "number" ? msg.total_cost_usd : 0;
         result = ok

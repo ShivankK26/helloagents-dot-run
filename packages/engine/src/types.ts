@@ -34,6 +34,12 @@ export interface ToolCall {
 /** Everything an agent does, in order. Traces, logs and the UI are built from these. */
 export type AgentEvent =
   | {
+      /** Commands the agent left running in the background (e.g. a big download). */
+      type: "agent.background";
+      at: number;
+      tasks: Array<{ id: string; description: string }>;
+    }
+  | {
       type: "agent.start";
       at: number;
       task: string;

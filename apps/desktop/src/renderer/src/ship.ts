@@ -1,4 +1,4 @@
-import type { ShipKind } from "../../shared/api";
+import type { ShipKind, StoredEvent } from "../../shared/api";
 
 /**
  * Whether a follow-up is really a request to ship ("cool push it", "open a PR").
@@ -11,6 +11,9 @@ export function shipIntent(text: string, inPlace: boolean): ShipKind | null {
   const ask =
     /^(?:(?:ok(?:ay)?|cool|great|nice|perfect|awesome|yes|yep|sure|looks good|lgtm|thanks?|also|then|now|and)[\s,!.]*)*(?:(?:can|could|would) you |please |go ahead and |just |also |now |and |then )*/;
   const rest = t.replace(ask, "");
+  // "push it to main": straight into the base branch.
+  if (/^(?:push|merge)\b.{0,30}\b(?:to|into|on)\s+(?:main|master)\b/.test(rest))
+    return inPlace ? "push" : "merge";
   // "push the code to github", "push my changes": pushing the work, not "push the button down".
   if (
     /^push\b/.test(rest) &&
@@ -41,4 +44,24 @@ export function shortPath(p: string, root?: string): string {
   const attached = /\/helloagents\/attachments\/(?:[0-9a-f]{8}-)?(.+)$/.exec(p);
   if (attached?.[1]) return `${attached[1]} (attached)`;
   return p.replace(/^\/Users\/[^/]+/, "~");
+}
+
+/** Where a run's code is now, from what helloagents shipped. */
+export function whereIsCode(
+  events: StoredEvent[],
+  base: string,
+  hasChanges: boolean,
+): { label: string; tone: "muted" | "ok" | "live"; url?: string } | null {
+  let where: { label: string; tone: "muted" | "ok" | "live"; url?: string } | null = hasChanges
+    ? { label: "Only on this Mac", tone: "muted" }
+    : null;
+  for (const { event: e } of events) {
+    if (e.type !== "tool.result" || e.name !== "ship" || !e.ok) continue;
+    const { kind, url } = e.input as { kind?: string; url?: string };
+    if (kind === "merge") where = { label: `In ${base}`, tone: "ok" };
+    else if (kind === "pr") where = { label: "PR open", tone: "live", ...(url && { url }) };
+    else if (kind === "push" && where?.label !== "PR open")
+      where = { label: "On GitHub", tone: "ok" };
+  }
+  return where;
 }

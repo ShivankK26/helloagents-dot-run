@@ -220,7 +220,51 @@ if (mode === "rich") {
     session_id: session,
   });
 }
-if (mode === "error") {
+// "background" leaves a download running, ends its turn, and carries on when it finishes,
+// the way Claude Code does when its stdin is kept open.
+if (mode === "background") {
+  out({
+    type: "system",
+    subtype: "background_tasks_changed",
+    tasks: [
+      { task_id: "b1", task_type: "local_bash", description: "xcodebuild -downloadPlatform iOS" },
+    ],
+  });
+  out({
+    type: "result",
+    subtype: "success",
+    is_error: false,
+    result: "Downloading in the background.",
+    session_id: session,
+  });
+  await new Promise((r) => setTimeout(r, 300));
+  out({ type: "system", subtype: "background_tasks_changed", tasks: [] });
+  out({
+    type: "system",
+    subtype: "init",
+    cwd: process.cwd(),
+    session_id: session,
+    model: "claude-opus-5-5",
+    tools: [],
+  });
+  out({
+    type: "assistant",
+    message: {
+      model: "claude-opus-5-5",
+      content: [{ type: "text", text: "The download finished." }],
+      usage: {},
+    },
+    parent_tool_use_id: null,
+    session_id: session,
+  });
+  out({
+    type: "result",
+    subtype: "success",
+    is_error: false,
+    result: "The download finished.",
+    session_id: session,
+  });
+} else if (mode === "error") {
   out({
     type: "result",
     subtype: "error_max_turns",

@@ -3675,3 +3675,72 @@ small.ask {
   white-space: normal;
   color: var(--muted);
 }
+
+/* A command the agent left running in the background. */
+.background-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line-2));
+  background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface));
+}
+.bg-time {
+  margin-left: auto;
+  font: 12px var(--mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sidebar that slides instead of jumping. */
+.sb-space {
+  width: 264px;
+  flex-shrink: 0;
+  transition: width 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sb-space.closed {
+  width: 0;
+}
+.sb-panel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 26;
+  display: flex;
+  transform: translateX(0);
+  transition:
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.22s ease;
+  will-change: transform;
+}
+.sb-panel.hidden {
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+.sb-panel.floating {
+  box-shadow: 24px 0 48px -16px var(--shade);
+}
+.sb-panel.floating .sidebar {
+  background: var(--surface);
+}
+.sb-panel .sidebar {
+  height: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-space,
+  .sb-panel {
+    transition: none;
+  }
+}
+
+/* Where the run's code is: only here, on GitHub, in a PR, in main. */
+.pill.where {
+  gap: 5px;
+  font-family: var(--sans);
+  font-size: 12px;
+}
+button.pill.where {
+  cursor: pointer;
+}

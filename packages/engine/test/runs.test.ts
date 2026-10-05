@@ -179,6 +179,18 @@ describe("RunManager", () => {
     expect((JSON.parse(await readFile(argsFile, "utf8")) as string[])[1]).toBe("thanks");
   });
 
+  test("waits for background commands, and the agent carries on when they finish", async () => {
+    process.env.FAKE_CLAUDE_MODE = "background";
+    const { store, manager, project } = await setup();
+    const runId = await manager.start(project.id, "Build it");
+    await manager.settled(runId);
+    const events = store.events(runId).map((e) => e.event);
+    const background = events.filter((e) => e.type === "agent.background");
+    expect(background.map((e) => e.type === "agent.background" && e.tasks.length)).toEqual([1, 0]);
+    expect(events.filter((e) => e.type === "agent.start")).toHaveLength(1);
+    expect(store.getRun(runId)?.summary).toBe("The download finished.");
+  });
+
   test("can be cancelled mid-run", async () => {
     process.env.FAKE_CLAUDE_MODE = "slow";
     const { store, manager, project } = await setup();

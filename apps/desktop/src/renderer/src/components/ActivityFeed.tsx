@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
   describeToolCall,
+  digestRun,
   isCommandTool,
   testResultLine,
   toolKind,
@@ -263,7 +264,8 @@ export function ActivityFeed({
   /** Shown after everything else, e.g. "connect to GitHub". */
   children?: ReactNode;
 }) {
-  const items = build(events, active && !approval, hideAnswer, root);
+  const background = active ? digestRun(events).background : null;
+  const items = build(events, active && !approval && !background, hideAnswer, root);
   // Ship buttons go on the last "Done", minus what was already shipped after it.
   const endAt = items.findLastIndex((it) => it.kind === "end");
   const lastEnd =
@@ -367,6 +369,9 @@ export function ActivityFeed({
         ) : null,
       )}
       {approval ? <ApprovalCard key={approval.id} request={approval} onAnswer={onAnswer} /> : null}
+      {background && !approval ? (
+        <BackgroundCard tasks={background.tasks} since={background.since} />
+      ) : null}
       {children}
     </div>
   );
@@ -509,7 +514,13 @@ function TurnEnd({
               onClick={() => onShip?.(k)}
             >
               {shipping === k ? <span className="spinner" /> : null}
-              {k === "pr" ? "Open PR" : k === "push" ? "Push" : SHIP_LABEL[k]}
+              {k === "pr"
+                ? "Open PR"
+                : k === "push"
+                  ? "Push"
+                  : k === "merge"
+                    ? "Merge into main"
+                    : SHIP_LABEL[k]}
             </button>
           ))}
         </span>
@@ -574,5 +585,32 @@ function AgentImage({ path, root }: { path: string; root?: string }) {
         </button>
       ) : null}
     </figure>
+  );
+}
+
+/** Like Claude Code's background shell: still running, and the agent carries on when it ends. */
+function BackgroundCard({ tasks, since }: { tasks: string[]; since: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <section className="background-card" aria-label="Running in the background">
+      <div className="approval-head">
+        <span className="spinner" />
+        <b>Running in the background</b>
+        <span className="bg-time">{ms(now - since)}</span>
+      </div>
+      {tasks.map((t) => (
+        <pre key={t} className="approval-what">
+          {t}
+        </pre>
+      ))}
+      <p className="approval-why">
+        Claude continues on its own when {tasks.length === 1 ? "it finishes" : "they finish"}. You
+        can leave this open or close the window; Stop ends it.
+      </p>
+    </section>
   );
 }

@@ -38,6 +38,9 @@ export function outcomeOf(run: RunListItem): Outcome {
       line: `Wants to run ${run.approval.description}`,
     };
   }
+  if (run.active && d.background) {
+    return { tone: "live", label: "Working", line: `In the background: ${d.background.tasks[0]}` };
+  }
   if (run.active) {
     const stage = STAGES.find((s) => s.id === d.stage) ?? STAGES[0];
     return { tone: "live", label: "Working", line: `${stage?.doing ?? "Working"}…` };

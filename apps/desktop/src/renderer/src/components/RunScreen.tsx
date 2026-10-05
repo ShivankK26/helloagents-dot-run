@@ -10,7 +10,7 @@ import type {
 import { agentName } from "../agents";
 import { compact, ms, tokenParts } from "../format";
 import { outcomeOf, STAGES } from "../outcome";
-import { shipIntent, shortPath } from "../ship";
+import { shipIntent, shortPath, whereIsCode } from "../ship";
 import { elapsed } from "../time";
 import { ActivityFeed } from "./ActivityFeed";
 import { ChangesView } from "./ChangesView";
@@ -109,6 +109,11 @@ export function RunScreen({
     async (kind: ShipKind) => {
       setShipping(kind);
       try {
+        if (kind === "push" && run && run.settings.workspace !== "checkout") {
+          const opened =
+            whereIsCode(events, run.settings.baseBranch ?? "main", true)?.label === "PR open";
+          if (!opened) kind = "pr";
+        }
         if (kind === "push" || kind === "pr") {
           const remote = await api.remoteInfo(runId);
           if (!remote.url) {
@@ -124,7 +129,7 @@ export function RunScreen({
         setShipping(undefined);
       }
     },
-    [api, runId],
+    [api, runId, run, events],
   );
 
   if (!run) return <div className="run-screen" />;
@@ -137,8 +142,19 @@ export function RunScreen({
   const canFollowUp = Boolean(worktree) && !run.active;
   const inPlace = run.settings.workspace === "checkout";
   const turns = events.filter((e) => e.event.type === "agent.start").length;
+  const base = run.settings.baseBranch ?? "main";
+  const where = worktree ? whereIsCode(events, base, d.filesChanged.length > 0) : null;
+  const prOpen = where?.label === "PR open";
+  // One clear next step: a PR into the base branch (or merge straight in). With a PR
+  // open, "push" sends new commits to it.
   const shipKinds: ShipKind[] =
-    worktree && !run.branchGone && !run.active ? (inPlace ? ["push"] : ["push", "pr"]) : [];
+    worktree && !run.branchGone && !run.active
+      ? inPlace
+        ? ["push"]
+        : prOpen
+          ? ["push"]
+          : ["merge", "pr"]
+      : [];
 
   async function discard() {
     await api.discardRun(runId);
@@ -160,6 +176,21 @@ export function RunScreen({
           <h1 title={run.title}>{run.title}</h1>
         </nav>
         <span className={`pill ${outcome.tone}`}>{outcome.label}</span>
+        {where ? (
+          where.url ? (
+            <button
+              className={`pill where ${where.tone}`}
+              title="Open the pull request"
+              onClick={() => where.url && void api.openExternal(where.url)}
+            >
+              <Icon name="pr" size={11} /> {where.label}
+            </button>
+          ) : (
+            <span className={`pill where ${where.tone}`} title={`Branch ${worktree?.branch ?? ""}`}>
+              <Icon name={where.tone === "muted" ? "branch" : "git"} size={11} /> {where.label}
+            </span>
+          )
+        ) : null}
         <span className="run-meta">
           <span>{took}</span>
           {tokens.fresh ? (
