@@ -121,7 +121,21 @@ export interface ProjectRecord {
 export type RunEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
 /** How much an agent may do without asking. */
-export type Access = "edits" | "full";
+/**
+ * How much the agent may do without asking, like Claude Code's modes:
+ * "auto" approves safe actions itself and asks about risky ones; "edits" edits
+ * freely and asks before other commands; "plan" plans first and asks before
+ * changing anything; "full" never asks (still on its own branch).
+ */
+export type Access = "auto" | "edits" | "plan" | "full";
+
+/** Claude Code's --permission-mode for each. */
+export const PERMISSION_MODES: Record<Access, string> = {
+  auto: "auto",
+  edits: "acceptEdits",
+  plan: "plan",
+  full: "bypassPermissions",
+};
 
 /** Choices made in the composer for one run. */
 export interface RunSettings {

@@ -34,15 +34,37 @@ const key = (projectId: string) => `helloagents.composer.${projectId}`;
 export function loadSettings(projectId: string): RunSettings {
   try {
     const raw = localStorage.getItem(key(projectId));
-    return raw
-      ? (JSON.parse(raw) as RunSettings)
-      : { effort: "high", access: "edits", workspace: "branch" };
+    const saved = raw ? (JSON.parse(raw) as RunSettings) : null;
+    // Auto became the default; "edits" saved before then was the old default, not a choice.
+    if (saved && saved.access === "edits" && !localStorage.getItem(`${key(projectId)}.mode`))
+      saved.access = "auto";
+    return saved ?? { effort: "high", access: "auto", workspace: "branch" };
   } catch {
-    return { effort: "high", access: "edits", workspace: "branch" };
+    return { effort: "high", access: "auto", workspace: "branch" };
   }
 }
 
+/** Modes, like Claude Code's: how much the agent may do before asking. */
+export const MODES = [
+  { id: "auto", name: "Auto", hint: "Does safe things itself; asks only about risky ones" },
+  {
+    id: "edits",
+    name: "Ask for commands",
+    hint: "Edits files and runs build and test commands; asks before anything else",
+  },
+  { id: "plan", name: "Plan first", hint: "Reads and plans, then asks before changing anything" },
+  { id: "full", name: "Full access", hint: "Never asks. Still on its own branch" },
+] as const;
+
+export const modeName = (access?: string) =>
+  MODES.find((m) => m.id === (access ?? "auto"))?.name ?? "Auto";
+
 export function saveSettings(projectId: string, s: RunSettings): void {
+  try {
+    localStorage.setItem(`${key(projectId)}.mode`, "1");
+  } catch {
+    // not remembered
+  }
   try {
     const { base: _base, ...keep } = s;
     localStorage.setItem(key(projectId), JSON.stringify(keep));

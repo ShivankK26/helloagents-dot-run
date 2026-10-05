@@ -25,7 +25,14 @@ import {
 } from "../git/worktree";
 import { failureExcerpt } from "../trace/views";
 import type { TraceStore } from "../trace/store";
-import type { AgentEvent, AgentId, ProjectActions, ProjectRecord, RunSettings } from "../types";
+import type {
+  Access,
+  AgentEvent,
+  AgentId,
+  ProjectActions,
+  ProjectRecord,
+  RunSettings,
+} from "../types";
 import {
   DEFAULT_CLAUDE_TOOLS,
   runClaudeCode,
@@ -276,12 +283,25 @@ export class RunManager {
     return this.approvals.get(runId)?.request;
   }
 
+  private controls = new Map<string, { setAccess: (access: Access) => void }>();
+
+  /** Changes how much a run may do without asking, now and for its next turns. */
+  setRunAccess(runId: string, access: Access): void {
+    const run = this.opts.store.getRun(runId);
+    if (!run) return;
+    this.opts.store.updateRunSettings(runId, { ...run.settings, access });
+    this.controls.get(runId)?.setAccess(access);
+    this.opts.onChange?.(runId);
+  }
+
   /** Answers a run's approval: allow once, always (for this project), or deny. */
   async answerApproval(
     runId: string,
     requestId: string,
-    answer: "allow" | "always" | "deny",
+    answer: "allow" | "always" | "auto" | "deny",
   ): Promise<void> {
+    // "auto": allow this, and let the run decide the safe things itself from now on.
+    if (answer === "auto") this.setRunAccess(runId, "auto");
     const pending = this.approvals.get(runId);
     if (!pending || pending.request.id !== requestId) return;
     this.approvals.delete(runId);
@@ -784,6 +804,7 @@ export class RunManager {
         signal: t.signal,
         onEvent: t.onEvent,
         allowedTools: [...DEFAULT_CLAUDE_TOOLS, ...t.alwaysAllow],
+        onControl: (control) => this.controls.set(t.runId, control),
         // Anything else waits for the user's OK, like Claude Code's own prompt.
         onPermission: (request) =>
           new Promise<PermissionDecision>((resolve) => {

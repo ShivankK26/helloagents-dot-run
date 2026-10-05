@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { AgentId, ProjectInfo, ProjectRecord, RunSettings } from "../../../shared/api";
 import { type AgentOption } from "../agents";
-import { EFFORTS, loadSettings, MODELS, modelName, saveSettings } from "../composer";
+import {
+  EFFORTS,
+  loadSettings,
+  MODELS,
+  MODES,
+  modeName,
+  modelName,
+  saveSettings,
+} from "../composer";
 import { errorText } from "../toast";
 import { AttachButton, AttachmentStrip, DropOverlay, useAttachments } from "./Attachments";
 import { Icon } from "./Icons";
@@ -218,30 +226,21 @@ export function NewTask({
             width={340}
             trigger={
               <>
-                <Icon name="lock" size={13} />{" "}
-                {settings.access === "full" ? "Full access" : "Ask for commands"}{" "}
+                <Icon name="lock" size={13} /> {modeName(settings.access)}{" "}
                 <span className="caret">
                   <Icon name="chevronDown" size={14} />
                 </span>
               </>
             }
             items={[
-              {
-                id: "edits",
-                label: "Ask for commands",
-                hint: "Edits files and runs build and test commands; asks before anything else",
-                checked: settings.access !== "full",
-                onSelect: () => update({ access: "edits" }),
-              },
-              {
-                id: "full",
-                label: "Full access",
-                hint: branchMode
-                  ? "Any command, no questions. Still on its own branch"
-                  : "Any command, no questions, in your own checkout",
-                checked: settings.access === "full",
-                onSelect: () => update({ access: "full" }),
-              },
+              { header: "Mode" },
+              ...MODES.map((m) => ({
+                id: m.id,
+                label: m.name,
+                hint: m.id === "full" && !branchMode ? "Never asks, in your own checkout" : m.hint,
+                checked: (settings.access ?? "auto") === m.id,
+                onSelect: () => update({ access: m.id }),
+              })),
             ]}
           />
           <span className="sep-v" />

@@ -246,6 +246,7 @@ export function ActivityFeed({
   onShip,
   approval,
   onAnswer,
+  mode,
   children,
 }: {
   events: StoredEvent[];
@@ -261,6 +262,8 @@ export function ActivityFeed({
   /** What the agent is waiting for the user to allow. */
   approval?: ApprovalRequest;
   onAnswer?: (answer: ApprovalAnswer) => void;
+  /** The run's mode ("auto", "edits"…). */
+  mode?: string;
   /** Shown after everything else, e.g. "connect to GitHub". */
   children?: ReactNode;
 }) {
@@ -368,7 +371,13 @@ export function ActivityFeed({
           </p>
         ) : null,
       )}
-      {approval ? <ApprovalCard key={approval.id} request={approval} onAnswer={onAnswer} /> : null}
+      {approval ? (
+        approval.tool === "ExitPlanMode" ? (
+          <PlanCard key={approval.id} plan={approval.description} onAnswer={onAnswer} />
+        ) : (
+          <ApprovalCard key={approval.id} request={approval} mode={mode} onAnswer={onAnswer} />
+        )
+      ) : null}
       {background && !approval ? (
         <BackgroundCard tasks={background.tasks} since={background.since} />
       ) : null}
@@ -380,9 +389,11 @@ export function ActivityFeed({
 /** Like Claude Code's permission prompt: the agent waits until you answer. */
 function ApprovalCard({
   request,
+  mode,
   onAnswer,
 }: {
   request: ApprovalRequest;
+  mode?: string;
   onAnswer?: (answer: ApprovalAnswer) => void;
 }) {
   const [sent, setSent] = useState<ApprovalAnswer>();
@@ -428,6 +439,17 @@ function ApprovalCard({
         <button className="btn btn-sm" disabled={Boolean(sent)} onClick={() => answer("deny")}>
           Deny
         </button>
+        {mode !== "auto" ? (
+          <button
+            className="btn btn-sm"
+            disabled={Boolean(sent)}
+            title="Allow this, and let the agent decide the safe things itself from now on"
+            onClick={() => answer("auto")}
+          >
+            {sent === "auto" ? <span className="spinner" /> : null}
+            Switch to Auto
+          </button>
+        ) : null}
         <span className="approval-note">The run is paused until you answer.</span>
       </div>
     </section>
@@ -611,6 +633,46 @@ function BackgroundCard({ tasks, since }: { tasks: string[]; since: number }) {
         Claude continues on its own when {tasks.length === 1 ? "it finishes" : "they finish"}. You
         can leave this open or close the window; Stop ends it.
       </p>
+    </section>
+  );
+}
+
+/** Plan mode: the agent's plan, waiting for a go-ahead before it changes anything. */
+function PlanCard({
+  plan,
+  onAnswer,
+}: {
+  plan: string;
+  onAnswer?: (answer: ApprovalAnswer) => void;
+}) {
+  const [sent, setSent] = useState<ApprovalAnswer>();
+  const answer = (a: ApprovalAnswer) => {
+    setSent(a);
+    onAnswer?.(a);
+  };
+  return (
+    <section className="approval plan" aria-label="Claude's plan">
+      <div className="approval-head">
+        <Icon name="layers" size={13} />
+        <b>Claude's plan</b>
+      </div>
+      <div className="plan-body">
+        <Markdown text={plan} />
+      </div>
+      <div className="approval-actions">
+        <button
+          className="btn btn-primary btn-sm"
+          disabled={Boolean(sent)}
+          onClick={() => answer("auto")}
+        >
+          {sent === "auto" ? <span className="spinner" /> : null}
+          Approve and build
+        </button>
+        <button className="btn btn-sm" disabled={Boolean(sent)} onClick={() => answer("deny")}>
+          Keep planning
+        </button>
+        <span className="approval-note">Reply below to change the plan.</span>
+      </div>
     </section>
   );
 }

@@ -3744,3 +3744,18 @@ small.ask {
 button.pill.where {
   cursor: pointer;
 }
+
+/* The "Now" card shows a short line, not a whole command. */
+.now-card b {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.approval.plan .plan-body {
+  max-height: 360px;
+  overflow: auto;
+  padding: 4px 2px;
+  font-size: 14px;
+}

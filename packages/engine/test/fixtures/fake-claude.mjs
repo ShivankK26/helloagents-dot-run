@@ -177,7 +177,9 @@ if (mode === "ask") {
       tool_use_id: "toolu_3",
     },
   });
-  const answer = await nextMessage();
+  // Skip helloagents' own requests (like a mode switch) until the answer arrives.
+  let answer = await nextMessage();
+  while (answer.type !== "control_response") answer = await nextMessage();
   const allowed = answer.response.response.behavior === "allow";
   if (process.env.FAKE_CLAUDE_ANSWER_FILE)
     writeFileSync(process.env.FAKE_CLAUDE_ANSWER_FILE, JSON.stringify(answer));

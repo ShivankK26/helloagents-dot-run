@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import type { AgentResult } from "../harness/agent";
 import { addUsage, EMPTY_USAGE } from "../harness/pricing";
+import { PERMISSION_MODES } from "../types";
 import type { Access, AgentEvent, AgentStatus, RunEffort, TokenUsage, ToolCall } from "../types";
 
 export interface ClaudeCodeOptions {
@@ -25,6 +26,8 @@ export interface ClaudeCodeOptions {
   access?: Access;
   /** Extra folders Claude Code may read, e.g. where attached images are saved. */
   addDirs?: readonly string[];
+  /** Gets a way to change the mode of the running session (e.g. to auto). */
+  onControl?: (control: { setAccess: (access: Access) => void }) => void;
   /**
    * Asked when Claude Code wants to do something that isn't pre-approved, like
    * Claude Code's own permission prompt. Without it, such actions are denied.
@@ -118,7 +121,7 @@ export function claudeArgs(
     "--verbose",
     // File edits need no approval; other tools are limited to allowedTools.
     "--permission-mode",
-    opts.access === "full" ? "bypassPermissions" : "acceptEdits",
+    PERMISSION_MODES[opts.access ?? "auto"],
     "--allowedTools",
     (opts.allowedTools ?? DEFAULT_CLAUDE_TOOLS).join(","),
     ...(opts.streamed ? ["--input-format", "stream-json"] : []),
@@ -270,6 +273,15 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
     // Unanswered prompts would keep the process alive; stdin errors after exit are harmless.
     child.stdin.on("error", () => undefined);
     if (streamed) send({ type: "user", message: { role: "user", content: opts.task } });
+    if (streamed)
+      opts.onControl?.({
+        setAccess: (access) =>
+          send({
+            type: "control_request",
+            request_id: `mode-${Date.now()}`,
+            request: { subtype: "set_permission_mode", mode: PERMISSION_MODES[access] },
+          }),
+      });
     // Without prompts, closing stdin stops Claude Code from waiting for piped input.
     else child.stdin.end();
 
@@ -295,6 +307,7 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
         return; // not one of Claude Code's JSON events
       }
       const at = now();
+      if (msg.type === "control_response") return;
       if (msg.type === "control_request") {
         void answerControl(msg);
         return;
@@ -435,6 +448,11 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
       const rule = suggestedRule(String(req.tool_name), req.input, suggestions);
       asking++;
       // For a command, show the command itself; Claude's own description says what it's for.
+      // A plan to approve (plan mode) shows the plan itself.
+      const plan =
+        req.tool_name === "ExitPlanMode"
+          ? (req.input as { plan?: unknown } | undefined)?.plan
+          : undefined;
       const command =
         req.tool_name === "Bash"
           ? (req.input as { command?: unknown } | undefined)?.command
@@ -445,7 +463,12 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
           id: String(req.tool_use_id ?? requestId),
           tool: String(req.tool_name),
           input: req.input,
-          description: typeof command === "string" ? command : (said ?? String(req.tool_name)),
+          description:
+            typeof plan === "string"
+              ? plan
+              : typeof command === "string"
+                ? command
+                : (said ?? String(req.tool_name)),
           ...(typeof command === "string" && said && said !== command
             ? { reason: said }
             : typeof req.decision_reason === "string" && { reason: req.decision_reason }),
@@ -534,11 +557,16 @@ export function suggestedRule(
     const command = String((input as { command?: unknown })?.command ?? "").trim();
     // The program that needed approval: skip "cd …" and env assignments, take the last
     // part of a chain (the one Claude Code flagged is usually the new one).
-    const parts = command
+    // The program doing the work: skip "cd …", env assignments and the little helpers
+    // that filter output (head, grep, sort…), e.g. xcodebuild in "cd x && xcodebuild … | head".
+    const programs = command
       .split(/&&|\|\||;|\|/)
       .map((p) => p.trim().replace(/^(?:[A-Z_][A-Z0-9_]*=\S+\s+)+/, ""))
-      .filter((p) => p && !/^cd\s/.test(p));
-    const program = parts.at(-1)?.split(/\s+/)[0];
+      .filter((p) => p && !/^cd\s/.test(p))
+      .map((p) => p.split(/\s+/)[0] ?? "");
+    const HELPERS =
+      /^(?:head|tail|grep|egrep|sort|uniq|wc|cat|echo|sed|awk|tee|tr|cut|xargs|true|sleep|printf|less|jq)$/;
+    const program = programs.find((p) => !HELPERS.test(p)) ?? programs[0];
     return program && /^[\w./-]+$/.test(program) ? `Bash(${program}:*)` : undefined;
   }
   const first = (

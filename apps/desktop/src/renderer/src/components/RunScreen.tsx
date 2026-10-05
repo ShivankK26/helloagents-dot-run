@@ -278,6 +278,7 @@ export function RunScreen({
                     hideAnswer={run.active || turns > 1 ? "" : d.answer}
                     root={worktree?.path}
                     {...(run.approval && { approval: run.approval })}
+                    mode={run.settings.access ?? "auto"}
                     {...(connect && {
                       children: (
                         <ConnectCard

@@ -140,6 +140,24 @@ describe("RunManager", () => {
     expect(manager.pendingApproval(runId)).toBeUndefined();
   });
 
+  test("'Switch to Auto' allows the command and puts the run in auto mode", async () => {
+    process.env.FAKE_CLAUDE_MODE = "ask";
+    const { store, manager, project } = await setup();
+    const runId = await manager.start(project.id, "Check the Xcode version", { access: "edits" });
+    let request = manager.pendingApproval(runId);
+    for (let i = 0; !request && i < 100; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      request = manager.pendingApproval(runId);
+    }
+    await manager.answerApproval(runId, request?.id ?? "", "auto");
+    await manager.settled(runId);
+    expect(store.getRun(runId)?.settings.access).toBe("auto");
+    const ran = store
+      .events(runId)
+      .find((e) => e.event.type === "tool.result" && e.event.id === "toolu_3")?.event;
+    expect(ran?.type === "tool.result" && ran.ok).toBe(true);
+  });
+
   test("a denied command reaches the agent as a refusal", async () => {
     process.env.FAKE_CLAUDE_MODE = "ask";
     const { store, manager, project } = await setup();

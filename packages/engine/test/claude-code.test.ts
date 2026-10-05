@@ -8,6 +8,7 @@ import {
   listSlashCommands,
   runClaudeCode,
   type AgentEvent,
+  suggestedRule,
 } from "../src/index";
 import { tempDir, workspace } from "./helpers";
 
@@ -33,7 +34,7 @@ async function run(mode = "success", extra: Partial<Parameters<typeof runClaudeC
 }
 
 describe("claudeArgs", () => {
-  test("runs headless with streamed JSON, auto-accepted edits and no prompts", () => {
+  test("runs headless with streamed JSON, auto mode and no prompts", () => {
     const args = claudeArgs({ task: "Fix it" });
     expect(args.slice(0, 2)).toEqual(["-p", "Fix it"]);
     expect(args).toEqual(
@@ -42,7 +43,7 @@ describe("claudeArgs", () => {
         "stream-json",
         "--verbose",
         "--permission-mode",
-        "acceptEdits",
+        "auto",
         "--permission-prompts",
         "none",
       ]),
@@ -176,5 +177,17 @@ describe("slash commands", () => {
   test("spots a slash task", () => {
     expect(isSlashTask("  /security-review now")).toBe(true);
     expect(isSlashTask("fix the /api route")).toBe(false);
+  });
+});
+
+describe("always allow", () => {
+  test("names the program doing the work, not the helpers around it", () => {
+    expect(
+      suggestedRule("Bash", {
+        command:
+          'cd "/x y" && xcodebuild build -scheme App > /tmp/b.log 2>&1; grep -E "error" /tmp/b.log | sort -u | head -40',
+      }),
+    ).toBe("Bash(xcodebuild:*)");
+    expect(suggestedRule("Bash", { command: "FOO=1 pnpm test | tail -5" })).toBe("Bash(pnpm:*)");
   });
 });

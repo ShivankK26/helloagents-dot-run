@@ -126,7 +126,7 @@ describe("composer settings", () => {
     expect(args[args.indexOf("--permission-mode") + 1]).toBe("bypassPermissions");
     expect(
       claudeArgs({ task: "x" })[claudeArgs({ task: "x" }).indexOf("--permission-mode") + 1],
-    ).toBe("acceptEdits");
+    ).toBe("auto");
   });
 });
 

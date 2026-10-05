@@ -213,6 +213,11 @@ export class TraceStore {
   }
 
   /** Marks a finished run as running again, for a follow-up in the same session. */
+  /** Changes a run's settings (e.g. its mode) for its next turns. */
+  updateRunSettings(id: string, settings: RunSettings): void {
+    this.db.prepare("UPDATE runs SET settings = ? WHERE id = ?").run(JSON.stringify(settings), id);
+  }
+
   reopenRun(id: string): void {
     this.db
       .prepare("UPDATE runs SET status = 'running', ended_at = NULL, error = NULL WHERE id = ?")

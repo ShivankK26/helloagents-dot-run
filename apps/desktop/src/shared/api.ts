@@ -83,7 +83,7 @@ export interface ApprovalRequest {
   rule?: string;
 }
 
-export type ApprovalAnswer = "allow" | "always" | "deny";
+export type ApprovalAnswer = "allow" | "always" | "auto" | "deny";
 
 export interface RunListItem extends RunRecord {
   active: boolean;
