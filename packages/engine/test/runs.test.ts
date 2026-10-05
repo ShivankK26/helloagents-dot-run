@@ -158,6 +158,27 @@ describe("RunManager", () => {
     expect(ran?.type === "tool.result" && ran.output).toMatch(/said no/);
   });
 
+  test("after commands were auto-denied, the next follow-up tells the agent that's over, once", async () => {
+    process.env.FAKE_CLAUDE_MODE = "denied";
+    const { manager, project } = await setup();
+    const runId = await manager.start(project.id, "Build it");
+    await manager.settled(runId);
+    delete process.env.FAKE_CLAUDE_MODE;
+
+    const argsFile = path.join(await tempDir(), "args.json");
+    process.env.FAKE_CLAUDE_ARGS_FILE = argsFile;
+    await manager.followUp(runId, "can you run it?");
+    await manager.settled(runId);
+    const first = JSON.parse(await readFile(argsFile, "utf8")) as string[];
+    expect(first[1]).toMatch(
+      /^can you run it\?\n\n\[Note from helloagents\][\s\S]*no longer apply/,
+    );
+
+    await manager.followUp(runId, "thanks");
+    await manager.settled(runId);
+    expect((JSON.parse(await readFile(argsFile, "utf8")) as string[])[1]).toBe("thanks");
+  });
+
   test("can be cancelled mid-run", async () => {
     process.env.FAKE_CLAUDE_MODE = "slow";
     const { store, manager, project } = await setup();

@@ -84,4 +84,4 @@ export {
 } from "./git/worktree";
 export type { ProjectInfo, ShipKind, ShipResult } from "./runs/manager";
 export { isSlashTask, listSlashCommands, readClaudeInit, type SlashCommand } from "./workers/slash";
-export { ATTACHMENTS_HEADER, withAttachments } from "./runs/manager";
+export { ATTACHMENTS_HEADER, NOTE_HEADER, withAttachments } from "./runs/manager";

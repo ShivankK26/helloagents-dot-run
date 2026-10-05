@@ -431,16 +431,20 @@ function ApprovalCard({
 
 /** Must match ATTACHMENTS_HEADER in the engine, which adds this note to the prompt. */
 const ATTACHED = "\n\n[Attached images]\n";
+/** Must match NOTE_HEADER in the engine: a note for the agent, not something you wrote. */
+const NOTE = "\n\n[Note from helloagents]\n";
 
 /** What you asked, with attached images shown as chips instead of the note the agent sees. */
 function YouSaid({ text }: { text: string }) {
+  // Notes helloagents added for the agent (attached images, approvals) aren't shown as text.
+  const cuts = [text.indexOf(NOTE), text.indexOf(ATTACHED)].filter((i) => i >= 0);
+  const asked = cuts.length ? text.slice(0, Math.min(...cuts)) : text;
   const at = text.indexOf(ATTACHED);
-  const asked = at < 0 ? text : text.slice(0, at);
   const images =
     at < 0
       ? []
       : text
-          .slice(at)
+          .slice(at + ATTACHED.length)
           .split("\n")
           .filter((l) => l.startsWith("- "))
           .map((l) => l.slice(2));

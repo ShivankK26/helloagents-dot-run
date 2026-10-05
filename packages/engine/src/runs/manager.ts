@@ -195,7 +195,7 @@ export class RunManager {
     this.opts.onChange?.(runId);
     this.work(runId, {
       agent: run.agent ?? "claude-code",
-      task: message,
+      task: this.withApprovalNote(runId, message, run.settings.access),
       workspace: run.worktree.path,
       ...(restored && actions?.setup && { setup: actions.setup }),
       // Images belong to the message they came with.
@@ -203,6 +203,24 @@ export class RunManager {
       actions,
       resumeSessionId: this.sessionOf(runId),
     });
+  }
+
+  /**
+   * If commands were auto-denied earlier in this conversation (before approvals
+   * existed, or with nobody to ask), the agent believes that still holds. Say once,
+   * in the message itself, that it no longer does.
+   */
+  private withApprovalNote(runId: string, message: string, access?: string): string {
+    if (access === "full") return message;
+    const events = this.opts.store.events(runId).map((e) => e.event);
+    const lastNote = events.findLastIndex(
+      (e) => e.type === "agent.start" && e.task.includes(NOTE_HEADER),
+    );
+    const deniedSince = events
+      .slice(lastNote + 1)
+      .some((e) => e.type === "tool.result" && !e.ok && AUTO_DENIED.test(e.output));
+    if (!deniedSince) return message;
+    return `${message}\n\n${NOTE_HEADER}\nCommands that need permission are no longer denied automatically: helloagents now asks the user, who can approve them. Earlier messages saying approval-needing commands would be refused for the rest of this session no longer apply. Try the commands you need again (for example builds, simulators, screenshots).`;
   }
 
   /** Continues a run that was stopped, in the same conversation. */
@@ -936,6 +954,15 @@ export class RunManager {
     return null;
   }
 }
+
+/** Marks a note helloagents adds to a message for the agent; the app hides it. */
+export const NOTE_HEADER = "[Note from helloagents]";
+
+/**
+ * Claude Code's own words when it auto-denies a prompt nobody could answer; it
+ * also tells the agent this holds "for the rest of this session".
+ */
+const AUTO_DENIED = /no approval surface|denied automatically|requires approval/i;
 
 /** Marks where attached images are listed in a prompt; the app hides this part. */
 export const ATTACHMENTS_HEADER = "[Attached images]";

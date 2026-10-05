@@ -123,8 +123,18 @@ out({
       {
         tool_use_id: "toolu_2",
         type: "tool_result",
-        is_error: mode === "fail",
-        content: [{ type: "text", text: mode === "fail" ? "1 test failed" : "3 tests passed" }],
+        is_error: mode === "fail" || mode === "denied",
+        content: [
+          {
+            type: "text",
+            text:
+              mode === "fail"
+                ? "1 test failed"
+                : mode === "denied"
+                  ? "Permission for this tool use was denied. It requires approval, and this session has no approval surface"
+                  : "3 tests passed",
+          },
+        ],
       },
     ],
   },
