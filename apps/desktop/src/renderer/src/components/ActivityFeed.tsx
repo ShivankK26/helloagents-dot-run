@@ -79,10 +79,10 @@ function build(events: StoredEvent[], active: boolean, hideAnswer: string, root?
   };
 
   for (const { seq, event: e } of events) {
-    if (turn && e.type !== "agent.start" && !(e.type === "tool.result" && e.name === "ship"))
-      turn.lastAt = e.at;
-    if (e.type === "agent.start" || (e.type === "tool.result" && e.name === "ship"))
-      closeTurn(seq - 0.5);
+    // helloagents' own steps (shipping, freeing the folder) come after the turn's Done line.
+    const own = e.type === "tool.result" && (e.name === "ship" || e.name === "folder");
+    if (turn && e.type !== "agent.start" && !own) turn.lastAt = e.at;
+    if (e.type === "agent.start" || own) closeTurn(seq - 0.5);
     if (e.type === "agent.start") {
       turn = { startAt: e.at, lastAt: e.at, files: new Set(), done: false };
       items.push({ kind: "you", key: seq, text: e.task });
@@ -152,6 +152,16 @@ function build(events: StoredEvent[], active: boolean, hideAnswer: string, root?
 
 function Step({ e, root }: { e: ToolResult; root?: string }) {
   if (e.name === "ship") return <Shipped e={e} />;
+  if (e.name === "folder")
+    return (
+      <div className="step ok folder-step">
+        <span className="k">
+          <Icon name="folder" size={12} />
+        </span>
+        <span>{e.output}</span>
+        <span className="r">by helloagents</span>
+      </div>
+    );
   const kind = toolKind(e.name);
   if (kind === "edit") {
     const { add, del } = editStats(e.input);

@@ -10,7 +10,7 @@ import type {
 import { agentName } from "../agents";
 import { compact, ms, tokenParts } from "../format";
 import { outcomeOf, STAGES } from "../outcome";
-import { SHIP_LABEL, shipIntent, shortPath } from "../ship";
+import { shipIntent, shortPath } from "../ship";
 import { elapsed } from "../time";
 import { ActivityFeed } from "./ActivityFeed";
 import { ChangesView } from "./ChangesView";
@@ -285,7 +285,6 @@ export function RunScreen({
           enabled={canFollowUp}
           active={run.active}
           inPlace={inPlace}
-          branch={worktree.branch}
           shipping={shipping}
           onShip={(k) => ship(k)}
         />
@@ -531,7 +530,6 @@ function Dock({
   enabled,
   active,
   inPlace,
-  branch,
   shipping,
   onShip,
 }: {
@@ -539,19 +537,17 @@ function Dock({
   enabled: boolean;
   active: boolean;
   inPlace: boolean;
-  branch: string;
   shipping?: ShipKind;
   onShip: (kind: ShipKind) => Promise<void>;
 }) {
   const api = window.helloagents;
   const [text, setText] = useState("");
-  const [toAgent, setToAgent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
   const images = useAttachments(setError);
 
   // "push it", "open a PR": helloagents does that itself, since the agent can't.
-  const intent = enabled && !toAgent && !images.items.length ? shipIntent(text, inPlace) : null;
+  const intent = enabled && !images.items.length ? shipIntent(text, inPlace) : null;
 
   async function send() {
     const message = text.trim();
@@ -566,7 +562,6 @@ function Dock({
     try {
       await api.followUp(runId, message, images.paths());
       setText("");
-      setToAgent(false);
       images.clear();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -599,10 +594,7 @@ function Dock({
           placeholder={
             active ? "You can follow up when it finishes…" : "Ask a follow-up, or ask for a change…"
           }
-          onChange={(e) => {
-            setText(e.target.value);
-            if (!e.target.value) setToAgent(false);
-          }}
+          onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
@@ -620,28 +612,9 @@ function Dock({
           <Icon name="send" size={15} />
         </button>
       </div>
-      <p className={`dock-hint ${intent ? "ship-hint" : ""}`}>
+      <p className="dock-hint">
         {error ??
-          (intent ? (
-            <>
-              <Icon name={intent === "pr" ? "pr" : "ship"} size={12} />{" "}
-              <span title={branch}>
-                {intent === "pr"
-                  ? "Send will open a pull request on GitHub"
-                  : intent === "push"
-                    ? "Send will push your code to GitHub"
-                    : intent === "commit"
-                      ? "Send will commit your changes"
-                      : `Send will ${SHIP_LABEL[intent].toLowerCase()}`}
-              </span>{" "}
-              ·{" "}
-              <button type="button" className="link-btn" onClick={() => setToAgent(true)}>
-                Send it to Claude instead
-              </button>
-            </>
-          ) : (
-            "Follow-ups continue this conversation on the same branch · drop images to attach · ⌘↵ to send"
-          ))}
+          "Follow-ups continue this conversation on the same branch · drop images to attach · ⌘↵ to send"}
       </p>
     </form>
   );

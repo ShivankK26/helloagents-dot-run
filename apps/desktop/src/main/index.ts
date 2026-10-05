@@ -174,7 +174,8 @@ app.whenReady().then(async () => {
     active: manager.isActive(run.id),
     ...(approvalOf(run.id) && { approval: approvalOf(run.id) }),
     devRunning: manager.devRunning(run.id),
-    branchGone: Boolean(run.worktree && !existsSync(run.worktree.path)),
+    // A folder freed to save space isn't gone: it comes back when the run continues.
+    branchGone: Boolean(run.worktree && manager.folderState(run.id) === "gone"),
     digest: digestRun(store.events(run.id)),
   });
 

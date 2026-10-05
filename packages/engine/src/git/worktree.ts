@@ -135,6 +135,13 @@ export async function createWorktree(
   return { path: dir, branch, base };
 }
 
+/** Recreates a removed worktree's folder from its branch (the branch must still exist). */
+export async function restoreWorktree(repo: string, worktree: Worktree): Promise<void> {
+  await git(repo, ["worktree", "prune"]);
+  await mkdir(path.dirname(worktree.path), { recursive: true });
+  await git(repo, ["worktree", "add", worktree.path, worktree.branch]);
+}
+
 /** Keeps a path out of git for this clone only (.git/info/exclude), e.g. agent screenshots. */
 async function excludeLocally(repo: string, pattern: string): Promise<void> {
   const common = (await git(repo, ["rev-parse", "--git-common-dir"])).trim();

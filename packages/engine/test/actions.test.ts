@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { chmod, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -269,6 +270,39 @@ describe("runs with actions", () => {
     expect(claudeArgs({ task: "x" }).join(" ")).toMatch(
       /--append-system-prompt .*Don't run git commit/,
     );
+  });
+
+  test("after a push the run's folder is removed, the branch kept, and it comes back on a follow-up", async () => {
+    const dir = await repo(MATH);
+    const remote = await tempDir();
+    await git(remote, ["init", "--bare", "-q"]);
+    await git(dir, ["remote", "add", "origin", remote]);
+    const { store, m, project } = await manager(dir, {
+      setup: null,
+      checks: [],
+      dev: null,
+      sendBackFailures: false,
+    });
+    const runId = await m.start(project.id, "fix add() in math.js");
+    await m.settled(runId);
+    const wt = store.getRun(runId)?.worktree;
+    if (!wt) throw new Error("no worktree");
+
+    await m.ship(runId, "push");
+    expect(existsSync(wt.path)).toBe(false);
+    expect(m.folderState(runId)).toBe("freed");
+    expect(await git(remote, ["branch", "--list", wt.branch])).toContain(wt.branch);
+    const freed = store
+      .events(runId)
+      .find((e) => e.event.type === "tool.result" && e.event.name === "folder")?.event;
+    expect(freed?.type === "tool.result" && freed.output).toMatch(/^Freed .+branch is kept/);
+
+    expect(await m.diff(runId)).toContain("fixed by fake claude");
+
+    await m.followUp(runId, "Also add a comment");
+    await m.settled(runId);
+    expect(existsSync(wt.path)).toBe(true);
+    expect(await readFile(path.join(wt.path, "math.js"), "utf8")).toContain("fixed by fake claude");
   });
 
   test("merge commits the run's work and merges it into the branch it came from", async () => {

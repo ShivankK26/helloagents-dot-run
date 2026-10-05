@@ -1,6 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { runAgent } from "../harness/agent";
@@ -10,6 +11,7 @@ import {
   connectGitHub,
   createWorktree,
   currentBranch,
+  git,
   headCommit,
   listBranches,
   mergeInto,
@@ -17,6 +19,7 @@ import {
   parseGitHubRepo,
   pushBranch,
   removeWorktree,
+  restoreWorktree,
   type Worktree,
   worktreeDiff,
 } from "../git/worktree";
@@ -185,15 +188,19 @@ export class RunManager {
     if (this.active.has(runId))
       throw new Error("This run is still working. Wait for it to finish.");
     const project = run.projectId ? store.getProject(run.projectId) : undefined;
+    const actions = project ? await this.projectActions(project) : undefined;
+    // A folder freed to save space comes back from the branch, installed again.
+    const restored = await this.ensureFolder(runId);
     store.reopenRun(runId);
     this.opts.onChange?.(runId);
     this.work(runId, {
       agent: run.agent ?? "claude-code",
       task: message,
       workspace: run.worktree.path,
+      ...(restored && actions?.setup && { setup: actions.setup }),
       // Images belong to the message they came with.
       settings: { ...run.settings, attachments: attachments ?? [] },
-      actions: project ? await this.projectActions(project) : undefined,
+      actions,
       resumeSessionId: this.sessionOf(runId),
     });
   }
@@ -217,7 +224,10 @@ export class RunManager {
     if (!actions.checks.length)
       throw new Error("This project has no checks yet. Add one in its actions.");
     const workspace = run.worktree.path;
+    const restored = await this.ensureFolder(runId);
     this.track(runId, async (signal) => {
+      if (restored && actions.setup)
+        await this.command(runId, "setup", [actions.setup], workspace, signal, actions);
       await this.checks(runId, actions, workspace, signal);
     });
   }
@@ -299,7 +309,11 @@ export class RunManager {
   async diff(runId: string): Promise<string> {
     const run = this.opts.store.getRun(runId);
     if (!run?.worktree) return "";
+    const project = run.projectId ? this.opts.store.getProject(run.projectId) : undefined;
     try {
+      // After a push the folder is gone, but the branch has every change.
+      if (!existsSync(run.worktree.path) && project)
+        return await git(project.path, ["diff", `${run.worktree.base}...${run.worktree.branch}`]);
       return await worktreeDiff(run.worktree);
     } catch {
       return "";
@@ -320,6 +334,76 @@ export class RunManager {
     this.stopDev(runId);
     await this.settled(runId);
     await removeWorktree(project.path, run.worktree, { deleteBranch: true });
+    this.recordFolder(runId, "discarded", "Deleted this run's folder and branch.");
+  }
+
+  // ---- Disk space ----
+  // Each run's folder is a full copy of the project (often with node_modules), so it's
+  // removed once the work is pushed, in a PR or merged. The branch always stays, and
+  // the folder comes back on its own if the run is continued.
+
+  /** "here", "freed" (to save space; comes back on use) or "gone" (discarded). */
+  folderState(runId: string): "here" | "freed" | "gone" {
+    const run = this.opts.store.getRun(runId);
+    if (!run?.worktree || existsSync(run.worktree.path)) return "here";
+    const last = this.opts.store
+      .events(runId)
+      .map((e) => e.event)
+      .filter((e) => e.type === "tool.result" && e.name === "folder")
+      .at(-1);
+    return last?.type === "tool.result" && (last.input as { action?: string }).action === "freed"
+      ? "freed"
+      : "gone";
+  }
+
+  /** Deletes a finished run's folder; its branch stays. Returns the bytes freed. */
+  async freeFolder(runId: string): Promise<number | null> {
+    const run = this.opts.store.getRun(runId);
+    const project = run?.projectId ? this.opts.store.getProject(run.projectId) : undefined;
+    const wt = run?.worktree;
+    if (!run || !project || !wt || this.active.has(runId) || this.devServers.has(runId))
+      return null;
+    if (run.settings.workspace === "checkout" || wt.path === project.path || !existsSync(wt.path))
+      return null;
+    const bytes = await folderSize(wt.path);
+    await commitAll(wt.path, `Unsaved work from helloagents: ${commitMessage(run.title)}`).catch(
+      () => null,
+    );
+    await removeWorktree(project.path, wt);
+    this.recordFolder(
+      runId,
+      "freed",
+      `Freed ${formatBytes(bytes)}: removed this run's folder to save space. The branch is kept, and the folder comes back if you continue.`,
+      bytes,
+    );
+    return bytes;
+  }
+
+  /** Brings back a freed run's folder from its branch. True if it had to (install again). */
+  private async ensureFolder(runId: string): Promise<boolean> {
+    const run = this.opts.store.getRun(runId);
+    const project = run?.projectId ? this.opts.store.getProject(run.projectId) : undefined;
+    if (!run?.worktree || !project || existsSync(run.worktree.path)) return false;
+    if (this.folderState(runId) !== "freed")
+      throw new Error("This run's branch was deleted, so it can't continue.");
+    await restoreWorktree(project.path, run.worktree);
+    this.recordFolder(runId, "restored", "Brought this run's folder back from its branch.");
+    return true;
+  }
+
+  private recordFolder(runId: string, action: string, output: string, bytes?: number): void {
+    this.opts.store.record(runId, "main", {
+      type: "tool.result",
+      at: Date.now(),
+      turn: 0,
+      id: randomUUID(),
+      name: "folder",
+      input: { action, ...(bytes !== undefined && { bytes }) },
+      ok: true,
+      output,
+      durationMs: 0,
+    });
+    this.opts.onChange?.(runId);
   }
 
   /**
@@ -371,6 +455,7 @@ export class RunManager {
       this.opts.onChange?.(runId);
     };
     try {
+      await this.ensureFolder(runId);
       const result =
         kind === "commit"
           ? await this.commit(runId)
@@ -380,6 +465,8 @@ export class RunManager {
               ? await this.openPullRequest(runId)
               : await this.merge(runId);
       record(true, result.message, result.url);
+      // Pushed, in a PR or merged: the work is safe in git, so the run's folder can go.
+      if (kind !== "commit") await this.freeFolder(runId).catch(() => null);
       return result;
     } catch (e) {
       record(false, e instanceof Error ? e.message : String(e));
@@ -505,6 +592,8 @@ export class RunManager {
     if (!actions.dev)
       throw new Error("This project has no dev server command. Add one in its actions.");
     if (!this.devServers.has(runId)) {
+      if ((await this.ensureFolder(runId)) && actions.setup)
+        await runShell(actions.setup, run.worktree.path, { nodeBin: actions.nodeBin });
       for (const [id, child] of this.devServers) {
         stopBackground(child); // one at a time: they usually share a port
         this.devServers.delete(id);
@@ -871,4 +960,19 @@ function explainGitError(error: unknown): string {
   }
   if (/not a git repository/i.test(message)) return "This folder isn't a git repository.";
   return message;
+}
+
+/** Disk space a folder uses, in bytes (via du, which is fast on big node_modules). */
+function folderSize(dir: string): Promise<number> {
+  return new Promise((resolve) =>
+    execFile("du", ["-sk", dir], (err, out) =>
+      resolve(err ? 0 : Number(out.trim().split(/\s+/)[0] ?? 0) * 1024),
+    ),
+  );
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
