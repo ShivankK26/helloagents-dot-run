@@ -3529,3 +3529,66 @@ code {
   font: 12px var(--mono);
   color: var(--ink);
 }
+
+/* Waiting for the user's OK, like Claude Code's permission prompt. */
+.pill.ask {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-color: transparent;
+}
+.dot.ask {
+  background: var(--warn);
+}
+small.ask {
+  color: var(--warn);
+}
+.approval {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line-2));
+  background: color-mix(in srgb, var(--warn-soft) 55%, var(--surface));
+}
+.approval-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.approval-head svg {
+  color: var(--warn);
+}
+.approval-what {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  font: 12.5px/1.5 var(--mono);
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow: auto;
+}
+.approval-why {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.approval-actions code {
+  font: 12px var(--mono);
+}
+.approval-note {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--faint);
+}

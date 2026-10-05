@@ -72,8 +72,23 @@ export interface SlashCommand {
 
 export type ThemeMode = "light" | "dark" | "system";
 
+/** Something the agent is waiting for the user to allow. */
+export interface ApprovalRequest {
+  id: string;
+  tool: string;
+  /** What it wants to do, e.g. the command. */
+  description: string;
+  reason?: string;
+  /** What "Always allow" would add, e.g. "Bash(xcodebuild:*)". */
+  rule?: string;
+}
+
+export type ApprovalAnswer = "allow" | "always" | "deny";
+
 export interface RunListItem extends RunRecord {
   active: boolean;
+  /** Waiting for the user's OK. */
+  approval?: ApprovalRequest;
   /** A dev server is running on this run's branch. */
   devRunning: boolean;
   /** The run had a branch, but its folder is gone (discarded or removed). */
@@ -141,6 +156,7 @@ export interface HelloagentsApi {
   /** Saves an attached image where the agent can read it; resolves with its path. */
   saveAttachment(name: string, bytes: Uint8Array): Promise<string>;
   cancelRun(runId: string): Promise<void>;
+  answerApproval(runId: string, requestId: string, answer: ApprovalAnswer): Promise<void>;
   discardRun(runId: string): Promise<void>;
   runEvents(runId: string, afterSeq: number): Promise<StoredEvent[]>;
   runDiff(runId: string): Promise<string>;
@@ -185,6 +201,7 @@ export const IPC = {
   listSlashCommands: "projects:slash-commands",
   saveAttachment: "attachments:save",
   cancelRun: "runs:cancel",
+  answerApproval: "runs:answer-approval",
   discardRun: "runs:discard",
   runEvents: "runs:events",
   runDiff: "runs:diff",

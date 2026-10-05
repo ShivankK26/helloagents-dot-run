@@ -5,6 +5,7 @@ import { digestRun, toErrors } from "@helloagents/engine/views";
 import type { AgentEvent, RunRecord, TokenUsage } from "@helloagents/engine/types";
 import type {
   AgentId,
+  ApprovalRequest,
   ErrorListItem,
   HelloagentsApi,
   ProjectActions,
@@ -22,6 +23,8 @@ interface DemoRun {
   active: boolean;
   dev: boolean;
   timers: number[];
+  /** Waiting for the visitor to allow a command. */
+  approval?: ApprovalRequest;
 }
 
 interface Step {
@@ -629,6 +632,20 @@ function seed(): void {
     });
     run.active = false;
   };
+  /** A run paused on a command that needs the user's OK. */
+  const asking = (p: ProjectRecord, task: string, startedMin: number) => {
+    const run = newRun(p, task, {}, ago(startedMin));
+    play(run, task, script(task, p).slice(0, 4), { live: false, startAt: ago(startedMin) });
+    run.active = true;
+    run.rec.status = "running";
+    run.rec.endedAt = null;
+    run.approval = {
+      id: "demo-approval",
+      tool: "Bash",
+      description: "pnpm dlx vercel deploy --prebuilt",
+      rule: "Bash(pnpm:*)",
+    };
+  };
   // Oldest first, so the newest ends up on top.
   done(HYDRA, "Add retries to the S3 uploader", 2900);
   done(HYDRA, "Rename user to account across the API", 1500);
@@ -640,6 +657,7 @@ function seed(): void {
   done(HYDRA, "Fix the failing date tests", 120, true);
   done(ORBIT, "Explain how billing works", 70);
   done(ACME, "Upgrade to Next.js 16", 35, true);
+  asking(ACME, "Deploy a preview of the pricing page", 2);
 }
 
 // ---- The API the app window talks to ----
@@ -647,6 +665,7 @@ function seed(): void {
 const listItem = (r: DemoRun): RunListItem => ({
   ...r.rec,
   active: r.active,
+  ...(r.approval && { approval: r.approval }),
   devRunning: r.dev,
   branchGone: false,
   digest: digestRun(r.events),
@@ -848,7 +867,61 @@ export const demoApi: HelloagentsApi = {
     ),
   saveAttachment: async (name) =>
     `/tmp/helloagents/attachments/${Math.random().toString(16).slice(2, 10)}-${name}`,
-  cancelRun: async (id) => stop(need(id)),
+  cancelRun: async (id) => {
+    const r = need(id);
+    delete r.approval;
+    stop(r);
+  },
+  answerApproval: async (id, _requestId, answer) => {
+    const r = need(id);
+    const asked = r.approval;
+    if (!asked) return;
+    delete r.approval;
+    await later(null, 400);
+    const ok = answer !== "deny";
+    const at = Date.now();
+    push(r, {
+      type: "tool.result",
+      at,
+      turn: 2,
+      id: `approved-${at}`,
+      name: "Bash",
+      input: { command: asked.description },
+      ok,
+      output: ok ? "Preview: https://acme-pricing-3k2.vercel.app (demo)" : "The user said no.",
+      durationMs: 2400,
+    });
+    const answer = ok
+      ? "Deployed a preview of the pricing page: https://acme-pricing-3k2.vercel.app (demo)."
+      : "I didn't deploy, since you said no. The build is ready whenever you want to.";
+    push(r, {
+      type: "model.response",
+      at: at + 500,
+      turn: 3,
+      durationMs: 500,
+      model: "claude-opus-5-5",
+      stopReason: "end_turn",
+      text: answer,
+      toolCalls: [],
+      usage: { inputTokens: 2, outputTokens: 30, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      costUsd: 0,
+    });
+    push(r, {
+      type: "agent.end",
+      at: at + 600,
+      status: "done",
+      summary: ok
+        ? "Deployed a preview of the pricing page (demo): https://acme-pricing-3k2.vercel.app"
+        : "I didn't deploy, since you said no. The build is ready whenever you want to.",
+      turns: 2,
+      usage: r.rec.usage,
+      costUsd: r.rec.costUsd,
+    });
+    r.active = false;
+    r.rec.status = "done";
+    r.rec.endedAt = at + 600;
+    notify(id);
+  },
   discardRun: async (id) => {
     const r = need(id);
     stop(r);

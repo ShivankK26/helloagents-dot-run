@@ -11,6 +11,7 @@ afterEach(() => {
   stores.splice(0).forEach((s) => s.close());
   delete process.env.FAKE_CLAUDE_MODE;
   delete process.env.FAKE_CLAUDE_ARGS_FILE;
+  delete process.env.FAKE_CLAUDE_ANSWER_FILE;
 });
 
 async function setup(
@@ -108,6 +109,53 @@ describe("RunManager", () => {
     expect(next[1]).toBe("Thanks");
     expect(next).not.toContain("--add-dir");
     expect(next).toContain("--disable-slash-commands");
+  });
+
+  test("asks before a command that isn't allowed, and remembers 'always'", async () => {
+    process.env.FAKE_CLAUDE_MODE = "ask";
+    const answerFile = path.join(await tempDir(), "answer.json");
+    process.env.FAKE_CLAUDE_ANSWER_FILE = answerFile;
+    const { store, manager, project } = await setup();
+    const runId = await manager.start(project.id, "Check the Xcode version");
+    // The run waits for the user.
+    let request = manager.pendingApproval(runId);
+    for (let i = 0; !request && i < 100; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      request = manager.pendingApproval(runId);
+    }
+    expect(request).toMatchObject({ tool: "Bash", rule: "Bash(xcodebuild:*)" });
+    await manager.answerApproval(runId, request?.id ?? "", "always");
+    await manager.settled(runId);
+
+    const answer = JSON.parse(await readFile(answerFile, "utf8")) as {
+      response: { response: { behavior: string; updatedPermissions?: unknown[] } };
+    };
+    expect(answer.response.response.behavior).toBe("allow");
+    expect(answer.response.response.updatedPermissions).toHaveLength(1);
+    const ran = store
+      .events(runId)
+      .find((e) => e.event.type === "tool.result" && e.event.id === "toolu_3")?.event;
+    expect(ran?.type === "tool.result" && ran.ok).toBe(true);
+    expect(store.getProject(project.id)?.actions?.alwaysAllow).toEqual(["Bash(xcodebuild:*)"]);
+    expect(manager.pendingApproval(runId)).toBeUndefined();
+  });
+
+  test("a denied command reaches the agent as a refusal", async () => {
+    process.env.FAKE_CLAUDE_MODE = "ask";
+    const { store, manager, project } = await setup();
+    const runId = await manager.start(project.id, "Check the Xcode version");
+    let request = manager.pendingApproval(runId);
+    for (let i = 0; !request && i < 100; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      request = manager.pendingApproval(runId);
+    }
+    await manager.answerApproval(runId, request?.id ?? "", "deny");
+    await manager.settled(runId);
+    const ran = store
+      .events(runId)
+      .find((e) => e.event.type === "tool.result" && e.event.id === "toolu_3")?.event;
+    expect(ran?.type === "tool.result" && ran.ok).toBe(false);
+    expect(ran?.type === "tool.result" && ran.output).toMatch(/said no/);
   });
 
   test("can be cancelled mid-run", async () => {

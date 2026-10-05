@@ -218,7 +218,7 @@ export function NewTask({
             trigger={
               <>
                 <Icon name="lock" size={13} />{" "}
-                {settings.access === "full" ? "Full access" : "Edits only"}{" "}
+                {settings.access === "full" ? "Full access" : "Ask for commands"}{" "}
                 <span className="caret">
                   <Icon name="chevronDown" size={14} />
                 </span>
@@ -226,16 +226,9 @@ export function NewTask({
             }
             items={[
               {
-                id: "ask",
-                label: "Ask first",
-                hint: "Asks before each command or change. Coming soon.",
-                disabled: true,
-                onSelect: () => undefined,
-              },
-              {
                 id: "edits",
-                label: "Edits only",
-                hint: "Edits files freely; only runs common build and test commands",
+                label: "Ask for commands",
+                hint: "Edits files and runs build and test commands; asks before anything else",
                 checked: settings.access !== "full",
                 onSelect: () => update({ access: "edits" }),
               },

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   describeToolCall,
   isCommandTool,
@@ -5,7 +6,7 @@ import {
   toolKind,
   toolPath,
 } from "@helloagents/engine/views";
-import type { ShipKind, StoredEvent } from "../../../shared/api";
+import type { ApprovalAnswer, ApprovalRequest, ShipKind, StoredEvent } from "../../../shared/api";
 import { ms } from "../format";
 import { SHIP_LABEL, shortPath } from "../ship";
 import { Icon } from "./Icons";
@@ -225,6 +226,8 @@ export function ActivityFeed({
   shipKinds = [],
   shipping,
   onShip,
+  approval,
+  onAnswer,
 }: {
   events: StoredEvent[];
   active: boolean;
@@ -236,8 +239,11 @@ export function ActivityFeed({
   shipKinds?: ShipKind[];
   shipping?: ShipKind;
   onShip?: (kind: ShipKind) => void;
+  /** What the agent is waiting for the user to allow. */
+  approval?: ApprovalRequest;
+  onAnswer?: (answer: ApprovalAnswer) => void;
 }) {
-  const items = build(events, active, hideAnswer, root);
+  const items = build(events, active && !approval, hideAnswer, root);
   // Ship buttons go on the last "Done", minus what was already shipped after it.
   const endAt = items.findLastIndex((it) => it.kind === "end");
   const lastEnd =
@@ -337,7 +343,65 @@ export function ActivityFeed({
           </p>
         ) : null,
       )}
+      {approval ? <ApprovalCard key={approval.id} request={approval} onAnswer={onAnswer} /> : null}
     </div>
+  );
+}
+
+/** Like Claude Code's permission prompt: the agent waits until you answer. */
+function ApprovalCard({
+  request,
+  onAnswer,
+}: {
+  request: ApprovalRequest;
+  onAnswer?: (answer: ApprovalAnswer) => void;
+}) {
+  const [sent, setSent] = useState<ApprovalAnswer>();
+  const answer = (a: ApprovalAnswer) => {
+    setSent(a);
+    onAnswer?.(a);
+  };
+  // "Bash(xcodebuild:*)" reads as "xcodebuild commands".
+  const rule = request.rule
+    ? /^Bash\((.+?)(?::\*)?\)$/.exec(request.rule)?.[1]
+      ? `${/^Bash\((.+?)(?::\*)?\)$/.exec(request.rule)?.[1]} commands`
+      : request.rule
+    : undefined;
+  return (
+    <section className="approval" aria-label="Needs your OK">
+      <div className="approval-head">
+        <Icon name="lock" size={13} />
+        <b>
+          {request.tool === "Bash"
+            ? "Claude wants to run a command"
+            : `Claude wants to use ${request.tool}`}
+        </b>
+      </div>
+      <pre className="approval-what">{request.description}</pre>
+      {request.reason && !/requires approval/i.test(request.reason) ? (
+        <p className="approval-why">{request.reason}</p>
+      ) : null}
+      <div className="approval-actions">
+        <button
+          className="btn btn-primary btn-sm"
+          disabled={Boolean(sent)}
+          onClick={() => answer("allow")}
+        >
+          {sent === "allow" ? <span className="spinner" /> : null}
+          Allow
+        </button>
+        {rule ? (
+          <button className="btn btn-sm" disabled={Boolean(sent)} onClick={() => answer("always")}>
+            {sent === "always" ? <span className="spinner" /> : null}
+            Always allow <code>{rule}</code>
+          </button>
+        ) : null}
+        <button className="btn btn-sm" disabled={Boolean(sent)} onClick={() => answer("deny")}>
+          Deny
+        </button>
+        <span className="approval-note">The run is paused until you answer.</span>
+      </div>
+    </section>
   );
 }
 

@@ -25,12 +25,33 @@ export interface ClaudeCodeOptions {
   access?: Access;
   /** Extra folders Claude Code may read, e.g. where attached images are saved. */
   addDirs?: readonly string[];
+  /**
+   * Asked when Claude Code wants to do something that isn't pre-approved, like
+   * Claude Code's own permission prompt. Without it, such actions are denied.
+   */
+  onPermission?: (request: PermissionRequest) => Promise<PermissionDecision>;
   signal?: AbortSignal;
   onEvent?: (event: AgentEvent) => void;
   /** Path to the claude executable (tests point this at a fake). */
   claudePath?: string;
   now?: () => number;
 }
+
+/** Claude Code wants to use a tool that needs the user's OK. */
+export interface PermissionRequest {
+  id: string;
+  tool: string;
+  input: unknown;
+  /** What it wants to do, e.g. the command. */
+  description: string;
+  /** Why it needs approval, in Claude Code's words. */
+  reason?: string;
+  /** The rule "always allow" would add, e.g. "Bash(xcodebuild:*)". */
+  rule?: string;
+}
+
+export type PermissionDecision =
+  { behavior: "allow"; always?: boolean } | { behavior: "deny"; message?: string };
 
 export interface ClaudeCodeResult extends AgentResult {
   sessionId?: string;
@@ -81,22 +102,32 @@ export function claudeArgs(
     | "effort"
     | "access"
     | "addDirs"
-  >,
+  > & { ask?: boolean },
 ): string[] {
   const args = [
     "-p",
-    opts.task,
+    // When the app answers permission prompts, the task goes in over stdin instead.
+    ...(opts.ask ? [] : [opts.task]),
     "--output-format",
     "stream-json",
     "--verbose",
-    // File edits need no approval; everything else is limited to allowedTools.
+    // File edits need no approval; other tools are limited to allowedTools.
     "--permission-mode",
     opts.access === "full" ? "bypassPermissions" : "acceptEdits",
     "--allowedTools",
     (opts.allowedTools ?? DEFAULT_CLAUDE_TOOLS).join(","),
-    // Nobody is there to answer a prompt: deny instead of waiting forever.
-    "--permission-prompts",
-    "none",
+    ...(opts.ask
+      ? // Anything else is asked of helloagents over stdin/stdout, which asks the user.
+        [
+          "--input-format",
+          "stream-json",
+          "--permission-prompts",
+          "host",
+          "--permission-prompt-tool",
+          "stdio",
+        ]
+      : // Nobody is there to answer a prompt: deny instead of waiting forever.
+        ["--permission-prompts", "none"]),
   ];
   if (opts.lean ?? true) {
     args.push(
@@ -208,12 +239,20 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
 
   return new Promise((resolve) => {
     let result: ClaudeCodeResult | undefined;
-    const child = spawn(opts.claudePath ?? "claude", claudeArgs(opts), {
+    const ask = Boolean(opts.onPermission) && opts.access !== "full";
+    const child = spawn(opts.claudePath ?? "claude", claudeArgs({ ...opts, ask }), {
       cwd: opts.workspace,
-      // Closing stdin stops Claude Code from waiting for piped input.
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       signal: opts.signal,
     });
+    const send = (message: unknown) => {
+      if (child.stdin.writable) child.stdin.write(`${JSON.stringify(message)}\n`);
+    };
+    // Unanswered prompts would keep the process alive; stdin errors after exit are harmless.
+    child.stdin.on("error", () => undefined);
+    if (ask) send({ type: "user", message: { role: "user", content: opts.task } });
+    // Without prompts, closing stdin stops Claude Code from waiting for piped input.
+    else child.stdin.end();
 
     let buffer = "";
     child.stdout.on("data", (chunk: Buffer) => {
@@ -237,6 +276,10 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
         return; // not one of Claude Code's JSON events
       }
       const at = now();
+      if (msg.type === "control_request") {
+        void answerControl(msg);
+        return;
+      }
       if (msg.type === "system" && msg.subtype === "init") {
         sessionId = msg.session_id as string;
         emit({
@@ -323,6 +366,7 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
           typeof msg.result === "string" && msg.result.trim()
             ? msg.result.trim()
             : lastText || "Claude Code finished without a summary.";
+        child.stdin.end();
         const cost = typeof msg.total_cost_usd === "number" ? msg.total_cost_usd : 0;
         result = ok
           ? end("done", summary, cost)
@@ -333,6 +377,67 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
               `${String(msg.subtype)}${typeof msg.result === "string" && msg.result ? `: ${msg.result}` : ""}`,
             );
       }
+    }
+
+    /** Claude Code asks the app something; today, only "may I use this tool?". */
+    async function answerControl(msg: Record<string, unknown>): Promise<void> {
+      const requestId = String(msg.request_id);
+      const req = (msg.request ?? {}) as Record<string, unknown>;
+      if (req.subtype !== "can_use_tool" || !opts.onPermission) {
+        send({
+          type: "control_response",
+          response: { subtype: "error", request_id: requestId, error: "Not supported" },
+        });
+        return;
+      }
+      const suggestions = Array.isArray(req.permission_suggestions)
+        ? (req.permission_suggestions as Array<Record<string, unknown>>)
+        : [];
+      const rule = suggestedRule(String(req.tool_name), req.input, suggestions);
+      // For a command, show the command itself; Claude's own description says what it's for.
+      const command =
+        req.tool_name === "Bash"
+          ? (req.input as { command?: unknown } | undefined)?.command
+          : undefined;
+      const said = typeof req.description === "string" ? req.description : undefined;
+      const decision = await opts
+        .onPermission({
+          id: String(req.tool_use_id ?? requestId),
+          tool: String(req.tool_name),
+          input: req.input,
+          description: typeof command === "string" ? command : (said ?? String(req.tool_name)),
+          ...(typeof command === "string" && said && said !== command
+            ? { reason: said }
+            : typeof req.decision_reason === "string" && { reason: req.decision_reason }),
+          ...(rule && { rule }),
+        })
+        .catch((): PermissionDecision => ({ behavior: "deny", message: "No answer." }));
+      send({
+        type: "control_response",
+        response: {
+          subtype: "success",
+          request_id: requestId,
+          response:
+            decision.behavior === "allow"
+              ? {
+                  behavior: "allow",
+                  updatedInput: req.input,
+                  // "Always": stop asking for this for the rest of the session too.
+                  ...(decision.always &&
+                    rule && {
+                      updatedPermissions: [
+                        {
+                          type: "addRules",
+                          rules: [ruleObject(rule)],
+                          behavior: "allow",
+                          destination: "session",
+                        },
+                      ],
+                    }),
+                }
+              : { behavior: "deny", message: decision.message ?? "The user said no." },
+        },
+      });
     }
 
     child.on("error", (e: NodeJS.ErrnoException) => {
@@ -373,4 +478,38 @@ function toolOutput(content: unknown): string {
       .join("\n");
   }
   return "";
+}
+
+/**
+ * The rule "always allow" adds. For a shell command, its program
+ * ("Bash(xcodebuild:*)"), like Claude Code's own "don't ask again for…".
+ */
+export function suggestedRule(
+  tool: string,
+  input: unknown,
+  suggestions: Array<Record<string, unknown>> = [],
+): string | undefined {
+  if (tool === "Bash") {
+    const command = String((input as { command?: unknown })?.command ?? "").trim();
+    // The program that needed approval: skip "cd …" and env assignments, take the last
+    // part of a chain (the one Claude Code flagged is usually the new one).
+    const parts = command
+      .split(/&&|\|\||;|\|/)
+      .map((p) => p.trim().replace(/^(?:[A-Z_][A-Z0-9_]*=\S+\s+)+/, ""))
+      .filter((p) => p && !/^cd\s/.test(p));
+    const program = parts.at(-1)?.split(/\s+/)[0];
+    return program && /^[\w./-]+$/.test(program) ? `Bash(${program}:*)` : undefined;
+  }
+  const first = (
+    suggestions[0]?.rules as Array<{ toolName?: string; ruleContent?: string }> | undefined
+  )?.[0];
+  if (first?.toolName)
+    return first.ruleContent ? `${first.toolName}(${first.ruleContent})` : first.toolName;
+  return tool;
+}
+
+/** "Bash(xcodebuild:*)" → { toolName: "Bash", ruleContent: "xcodebuild:*" }. */
+function ruleObject(rule: string): { toolName: string; ruleContent?: string } {
+  const m = /^([^(]+)\((.*)\)$/.exec(rule);
+  return m?.[1] ? { toolName: m[1], ruleContent: m[2] } : { toolName: rule };
 }

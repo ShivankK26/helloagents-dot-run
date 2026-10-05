@@ -2,7 +2,7 @@ import type { RunStage } from "@helloagents/engine/views";
 import type { RunListItem } from "../../shared/api";
 import { elapsed } from "./time";
 
-export type Tone = "live" | "ok" | "bad" | "muted";
+export type Tone = "live" | "ok" | "bad" | "muted" | "ask";
 
 export interface Outcome {
   tone: Tone;
@@ -31,6 +31,13 @@ const FAILED: Record<string, string> = {
  */
 export function outcomeOf(run: RunListItem): Outcome {
   const d = run.digest;
+  if (run.approval) {
+    return {
+      tone: "ask",
+      label: "Needs your OK",
+      line: `Wants to run ${run.approval.description}`,
+    };
+  }
   if (run.active) {
     const stage = STAGES.find((s) => s.id === d.stage) ?? STAGES[0];
     return { tone: "live", label: "Working", line: `${stage?.doing ?? "Working"}…` };

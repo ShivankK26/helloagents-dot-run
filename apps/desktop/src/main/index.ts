@@ -36,6 +36,8 @@ import {
 import {
   IPC,
   type AppInfo,
+  type ApprovalAnswer,
+  type ApprovalRequest,
   type ErrorListItem,
   type FolderInfo,
   type Opener,
@@ -155,6 +157,7 @@ app.whenReady().then(async () => {
       updateBadge();
     },
     onSettled: (runId) => notifySettled(runId),
+    onApproval: (runId, request) => notifyApproval(runId, request.description),
     // HELLOAGENTS_CLAUDE_PATH points at a fake CLI for free demos.
     ...(process.env.HELLOAGENTS_CLAUDE_PATH && { claudePath: process.env.HELLOAGENTS_CLAUDE_PATH }),
     createModel: () => {
@@ -169,6 +172,7 @@ app.whenReady().then(async () => {
   const listItem = (run: NonNullable<ReturnType<TraceStore["getRun"]>>): RunListItem => ({
     ...run,
     active: manager.isActive(run.id),
+    ...(approvalOf(run.id) && { approval: approvalOf(run.id) }),
     devRunning: manager.devRunning(run.id),
     branchGone: Boolean(run.worktree && !existsSync(run.worktree.path)),
     digest: digestRun(store.events(run.id)),
@@ -387,6 +391,40 @@ app.whenReady().then(async () => {
     n.show();
   }
   ipcMain.handle(IPC.cancelRun, (_e, runId: string) => manager.cancel(runId));
+  ipcMain.handle(
+    IPC.answerApproval,
+    (_e, runId: string, requestId: string, answer: ApprovalAnswer) =>
+      manager.answerApproval(runId, requestId, answer),
+  );
+  function approvalOf(runId: string): ApprovalRequest | undefined {
+    const r = manager.pendingApproval(runId);
+    return r
+      ? {
+          id: r.id,
+          tool: r.tool,
+          description: r.description,
+          ...(r.reason && { reason: r.reason }),
+          ...(r.rule && { rule: r.rule }),
+        }
+      : undefined;
+  }
+  /** Like Claude Code's prompt, but it may be in the background: say so. */
+  function notifyApproval(runId: string, what: string): void {
+    updateBadge();
+    if (win?.isFocused() || !Notification.isSupported()) return;
+    const run = store.getRun(runId);
+    const project = run?.projectId ? store.getProject(run.projectId)?.name : undefined;
+    const n = new Notification({
+      title: `${project ?? "A run"} needs your OK`,
+      body: `Claude wants to run: ${what}`,
+      silent: false,
+    });
+    n.on("click", () => {
+      win?.show();
+      win?.webContents.send(IPC.openRun, runId);
+    });
+    n.show();
+  }
   ipcMain.handle(IPC.discardRun, (_e, runId: string) => manager.discard(runId));
   ipcMain.handle(IPC.runEvents, (_e, runId: string, afterSeq: number) =>
     store.events(runId, { afterSeq }),

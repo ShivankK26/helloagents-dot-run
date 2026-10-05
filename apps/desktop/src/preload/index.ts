@@ -36,6 +36,8 @@ const api: HelloagentsApi = {
   getRun: (runId) => invoke(IPC.getRun, runId),
   startRun: (projectId, task, settings) => invoke(IPC.startRun, projectId, task, settings),
   cancelRun: (runId) => invoke(IPC.cancelRun, runId),
+  answerApproval: (runId, requestId, answer) =>
+    invoke(IPC.answerApproval, runId, requestId, answer),
   discardRun: (runId) => invoke(IPC.discardRun, runId),
   runEvents: (runId, afterSeq) => invoke(IPC.runEvents, runId, afterSeq),
   runDiff: (runId) => invoke(IPC.runDiff, runId),

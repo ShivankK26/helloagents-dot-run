@@ -34,11 +34,17 @@ export type { LogLevel, LogLine, RunError } from "./trace/views";
 
 export {
   claudeArgs,
+  suggestedRule,
   DEFAULT_CLAUDE_TOOLS,
   LEAN_CLAUDE_TOOLS,
   runClaudeCode,
 } from "./workers/claude-code";
-export type { ClaudeCodeOptions, ClaudeCodeResult } from "./workers/claude-code";
+export type {
+  ClaudeCodeOptions,
+  ClaudeCodeResult,
+  PermissionDecision,
+  PermissionRequest,
+} from "./workers/claude-code";
 export { detectAgents } from "./workers/detect";
 export {
   cloneRepo,

@@ -91,7 +91,7 @@ export function RunScreen({
     const justShipped = shipped?.type === "tool.result" && shipped.name === "ship";
     if (tab === "activity" && (run?.active || justShipped) && feed)
       feed.scrollTop = feed.scrollHeight;
-  }, [events, tab, run?.active]);
+  }, [events, tab, run?.active, run?.approval?.id]);
 
   /** Commit, push, PR or merge, done by helloagents (the agent can't push). */
   const ship = useCallback(
@@ -118,6 +118,7 @@ export function RunScreen({
   const worktree = run.worktree;
   const canFollowUp = Boolean(worktree) && !run.active;
   const inPlace = run.settings.workspace === "checkout";
+  const turns = events.filter((e) => e.event.type === "agent.start").length;
   const shipKinds: ShipKind[] =
     worktree && !run.branchGone && !run.active ? (inPlace ? ["push"] : ["push", "pr"]) : [];
 
@@ -206,7 +207,7 @@ export function RunScreen({
                     onSendBack={(message) => void api.followUp(runId, message)}
                   />
                 ) : null}
-                {!run.active && !d.filesChanged.length && d.answer ? (
+                {!run.active && !d.filesChanged.length && d.answer && turns === 1 ? (
                   <details className="folded">
                     <summary>
                       <Icon name="chevron" size={12} /> How the agent got there
@@ -222,8 +223,16 @@ export function RunScreen({
                   <ActivityFeed
                     events={events}
                     active={run.active}
-                    hideAnswer={run.active ? "" : d.answer}
+                    // With follow-ups, the answer belongs under the question it answers.
+                    hideAnswer={run.active || turns > 1 ? "" : d.answer}
                     root={worktree?.path}
+                    {...(run.approval && { approval: run.approval })}
+                    onAnswer={(a) =>
+                      run.approval &&
+                      void api
+                        .answerApproval(runId, run.approval.id, a)
+                        .catch((e: unknown) => showToast(errorText(e), { tone: "bad" }))
+                    }
                     shipKinds={shipKinds}
                     shipping={shipping}
                     onShip={(k) => void ship(k)}

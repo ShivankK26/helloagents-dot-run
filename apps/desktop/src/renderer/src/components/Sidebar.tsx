@@ -115,8 +115,8 @@ export function Sidebar({
     );
   };
 
-  const needsYou = visible.filter((r) => !r.active && outcomeOf(r).tone === "bad");
-  const working = visible.filter((r) => r.active);
+  const needsYou = visible.filter((r) => r.approval || (!r.active && outcomeOf(r).tone === "bad"));
+  const working = visible.filter((r) => r.active && !r.approval);
   const done = visible.filter((r) => !r.active && outcomeOf(r).tone !== "bad");
   const claude = agents.find((a) => a.id === "claude-code");
 

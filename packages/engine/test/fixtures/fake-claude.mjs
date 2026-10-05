@@ -3,11 +3,22 @@
 // captured from a real `claude -p --output-format stream-json --verbose` run,
 // and performs a real file edit so the worktree has a diff.
 import { appendFileSync, writeFileSync } from "node:fs";
+import { createInterface } from "node:readline";
 
 const args = process.argv.slice(2);
 const mode = process.env.FAKE_CLAUDE_MODE ?? "success";
+// With --input-format stream-json the task arrives on stdin, and so do answers
+// to permission prompts.
+const streamed = args.includes("--input-format");
+const lines = streamed ? createInterface({ input: process.stdin })[Symbol.asyncIterator]() : null;
+const nextMessage = async () => JSON.parse((await lines.next()).value);
+const prompt = streamed ? (await nextMessage()).message.content : args[1];
+// Recorded as ["-p", <task>, ...flags] either way, so tests can read the task.
 if (process.env.FAKE_CLAUDE_ARGS_FILE)
-  writeFileSync(process.env.FAKE_CLAUDE_ARGS_FILE, JSON.stringify(args));
+  writeFileSync(
+    process.env.FAKE_CLAUDE_ARGS_FILE,
+    JSON.stringify(streamed ? ["-p", prompt, ...args.slice(1)] : args),
+  );
 const session = args.includes("--resume")
   ? args[args.indexOf("--resume") + 1]
   : "11111111-2222-3333-4444-555555555555";
@@ -121,6 +132,52 @@ out({
   session_id: session,
 });
 out({ type: "rate_limit_event", rate_limit_info: { status: "allowed" } });
+// "ask" wants to run a command that needs approval, like a real xcodebuild call.
+if (mode === "ask") {
+  const input = { command: "cd app && xcodebuild -version" };
+  out({
+    type: "assistant",
+    message: {
+      model: "claude-opus-5-5",
+      content: [{ type: "tool_use", id: "toolu_3", name: "Bash", input }],
+      usage: {},
+    },
+    parent_tool_use_id: null,
+    session_id: session,
+  });
+  out({
+    type: "control_request",
+    request_id: "req-1",
+    request: {
+      subtype: "can_use_tool",
+      tool_name: "Bash",
+      input,
+      description: input.command,
+      decision_reason: "This command requires approval",
+      tool_use_id: "toolu_3",
+    },
+  });
+  const answer = await nextMessage();
+  const allowed = answer.response.response.behavior === "allow";
+  if (process.env.FAKE_CLAUDE_ANSWER_FILE)
+    writeFileSync(process.env.FAKE_CLAUDE_ANSWER_FILE, JSON.stringify(answer));
+  out({
+    type: "user",
+    message: {
+      role: "user",
+      content: [
+        {
+          tool_use_id: "toolu_3",
+          type: "tool_result",
+          is_error: !allowed,
+          content: allowed ? "Xcode 26.0" : answer.response.response.message,
+        },
+      ],
+    },
+    parent_tool_use_id: null,
+    session_id: session,
+  });
+}
 // "rich" ends with a formatted answer, like a real explanation from Claude Code.
 const RICH = [
   "**stats-lib** is a tiny statistics library.",

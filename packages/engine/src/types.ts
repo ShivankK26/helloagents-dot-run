@@ -96,6 +96,8 @@ export interface ProjectActions {
    * helloagents when the default Node was too old for the project's tools.
    */
   nodeBin?: string | null;
+  /** Permission rules the user chose "Always allow" for, e.g. "Bash(xcodebuild:*)". */
+  alwaysAllow?: string[];
 }
 
 export interface ProjectRecord {

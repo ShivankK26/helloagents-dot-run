@@ -19,7 +19,12 @@ import {
 import { failureExcerpt } from "../trace/views";
 import type { TraceStore } from "../trace/store";
 import type { AgentEvent, AgentId, ProjectActions, ProjectRecord, RunSettings } from "../types";
-import { runClaudeCode } from "../workers/claude-code";
+import {
+  DEFAULT_CLAUDE_TOOLS,
+  runClaudeCode,
+  type PermissionDecision,
+  type PermissionRequest,
+} from "../workers/claude-code";
 import { isSlashTask } from "../workers/slash";
 import {
   declaredPackageManager,
@@ -42,6 +47,8 @@ export interface RunManagerOptions {
   onChange?: (runId: string) => void;
   /** Called once a run's work has fully stopped (agent, checks and retries). */
   onSettled?: (runId: string) => void;
+  /** An agent is waiting for the user's OK to do something. */
+  onApproval?: (runId: string, request: PermissionRequest) => void;
   /** Path to the claude CLI; tests use a fake. */
   claudePath?: string;
   /** Builds the model for the built-in harness. Throws if no API key is set. */
@@ -220,7 +227,51 @@ export class RunManager {
   }
 
   cancel(runId: string): void {
+    this.approvals.get(runId)?.resolve({ behavior: "deny", message: "Stopped by the user." });
+    this.approvals.delete(runId);
     this.active.get(runId)?.abort();
+  }
+
+  // ---- Approvals ----
+
+  private approvals = new Map<
+    string,
+    { request: PermissionRequest; resolve: (d: PermissionDecision) => void }
+  >();
+
+  /** What a run is waiting for the user to approve, if anything. */
+  pendingApproval(runId: string): PermissionRequest | undefined {
+    return this.approvals.get(runId)?.request;
+  }
+
+  /** Answers a run's approval: allow once, always (for this project), or deny. */
+  async answerApproval(
+    runId: string,
+    requestId: string,
+    answer: "allow" | "always" | "deny",
+  ): Promise<void> {
+    const pending = this.approvals.get(runId);
+    if (!pending || pending.request.id !== requestId) return;
+    this.approvals.delete(runId);
+    const rule = pending.request.rule;
+    if (answer === "always" && rule) {
+      const projectId = this.opts.store.getRun(runId)?.projectId;
+      const project = projectId ? this.opts.store.getProject(projectId) : undefined;
+      if (project) {
+        const actions = await this.projectActions(project);
+        const alwaysAllow = [...new Set([...(actions.alwaysAllow ?? []), rule])];
+        this.opts.store.setProjectActions(project.id, { ...actions, alwaysAllow });
+      }
+    }
+    pending.resolve(
+      answer === "deny"
+        ? {
+            behavior: "deny",
+            message: "The user said no. Don't try this again; continue without it.",
+          }
+        : { behavior: "allow", always: answer === "always" },
+    );
+    this.opts.onChange?.(runId);
   }
 
   /** Stops every agent and dev server, and waits for them to record where they stopped. */
@@ -511,6 +562,8 @@ export class RunManager {
           notify();
         }
         const status = await this.agentTurn(w.agent, {
+          runId,
+          alwaysAllow: w.actions?.alwaysAllow ?? [],
           task,
           workspace: w.workspace,
           settings: w.settings,
@@ -540,6 +593,8 @@ export class RunManager {
   private async agentTurn(
     agent: AgentId,
     t: {
+      runId: string;
+      alwaysAllow: string[];
       task: string;
       workspace: string;
       settings: RunSettings;
@@ -560,6 +615,15 @@ export class RunManager {
         workspace: t.workspace,
         signal: t.signal,
         onEvent: t.onEvent,
+        allowedTools: [...DEFAULT_CLAUDE_TOOLS, ...t.alwaysAllow],
+        // Anything else waits for the user's OK, like Claude Code's own prompt.
+        onPermission: (request) =>
+          new Promise<PermissionDecision>((resolve) => {
+            if (t.signal.aborted) return resolve({ behavior: "deny" });
+            this.approvals.set(t.runId, { request, resolve });
+            this.opts.onChange?.(t.runId);
+            this.opts.onApproval?.(t.runId, request);
+          }),
         ...(t.resumeSessionId && { resumeSessionId: t.resumeSessionId }),
         ...(t.settings.model && { model: t.settings.model }),
         ...(t.settings.effort && { effort: t.settings.effort }),

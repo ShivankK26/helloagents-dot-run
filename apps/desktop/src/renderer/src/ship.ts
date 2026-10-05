@@ -32,5 +32,5 @@ export function shortPath(p: string, root?: string): string {
   if (root && p.startsWith(`${root}/`)) return p.slice(root.length + 1);
   const attached = /\/helloagents\/attachments\/(?:[0-9a-f]{8}-)?(.+)$/.exec(p);
   if (attached?.[1]) return `${attached[1]} (attached)`;
-  return p;
+  return p.replace(/^\/Users\/[^/]+/, "~");
 }
