@@ -143,6 +143,12 @@ export interface HelloagentsApi {
   resumeRun(runId: string): Promise<void>;
   runChecks(runId: string): Promise<void>;
   ship(runId: string, kind: ShipKind): Promise<ShipResult>;
+  /** Where the run's project pushes to (null if not on GitHub yet) and a suggested repo. */
+  remoteInfo(runId: string): Promise<{ url: string | null; suggestion: string }>;
+  /** Connects the project to a GitHub repo, creating it (private) if it doesn't exist. */
+  connectRemote(runId: string, repo: string): Promise<ShipResult>;
+  /** An image the agent looked at, as a data URL (for screenshots in the feed). */
+  readImage(path: string): Promise<string | null>;
   /** Starts the dev server on the run's branch and opens it in the browser. */
   startDev(runId: string): Promise<string>;
   stopDev(runId: string): Promise<void>;
@@ -192,6 +198,9 @@ export const IPC = {
   resumeRun: "runs:resume",
   runChecks: "runs:checks",
   ship: "runs:ship",
+  remoteInfo: "runs:remote-info",
+  connectRemote: "runs:connect-remote",
+  readImage: "files:read-image",
   startDev: "runs:dev-start",
   stopDev: "runs:dev-stop",
   listOpeners: "openers:list",

@@ -1,4 +1,5 @@
 import type { ChildProcess } from "node:child_process";
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import path from "node:path";
@@ -6,15 +7,18 @@ import { runAgent } from "../harness/agent";
 import type { ModelClient } from "../harness/model";
 import {
   commitAll,
+  connectGitHub,
   createWorktree,
   currentBranch,
   headCommit,
   listBranches,
   mergeInto,
+  originUrl,
+  parseGitHubRepo,
   pushBranch,
   removeWorktree,
-  worktreeDiff,
   type Worktree,
+  worktreeDiff,
 } from "../git/worktree";
 import { failureExcerpt } from "../trace/views";
 import type { TraceStore } from "../trace/store";
@@ -383,6 +387,59 @@ export class RunManager {
     }
   }
 
+  /** Where a run's project pushes to, and a guess at where it should if it has no remote yet. */
+  async remoteInfo(runId: string): Promise<{ url: string | null; suggestion: string }> {
+    const { project } = this.shippable(runId);
+    const url = await originUrl(project.path);
+    if (url) return { url, suggestion: parseGitHubRepo(url) ?? url };
+    // A repo the user or agent mentioned ("github.com/me/app"), else their account + the folder name.
+    const texts = this.opts.store
+      .events(runId)
+      .flatMap(({ event: e }) =>
+        e.type === "agent.start" ? [e.task] : e.type === "model.response" ? [e.text] : [],
+      );
+    for (const t of texts.reverse()) {
+      const m = /github\.com\/([\w.-]+\/[\w.-]+?)(?:\.git)?\b/.exec(t);
+      if (m?.[1]) return { url: null, suggestion: m[1] };
+    }
+    const login = await new Promise<string>((resolve) =>
+      execFile("gh", ["api", "user", "--jq", ".login"], (err, out) =>
+        resolve(err ? "" : out.trim()),
+      ),
+    );
+    const slug = path
+      .basename(project.path)
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, "-");
+    return { url: null, suggestion: login ? `${login}/${slug}` : slug };
+  }
+
+  /** Puts the run's project on GitHub (an existing repo, or a new private one). */
+  async connectRemote(runId: string, target: string): Promise<ShipResult> {
+    const { run, project } = this.shippable(runId);
+    const base = run.settings.baseBranch ?? (await currentBranch(project.path)) ?? "main";
+    const r = await connectGitHub(project.path, target, base);
+    const message = r.created
+      ? `Created ${r.url.replace("https://", "")} (private) and connected it`
+      : `Connected to ${r.url.replace("https://", "")}`;
+    this.opts.store.record(runId, "main", {
+      type: "tool.result",
+      at: Date.now(),
+      turn: 0,
+      id: randomUUID(),
+      name: "ship",
+      input: { kind: "connect", url: r.url },
+      ok: true,
+      output: message,
+      durationMs: 0,
+    });
+    this.opts.onChange?.(runId);
+    return {
+      message,
+      url: r.url,
+    };
+  }
+
   async commit(runId: string): Promise<ShipResult> {
     const { run } = this.shippable(runId);
     const sha = await commitAll(run.worktree.path, commitMessage(run.title));
@@ -393,6 +450,8 @@ export class RunManager {
 
   async push(runId: string): Promise<ShipResult> {
     const { run } = this.shippable(runId);
+    if (!(await originUrl(run.worktree.path)))
+      throw new Error("This project isn't on GitHub yet. Connect it first.");
     await commitAll(run.worktree.path, commitMessage(run.title));
     await pushBranch(run.worktree.path, run.worktree.branch);
     return { message: `Pushed ${run.worktree.branch}` };

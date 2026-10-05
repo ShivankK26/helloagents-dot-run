@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   AnthropicModel,
@@ -323,6 +323,29 @@ app.whenReady().then(async () => {
   ipcMain.handle(IPC.resumeRun, (_e, runId: string) => manager.resume(runId));
   ipcMain.handle(IPC.runChecks, (_e, runId: string) => manager.runChecks(runId));
   ipcMain.handle(IPC.ship, (_e, runId: string, kind: ShipKind) => manager.ship(runId, kind));
+  ipcMain.handle(IPC.remoteInfo, (_e, runId: string) => manager.remoteInfo(runId));
+  ipcMain.handle(IPC.connectRemote, (_e, runId: string, repo: string) =>
+    manager.connectRemote(runId, repo),
+  );
+  // Only images, and only reasonably sized ones: this is for screenshots the agent took.
+  const IMAGE_TYPES: Record<string, string> = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+  };
+  ipcMain.handle(IPC.readImage, async (_e, file: string) => {
+    const type = IMAGE_TYPES[path.extname(file).toLowerCase()];
+    if (!type || !path.isAbsolute(file)) return null;
+    try {
+      const info = await stat(file);
+      if (!info.isFile() || info.size > 15 * 1024 * 1024) return null;
+      return `data:${type};base64,${(await readFile(file)).toString("base64")}`;
+    } catch {
+      return null;
+    }
+  });
   ipcMain.handle(IPC.startDev, async (_e, runId: string) => {
     const url = await manager.startDev(runId);
     win?.webContents.send(IPC.runChanged, runId);

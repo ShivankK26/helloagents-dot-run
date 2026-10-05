@@ -93,11 +93,21 @@ export function RunScreen({
       feed.scrollTop = feed.scrollHeight;
   }, [events, tab, run?.active, run?.approval?.id]);
 
+  // A push or PR on a project that isn't on GitHub yet first asks which repo.
+  const [connect, setConnect] = useState<{ kind: ShipKind; suggestion: string }>();
+
   /** Commit, push, PR or merge, done by helloagents (the agent can't push). */
   const ship = useCallback(
     async (kind: ShipKind) => {
       setShipping(kind);
       try {
+        if (kind === "push" || kind === "pr") {
+          const remote = await api.remoteInfo(runId);
+          if (!remote.url) {
+            setConnect({ kind, suggestion: remote.suggestion });
+            return;
+          }
+        }
         const r = await api.ship(runId, kind);
         showToast(r.message, { tone: "ok", ...(r.url && { url: r.url }) });
       } catch (e) {
@@ -152,6 +162,8 @@ export function RunScreen({
           ) : null}
         </span>
         <RunActions
+          onShip={(k) => void ship(k)}
+          shipping={shipping}
           run={run}
           project={project}
           openers={openers}
@@ -227,6 +239,21 @@ export function RunScreen({
                     hideAnswer={run.active || turns > 1 ? "" : d.answer}
                     root={worktree?.path}
                     {...(run.approval && { approval: run.approval })}
+                    {...(connect && {
+                      children: (
+                        <ConnectCard
+                          suggestion={connect.suggestion}
+                          kind={connect.kind}
+                          onCancel={() => setConnect(undefined)}
+                          onConnect={async (repo) => {
+                            await api.connectRemote(runId, repo);
+                            const kind = connect.kind;
+                            setConnect(undefined);
+                            await ship(kind);
+                          }}
+                        />
+                      ),
+                    })}
                     onAnswer={(a) =>
                       run.approval &&
                       void api
@@ -626,6 +653,8 @@ function RunActions({
   confirmDiscard,
   setConfirmDiscard,
   onDiscard,
+  onShip,
+  shipping,
 }: {
   run: RunListItem;
   project: ProjectRecord;
@@ -633,6 +662,8 @@ function RunActions({
   confirmDiscard: boolean;
   setConfirmDiscard: (v: boolean) => void;
   onDiscard: () => void;
+  onShip: (kind: ShipKind) => void;
+  shipping?: ShipKind;
 }) {
   const api = window.helloagents;
   const [busy, setBusy] = useState<string>();
@@ -652,15 +683,7 @@ function RunActions({
       setBusy(undefined);
     }
   };
-  const ship = (kind: ShipKind) =>
-    void act(
-      kind,
-      () => api.ship(run.id, kind),
-      (r) => {
-        const res = r as { message: string; url?: string };
-        showToast(res.message, { tone: "ok", ...(res.url && { url: res.url }) });
-      },
-    );
+  const ship = onShip;
 
   if (run.active) {
     return (
@@ -767,12 +790,7 @@ function RunActions({
         width={320}
         trigger={
           <>
-            {busy && ["commit", "push", "pr", "merge"].includes(busy) ? (
-              <span className="spinner" />
-            ) : (
-              <Icon name="ship" size={13} />
-            )}{" "}
-            Ship{" "}
+            {shipping ? <span className="spinner" /> : <Icon name="ship" size={13} />} Ship{" "}
             <span className="caret">
               <Icon name="chevronDown" size={14} />
             </span>
@@ -850,5 +868,64 @@ function RunActions({
         ]}
       />
     </div>
+  );
+}
+
+/** The project isn't on GitHub yet: which repo should it go to? */
+function ConnectCard({
+  suggestion,
+  kind,
+  onConnect,
+  onCancel,
+}: {
+  suggestion: string;
+  kind: ShipKind;
+  onConnect: (repo: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [repo, setRepo] = useState(suggestion);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  return (
+    <section className="connect-card" aria-label="Put this project on GitHub">
+      <div className="approval-head">
+        <Icon name="git" size={13} />
+        <b>Put this project on GitHub</b>
+      </div>
+      <p>
+        It isn't connected to a GitHub repo yet. helloagents uses the repo if it exists, or creates
+        it as private, then {kind === "pr" ? "pushes and opens the pull request" : "pushes"}.
+      </p>
+      <form
+        className="connect-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!repo.trim() || busy) return;
+          setBusy(true);
+          setError(undefined);
+          void onConnect(repo.trim())
+            .catch((err: unknown) => setError(errorText(err)))
+            .finally(() => setBusy(false));
+        }}
+      >
+        <label className="repo-input">
+          github.com/
+          <input
+            value={repo}
+            onChange={(e) => setRepo(e.target.value)}
+            aria-label="GitHub repo (owner/name)"
+            spellCheck={false}
+          />
+        </label>
+        <button className="btn btn-primary btn-sm" type="submit" disabled={busy || !repo.trim()}>
+          {busy ? <span className="spinner" /> : null}
+          {kind === "pr" ? "Connect and open PR" : "Connect and push"}
+        </button>
+        <button className="btn btn-sm" type="button" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+      </form>
+      {error ? <p className="error-text">{error}</p> : null}
+    </section>
   );
 }

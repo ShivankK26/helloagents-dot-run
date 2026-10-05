@@ -872,6 +872,9 @@ export const demoApi: HelloagentsApi = {
     delete r.approval;
     stop(r);
   },
+  remoteInfo: async () => ({ url: "https://github.com/acme/demo.git", suggestion: "acme/demo" }),
+  connectRemote: async () => ({ message: "Connected (demo)" }),
+  readImage: async () => null,
   answerApproval: async (id, _requestId, answer) => {
     const r = need(id);
     const asked = r.approval;
@@ -891,7 +894,7 @@ export const demoApi: HelloagentsApi = {
       output: ok ? "Preview: https://acme-pricing-3k2.vercel.app (demo)" : "The user said no.",
       durationMs: 2400,
     });
-    const answer = ok
+    const reply = ok
       ? "Deployed a preview of the pricing page: https://acme-pricing-3k2.vercel.app (demo)."
       : "I didn't deploy, since you said no. The build is ready whenever you want to.";
     push(r, {
@@ -901,7 +904,7 @@ export const demoApi: HelloagentsApi = {
       durationMs: 500,
       model: "claude-opus-5-5",
       stopReason: "end_turn",
-      text: answer,
+      text: reply,
       toolCalls: [],
       usage: { inputTokens: 2, outputTokens: 30, cacheReadTokens: 0, cacheWriteTokens: 0 },
       costUsd: 0,

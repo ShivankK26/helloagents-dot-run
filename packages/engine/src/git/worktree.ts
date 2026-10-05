@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 /** Runs git and returns stdout. Throws with git's own message on failure. */
@@ -131,7 +131,77 @@ export async function createWorktree(
   const dir = path.join(root, `${path.basename(repo)}-${slug}`);
   await mkdir(root, { recursive: true });
   await git(repo, ["worktree", "add", "-b", branch, dir, base]);
+  await excludeLocally(repo, ".helloagents/");
   return { path: dir, branch, base };
+}
+
+/** Keeps a path out of git for this clone only (.git/info/exclude), e.g. agent screenshots. */
+async function excludeLocally(repo: string, pattern: string): Promise<void> {
+  const common = (await git(repo, ["rev-parse", "--git-common-dir"])).trim();
+  const file = path.resolve(repo, common, "info", "exclude");
+  const current = await readFile(file, "utf8").catch(() => "");
+  if (current.split("\n").includes(pattern)) return;
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, `${current}${current && !current.endsWith("\n") ? "\n" : ""}${pattern}\n`);
+}
+
+/** The repo's "origin" URL, or null if it has none. */
+export async function originUrl(dir: string): Promise<string | null> {
+  return git(dir, ["remote", "get-url", "origin"]).then(
+    (u) => u.trim() || null,
+    () => null,
+  );
+}
+
+/**
+ * Connects a repo to GitHub as "origin": uses the GitHub repo if it exists,
+ * otherwise creates it (private) with the GitHub CLI. If the GitHub repo is
+ * empty, pushes the base branch first so pull requests have something to target.
+ */
+export async function connectGitHub(
+  repo: string,
+  target: string,
+  baseBranch: string,
+): Promise<{ url: string; created: boolean }> {
+  const name = parseGitHubRepo(target);
+  if (!name) throw new Error(`"${target}" isn't a GitHub repo. Use owner/name or its URL.`);
+  const gh = (args: string[]) =>
+    new Promise<string>((resolve, reject) =>
+      execFile("gh", args, { cwd: repo }, (error, stdout, stderr) =>
+        error
+          ? reject(
+              new Error(
+                (error as NodeJS.ErrnoException).code === "ENOENT"
+                  ? "The GitHub CLI (gh) isn't installed. Install it with `brew install gh` and run `gh auth login`."
+                  : stderr.trim() || error.message,
+              ),
+            )
+          : resolve(stdout),
+      ),
+    );
+  let created = false;
+  let empty = true;
+  try {
+    empty = (
+      JSON.parse(await gh(["repo", "view", name, "--json", "isEmpty"])) as { isEmpty: boolean }
+    ).isEmpty;
+  } catch (e) {
+    if ((e as Error).message.includes("gh) isn't installed")) throw e;
+    await gh(["repo", "create", name, "--private"]);
+    created = true;
+  }
+  const url = `https://github.com/${name}.git`;
+  if (await originUrl(repo)) await git(repo, ["remote", "set-url", "origin", url]);
+  else await git(repo, ["remote", "add", "origin", url]);
+  if (empty) await git(repo, ["push", "--set-upstream", "origin", baseBranch]);
+  return { url: `https://github.com/${name}`, created };
+}
+
+/** "owner/name", from "owner/name", a github.com URL or an SSH address. */
+export function parseGitHubRepo(text: string): string | null {
+  const t = text.trim().replace(/\.git$/, "");
+  const m = /github\.com[/:]([\w.-]+)\/([\w.-]+)/.exec(t) ?? /^([\w.-]+)\/([\w.-]+)$/.exec(t);
+  return m ? `${m[1]}/${m[2]}` : null;
 }
 
 export async function removeWorktree(

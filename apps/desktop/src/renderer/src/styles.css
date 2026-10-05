@@ -3592,3 +3592,80 @@ small.ask {
   font-size: 12px;
   color: var(--faint);
 }
+
+/* Screenshots the agent looked at. */
+.agent-image {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.agent-shot {
+  align-self: flex-start;
+  margin: 2px 0 6px 28px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--sunk);
+  cursor: zoom-in;
+  max-width: min(320px, 100%);
+}
+.agent-shot.big {
+  max-width: 100%;
+  cursor: zoom-out;
+}
+.agent-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 520px;
+  object-fit: contain;
+}
+.agent-shot.big img {
+  max-height: none;
+}
+
+/* Putting a project on GitHub before the first push. */
+.connect-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+}
+.connect-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.connect-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.connect-row .repo-input {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--sunk);
+  font: 13px var(--mono);
+  color: var(--faint);
+}
+.connect-row input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+}

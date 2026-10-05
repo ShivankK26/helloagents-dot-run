@@ -139,10 +139,12 @@ export function claudeArgs(
       "--disable-slash-commands",
       "--tools",
       LEAN_CLAUDE_TOOLS.join(","),
-      "--append-system-prompt",
-      SHIPPING_NOTE,
     );
   }
+  args.push(
+    "--append-system-prompt",
+    opts.ask ? `${HELLOAGENTS_NOTE} ${ASKING_NOTE}` : HELLOAGENTS_NOTE,
+  );
   if (opts.addDirs?.length) args.push("--add-dir", ...opts.addDirs);
   if (opts.model) args.push("--model", opts.model);
   if (opts.effort) args.push("--effort", opts.effort);
@@ -155,11 +157,22 @@ export function claudeArgs(
  * helloagents commits, pushes and opens pull requests itself (its Ship menu),
  * so the agent shouldn't try: in "edits" access those commands are blocked anyway.
  */
-export const SHIPPING_NOTE =
+export const HELLOAGENTS_NOTE =
   "You are running inside helloagents, on a branch of your own. Don't run git commit, git push, " +
-  "or gh pr commands: helloagents does that itself. If the user asks you to commit, push, or open " +
-  'a pull request, don\'t try; tell them to use the Ship button (or type "push" / "open a PR" ' +
-  "in the follow-up box). Leave your changes uncommitted.";
+  "git remote, or gh pr commands: helloagents does that itself (including connecting the repo to " +
+  'GitHub). If the user asks you to commit or push, don\'t try; tell them to type "push" or use ' +
+  "the Ship button. Leave your changes uncommitted. " +
+  "To show the user what something looks like (an app in the iOS Simulator, a web page), take a " +
+  "screenshot into .helloagents/screenshots/ (for example `xcrun simctl io booted screenshot " +
+  ".helloagents/screenshots/home.png`) and open it with the Read tool: helloagents shows images " +
+  "you read to the user.";
+
+/** Added when helloagents answers permission prompts. */
+export const ASKING_NOTE =
+  "When a command needs permission, just run it: helloagents asks the user, who can allow it. " +
+  "If earlier in this conversation a command was denied automatically because nobody could " +
+  "approve it, that no longer applies: you may try it again. You can build and run apps " +
+  "(xcodebuild, xcrun simctl, dev servers) this way.";
 
 /** What Claude Code prints when it doesn't know a flag (e.g. an older version). */
 const REJECTED_FLAG = /unknown option|unknown argument|invalid option|error: option/i;

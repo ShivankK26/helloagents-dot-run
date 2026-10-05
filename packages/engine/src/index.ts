@@ -49,7 +49,10 @@ export { detectAgents } from "./workers/detect";
 export {
   cloneRepo,
   createWorktree,
+  connectGitHub,
   findChildRepos,
+  originUrl,
+  parseGitHubRepo,
   setUpRepo,
   git,
   isGitRepo,

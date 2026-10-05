@@ -7,6 +7,7 @@ import {
   findChildRepos,
   git,
   isGitRepo,
+  parseGitHubRepo,
   removeWorktree,
   setUpRepo,
   worktreeDiff,
@@ -89,5 +90,23 @@ describe("setUpRepo", () => {
     expect(tracked).toEqual([".gitignore", "App/main.swift"]);
     // Running it again on a set-up repo changes nothing.
     expect(await setUpRepo(dir)).toBe(sha);
+  });
+});
+
+describe("GitHub", () => {
+  test("reads owner/name from what people paste", () => {
+    expect(parseGitHubRepo("ShivankK26/clearstock-ios-app")).toBe("ShivankK26/clearstock-ios-app");
+    expect(parseGitHubRepo("https://github.com/acme/web.git")).toBe("acme/web");
+    expect(parseGitHubRepo("git@github.com:acme/web.git")).toBe("acme/web");
+    expect(parseGitHubRepo("not a repo")).toBeNull();
+  });
+
+  test("agent screenshots in .helloagents/ stay out of git", async () => {
+    const dir = await workspace({ "a.txt": "a" });
+    await setUpRepo(dir);
+    const wt = await createWorktree(dir, await tempDir(), "shots");
+    await mkdir(path.join(wt.path, ".helloagents/screenshots"), { recursive: true });
+    await writeFile(path.join(wt.path, ".helloagents/screenshots/home.png"), "png");
+    expect((await git(wt.path, ["status", "--porcelain"])).trim()).toBe("");
   });
 });

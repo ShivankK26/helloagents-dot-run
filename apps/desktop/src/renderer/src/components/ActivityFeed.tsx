@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   describeToolCall,
   isCommandTool,
@@ -21,6 +21,7 @@ type Item =
   | { kind: "tool"; key: number; event: ToolResult }
   | { kind: "pending"; key: number; label: string }
   | { kind: "note"; key: number; text: string }
+  | { kind: "image"; key: number; path: string }
   | {
       kind: "end";
       key: number;
@@ -48,6 +49,7 @@ export function editStats(input: unknown): { add: number; del: number } {
   return { add: lines(added), del: lines(removed) };
 }
 
+const IMAGE = /\.(?:png|jpe?g|gif|webp)$/i;
 const TEST = /\b(test|tests|jest|vitest|pytest|mocha|playwright|rspec)\b|go test|cargo test/i;
 const tail = (text: string, n = 30) => text.trimEnd().split("\n").slice(-n).join("\n");
 
@@ -97,7 +99,12 @@ function build(events: StoredEvent[], active: boolean, hideAnswer: string, root?
     if (e.type === "model.response" && e.text.trim()) {
       items.push({ kind: "say", key: seq, text: e.text });
     } else if (e.type === "tool.result") {
-      if (toolKind(e.name) === "read") {
+      const readPath = toolKind(e.name) === "read" ? toolPath(e.input) : undefined;
+      if (readPath && IMAGE.test(readPath) && e.ok) {
+        // Screenshots the agent looked at are shown, not just listed.
+        const full = readPath.startsWith("/") || !root ? readPath : `${root}/${readPath}`;
+        items.push({ kind: "image", key: seq, path: full });
+      } else if (toolKind(e.name) === "read") {
         const last = items.at(-1);
         const file = shortPath(toolPath(e.input) ?? describeToolCall(e.name, e.input), root);
         if (last?.kind === "reads") {
@@ -228,6 +235,7 @@ export function ActivityFeed({
   onShip,
   approval,
   onAnswer,
+  children,
 }: {
   events: StoredEvent[];
   active: boolean;
@@ -242,6 +250,8 @@ export function ActivityFeed({
   /** What the agent is waiting for the user to allow. */
   approval?: ApprovalRequest;
   onAnswer?: (answer: ApprovalAnswer) => void;
+  /** Shown after everything else, e.g. "connect to GitHub". */
+  children?: ReactNode;
 }) {
   const items = build(events, active && !approval, hideAnswer, root);
   // Ship buttons go on the last "Done", minus what was already shipped after it.
@@ -266,7 +276,8 @@ export function ActivityFeed({
   // Consecutive steps share one indented track; messages sit between them.
   const blocks: Array<{ key: number; steps?: Item[]; item?: Item }> = [];
   for (const it of items) {
-    const isStep = it.kind === "reads" || it.kind === "tool" || it.kind === "pending";
+    const isStep =
+      it.kind === "reads" || it.kind === "tool" || it.kind === "pending" || it.kind === "image";
     const last = blocks.at(-1);
     if (isStep && last?.steps) last.steps.push(it);
     else if (isStep) blocks.push({ key: it.key, steps: [it] });
@@ -309,6 +320,8 @@ export function ActivityFeed({
                   </details>
                 );
               }
+              if (it.kind === "image")
+                return <AgentImage key={it.key} path={it.path} root={root} />;
               if (it.kind === "pending") {
                 return (
                   <div key={it.key} className="step now">
@@ -344,6 +357,7 @@ export function ActivityFeed({
         ) : null,
       )}
       {approval ? <ApprovalCard key={approval.id} request={approval} onAnswer={onAnswer} /> : null}
+      {children}
     </div>
   );
 }
@@ -511,5 +525,40 @@ function Shipped({ e }: { e: ToolResult }) {
       </span>
       <span className="r">{e.ok ? "by helloagents" : "failed"}</span>
     </div>
+  );
+}
+
+/** An image the agent looked at, like a simulator screenshot. Click to see it full size. */
+function AgentImage({ path, root }: { path: string; root?: string }) {
+  const [src, setSrc] = useState<string | null>();
+  const [big, setBig] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void window.helloagents.readImage(path).then((d) => live && setSrc(d));
+    return () => {
+      live = false;
+    };
+  }, [path]);
+  return (
+    <figure className="agent-image">
+      <figcaption className="step ok">
+        <span className="k">
+          <Icon name="image" size={12} />
+        </span>
+        <span>
+          Looked at <code>{shortPath(path, root)}</code>
+        </span>
+        <span className="r" />
+      </figcaption>
+      {src ? (
+        <button
+          type="button"
+          className={`agent-shot ${big ? "big" : ""}`}
+          onClick={() => setBig(!big)}
+        >
+          <img src={src} alt={shortPath(path, root)} />
+        </button>
+      ) : null}
+    </figure>
   );
 }
