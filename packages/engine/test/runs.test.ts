@@ -191,6 +191,16 @@ describe("RunManager", () => {
     expect(store.getRun(runId)?.summary).toBe("The download finished.");
   });
 
+  test("a leftover 'done' at the start of a resumed session doesn't end the turn", async () => {
+    process.env.FAKE_CLAUDE_MODE = "early";
+    const { store, manager, project } = await setup();
+    const runId = await manager.start(project.id, "Fix add()");
+    await manager.settled(runId);
+    const ends = store.events(runId).filter((e) => e.event.type === "agent.end");
+    expect(ends).toHaveLength(1);
+    expect(store.getRun(runId)?.summary).toBe("Fixed add() and the tests pass.");
+  });
+
   test("can be cancelled mid-run", async () => {
     process.env.FAKE_CLAUDE_MODE = "slow";
     const { store, manager, project } = await setup();

@@ -257,6 +257,8 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
     const ask = streamed && opts.access !== "full";
     const background = new Map<string, string>();
     let started = false;
+    // Prompts waiting for the user: stdin must stay open until they're answered.
+    let asking = 0;
     const child = spawn(opts.claudePath ?? "claude", claudeArgs({ ...opts, ask, streamed }), {
       cwd: opts.workspace,
       stdio: ["pipe", "pipe", "pipe"],
@@ -397,8 +399,12 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
           typeof msg.result === "string" && msg.result.trim()
             ? msg.result.trim()
             : lastText || "Claude Code finished without a summary.";
+        // A resumed session can report a leftover "done" before it has looked at the new
+        // message; that's not the end of this turn.
+        if (ok && streamed && turns === 0) return;
         // Something still running in the background: Claude Code continues when it ends.
         if (ok && background.size && streamed) return;
+        if (asking > 0) return;
         child.stdin.end();
         const cost = typeof msg.total_cost_usd === "number" ? msg.total_cost_usd : 0;
         result = ok
@@ -427,6 +433,7 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
         ? (req.permission_suggestions as Array<Record<string, unknown>>)
         : [];
       const rule = suggestedRule(String(req.tool_name), req.input, suggestions);
+      asking++;
       // For a command, show the command itself; Claude's own description says what it's for.
       const command =
         req.tool_name === "Bash"
@@ -444,7 +451,8 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
             : typeof req.decision_reason === "string" && { reason: req.decision_reason }),
           ...(rule && { rule }),
         })
-        .catch((): PermissionDecision => ({ behavior: "deny", message: "No answer." }));
+        .catch((): PermissionDecision => ({ behavior: "deny", message: "No answer." }))
+        .finally(() => asking--);
       send({
         type: "control_response",
         response: {

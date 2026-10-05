@@ -47,6 +47,16 @@ out({
   plugins: [],
 });
 out({ type: "system", subtype: "commands_changed", commands: [] });
+// "early" plays a resumed session that reports a leftover, empty "done" first.
+if (mode === "early")
+  out({
+    type: "result",
+    subtype: "success",
+    is_error: false,
+    result: "",
+    session_id: session,
+    num_turns: 0,
+  });
 if (mode === "slow") await new Promise((r) => setTimeout(r, 20000));
 out({
   type: "assistant",
