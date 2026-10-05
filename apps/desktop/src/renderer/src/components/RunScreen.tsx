@@ -627,14 +627,16 @@ function Dock({
               <Icon name={intent === "pr" ? "pr" : "ship"} size={12} />{" "}
               <span title={branch}>
                 {intent === "pr"
-                  ? "Sending opens a pull request"
+                  ? "Send will open a pull request on GitHub"
                   : intent === "push"
-                    ? "Sending pushes this branch to GitHub"
-                    : `Sending does this: ${SHIP_LABEL[intent]}`}
+                    ? "Send will push your code to GitHub"
+                    : intent === "commit"
+                      ? "Send will commit your changes"
+                      : `Send will ${SHIP_LABEL[intent].toLowerCase()}`}
               </span>{" "}
-              (helloagents does it; Claude can't push) ·{" "}
+              ·{" "}
               <button type="button" className="link-btn" onClick={() => setToAgent(true)}>
-                Ask Claude instead
+                Send it to Claude instead
               </button>
             </>
           ) : (
