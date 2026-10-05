@@ -219,6 +219,23 @@ describe("RunManager", () => {
     expect(store.getRun(runId)?.summary).toBe("Fixed add() and the tests pass.");
   });
 
+  test("a message sent while it works reaches the running agent", async () => {
+    process.env.FAKE_CLAUDE_MODE = "chat";
+    const { store, manager, project } = await setup();
+    const runId = await manager.start(project.id, "Fix add()");
+    for (
+      let i = 0;
+      i < 100 && !store.events(runId).some((e) => e.event.type === "agent.start");
+      i++
+    )
+      await new Promise((r) => setTimeout(r, 20));
+    await manager.followUp(runId, "also add a comment");
+    await manager.settled(runId);
+    const said = store.events(runId).find((e) => e.event.type === "user.message")?.event;
+    expect(said?.type === "user.message" && said.text).toBe("also add a comment");
+    expect(store.events(runId).filter((e) => e.event.type === "agent.start")).toHaveLength(1);
+  });
+
   test("can be cancelled mid-run", async () => {
     process.env.FAKE_CLAUDE_MODE = "slow";
     const { store, manager, project } = await setup();

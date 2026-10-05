@@ -838,7 +838,16 @@ export const demoApi: HelloagentsApi = {
   openIn: () => fail(),
   projectMenu: async () => "remove",
   setTheme: async () => undefined,
-  followUp: async (id, message, images) => continueLive(need(id), message, images),
+  followUp: async (id, message, images) => {
+    const r = need(id);
+    // While it works, the message joins what it's doing, like the real app.
+    if (r.active) {
+      push(r, { type: "user.message", at: Date.now(), text: message });
+      notify(id);
+      return;
+    }
+    continueLive(r, message, images);
+  },
   listSlashCommands: async () =>
     later(
       [

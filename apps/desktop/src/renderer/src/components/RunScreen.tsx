@@ -10,7 +10,7 @@ import type {
 import { agentName } from "../agents";
 import { compact, ms, tokenParts } from "../format";
 import { outcomeOf, STAGES } from "../outcome";
-import { shipIntent, shortPath, whereIsCode } from "../ship";
+import { shipIntent, whereIsCode } from "../ship";
 import { elapsed } from "../time";
 import { ActivityFeed } from "./ActivityFeed";
 import { ChangesView } from "./ChangesView";
@@ -139,7 +139,8 @@ export function RunScreen({
   const d = run.digest;
   const took = elapsed(run.startedAt, run.endedAt ?? now);
   const worktree = run.worktree;
-  const canFollowUp = Boolean(worktree) && !run.active;
+  // You can type while it works; the agent reads it right away.
+  const canFollowUp = Boolean(worktree);
   const inPlace = run.settings.workspace === "checkout";
   const turns = events.filter((e) => e.event.type === "agent.start").length;
   const base = run.settings.baseBranch ?? "main";
@@ -308,11 +309,17 @@ export function RunScreen({
                 <div ref={feedEnd} />
               </div>
             </div>
-            <SidePanel run={run} events={events} took={took} onTrace={() => setTab("trace")} />
           </div>
         ) : null}
         {tab === "changes" ? (
-          <ChangesView diff={diff} loading={!diffLoaded} {...(diffError && { error: diffError })} />
+          <ChangesView
+            diff={diff}
+            loading={!diffLoaded}
+            {...(diffError && { error: diffError })}
+            footer={
+              <RunFacts run={run} events={events} took={took} onTrace={() => setTab("trace")} />
+            }
+          />
         ) : null}
         {tab === "trace" ? (
           <div className="trace-tab">
@@ -452,7 +459,7 @@ function SummaryCard({
   );
 }
 
-function SidePanel({
+function RunFacts({
   run,
   events,
   took,
@@ -463,7 +470,6 @@ function SidePanel({
   took: string;
   onTrace: () => void;
 }) {
-  const d = run.digest;
   const tokens = tokenParts(run.usage);
   const start = events.find((e) => e.event.type === "agent.start")?.event;
   const model = start?.type === "agent.start" ? start.model : run.model;
@@ -482,57 +488,35 @@ function SidePanel({
   const total = spent || 1;
 
   return (
-    <aside className="side-panel">
-      {run.active ? (
-        <div className="now-card">
-          <small>Now</small>
-          <b>{outcomeOf(run).line}</b>
-          <span>{took} so far</span>
-        </div>
-      ) : (
-        <section>
-          <h2 className="label">This run</h2>
-          <dl className="run-facts">
-            <dt>Agent</dt>
-            <dd>{agentName(run.agent ?? "claude-code")}</dd>
-            <dt>Model</dt>
-            <dd title={model}>{model}</dd>
-            {run.worktree ? (
-              <>
-                <dt>Branch</dt>
-                <dd title={run.worktree.branch}>{run.worktree.branch}</dd>
-              </>
-            ) : null}
-            <dt>Started</dt>
-            <dd>
-              {new Date(run.startedAt).toLocaleTimeString([], {
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-            </dd>
-            <dt>Took</dt>
-            <dd>{took}</dd>
-            <dt>New tokens</dt>
-            <dd>{compact(tokens.fresh)}</dd>
-            <dt>Cached</dt>
-            <dd>{compact(tokens.cached)}</dd>
-          </dl>
-        </section>
-      )}
-
-      {d.filesChanged.length ? (
-        <section>
-          <h2 className="label">Files changed</h2>
-          <ul className="file-list">
-            {d.filesChanged.map((f) => (
-              <li key={f} title={f}>
-                <Icon name="file" size={13} />
-                <span>{shortPath(f, run.worktree?.path)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+    <div className="run-facts-panel">
+      <section>
+        <h2 className="label">This run</h2>
+        <dl className="run-facts">
+          <dt>Agent</dt>
+          <dd>{agentName(run.agent ?? "claude-code")}</dd>
+          <dt>Model</dt>
+          <dd title={model}>{model}</dd>
+          {run.worktree ? (
+            <>
+              <dt>Branch</dt>
+              <dd title={run.worktree.branch}>{run.worktree.branch}</dd>
+            </>
+          ) : null}
+          <dt>Started</dt>
+          <dd>
+            {new Date(run.startedAt).toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </dd>
+          <dt>Took</dt>
+          <dd>{took}</dd>
+          <dt>New tokens</dt>
+          <dd>{compact(tokens.fresh)}</dd>
+          <dt>Cached</dt>
+          <dd>{compact(tokens.cached)}</dd>
+        </dl>
+      </section>
 
       {spent > 0 ? (
         <section>
@@ -562,7 +546,7 @@ function SidePanel({
       <button className="btn" onClick={onTrace}>
         <Icon name="trace" size={13} /> Open trace
       </button>
-    </aside>
+    </div>
   );
 }
 
@@ -589,7 +573,7 @@ function Dock({
   const images = useAttachments(setError);
 
   // "push it", "open a PR": helloagents does that itself, since the agent can't.
-  const intent = enabled && !images.items.length ? shipIntent(text, inPlace) : null;
+  const intent = enabled && !active && !images.items.length ? shipIntent(text, inPlace) : null;
 
   async function send() {
     const message = text.trim();
@@ -634,7 +618,9 @@ function Dock({
           value={text}
           disabled={!enabled}
           placeholder={
-            active ? "You can follow up when it finishes…" : "Ask a follow-up, or ask for a change…"
+            active
+              ? "Add to what it's doing: it reads this right away…"
+              : "Ask a follow-up, or ask for a change…"
           }
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {

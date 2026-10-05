@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { parseDiff } from "./Diff";
 import { Icon } from "./Icons";
 
@@ -7,10 +7,13 @@ export function ChangesView({
   diff,
   loading,
   error,
+  footer,
 }: {
   diff: string;
   loading: boolean;
   error?: string;
+  /** Under the file list: the run's facts and where the time went. */
+  footer?: ReactNode;
 }) {
   const files = parseDiff(diff);
   const [picked, setPicked] = useState<string>();
@@ -56,6 +59,7 @@ export function ChangesView({
             </span>
           </button>
         ))}
+        {footer ? <div className="tree-footer">{footer}</div> : null}
       </nav>
       {current ? (
         <section className="dfile" aria-label={current.path}>

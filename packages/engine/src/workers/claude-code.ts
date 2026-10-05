@@ -27,7 +27,7 @@ export interface ClaudeCodeOptions {
   /** Extra folders Claude Code may read, e.g. where attached images are saved. */
   addDirs?: readonly string[];
   /** Gets a way to change the mode of the running session (e.g. to auto). */
-  onControl?: (control: { setAccess: (access: Access) => void }) => void;
+  onControl?: (control: AgentControl) => void;
   /**
    * Asked when Claude Code wants to do something that isn't pre-approved, like
    * Claude Code's own permission prompt. Without it, such actions are denied.
@@ -55,6 +55,13 @@ export interface PermissionRequest {
 
 export type PermissionDecision =
   { behavior: "allow"; always?: boolean } | { behavior: "deny"; message?: string };
+
+/** Talking to a running Claude Code session. */
+export interface AgentControl {
+  setAccess: (access: Access) => void;
+  /** Adds a message to what the agent is doing. False if the session has ended. */
+  say: (text: string) => boolean;
+}
 
 export interface ClaudeCodeResult extends AgentResult {
   sessionId?: string;
@@ -124,7 +131,8 @@ export function claudeArgs(
     PERMISSION_MODES[opts.access ?? "auto"],
     "--allowedTools",
     (opts.allowedTools ?? DEFAULT_CLAUDE_TOOLS).join(","),
-    ...(opts.streamed ? ["--input-format", "stream-json"] : []),
+    // Replays say when the agent has read a message sent mid-task.
+    ...(opts.streamed ? ["--input-format", "stream-json", "--replay-user-messages"] : []),
     ...(opts.ask
       ? // Anything else is asked of helloagents over stdin/stdout, which asks the user.
         ["--permission-prompts", "host", "--permission-prompt-tool", "stdio"]
@@ -214,6 +222,7 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
   const now = opts.now ?? Date.now;
   const emit = opts.onEvent ?? (() => {});
   const pending = new Map<string, ToolCall>();
+  const asked = new Map<string, number>();
   let usage: TokenUsage = EMPTY_USAGE;
   let turns = 0;
   let lastAt = now();
@@ -273,8 +282,16 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
     // Unanswered prompts would keep the process alive; stdin errors after exit are harmless.
     child.stdin.on("error", () => undefined);
     if (streamed) send({ type: "user", message: { role: "user", content: opts.task } });
+    // Messages sent mid-task, not yet read by the agent.
+    const unread = new Set<string>();
     if (streamed)
       opts.onControl?.({
+        say: (text) => {
+          if (!child.stdin.writable || ended) return false;
+          unread.add(text);
+          send({ type: "user", message: { role: "user", content: text } });
+          return true;
+        },
         setAccess: (access) =>
           send({
             type: "control_request",
@@ -357,7 +374,10 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
         const toolCalls: ToolCall[] = (m.content ?? [])
           .filter((b) => b.type === "tool_use")
           .map((b) => ({ id: String(b.id), name: String(b.name), input: b.input }));
-        for (const call of toolCalls) pending.set(call.id, call);
+        for (const call of toolCalls) {
+          pending.set(call.id, call);
+          asked.set(call.id, at);
+        }
         const u = m.usage ?? {};
         const turnUsage: TokenUsage = {
           inputTokens: u.input_tokens ?? 0,
@@ -385,6 +405,12 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
       if (msg.type === "user") {
         if (msg.parent_tool_use_id) return;
         const content = (msg.message as { content?: unknown }).content;
+        // The agent read a message sent while it was working.
+        if (msg.isReplay) {
+          const text = typeof content === "string" ? content : "";
+          if (unread.delete(text)) emit({ type: "user.message", at, text });
+          return;
+        }
         if (!Array.isArray(content)) return;
         for (const block of content as Array<Record<string, unknown>>) {
           if (block.type !== "tool_result") continue;
@@ -400,7 +426,8 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
             input: call?.input ?? {},
             ok: block.is_error !== true,
             output: toolOutput(block.content),
-            durationMs: 0,
+            // From when the agent asked for the tool to when the result came back.
+            durationMs: asked.has(id) ? at - (asked.get(id) ?? at) : 0,
           });
         }
         lastAt = at;
@@ -418,6 +445,8 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
         // Something still running in the background: Claude Code continues when it ends.
         if (ok && background.size && streamed) return;
         if (asking > 0) return;
+        // A message sent just as the turn ended is read in a new turn: wait for it.
+        if (unread.size) return;
         child.stdin.end();
         const cost = typeof msg.total_cost_usd === "number" ? msg.total_cost_usd : 0;
         result = ok

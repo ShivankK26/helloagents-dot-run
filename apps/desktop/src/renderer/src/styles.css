@@ -3759,3 +3759,22 @@ button.pill.where {
   padding: 4px 2px;
   font-size: 14px;
 }
+
+/* Activity is one column; the run's facts live under the Changes file list. */
+.activity-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+.tree-footer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.run-facts-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 0 4px;
+}
+.run-facts-panel .btn {
+  align-self: flex-start;
+}

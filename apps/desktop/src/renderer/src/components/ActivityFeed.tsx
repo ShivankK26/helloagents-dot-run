@@ -97,6 +97,10 @@ function build(events: StoredEvent[], active: boolean, hideAnswer: string, root?
         };
     }
     if (e.type === "agent.start") continue;
+    if (e.type === "user.message") {
+      items.push({ kind: "you", key: seq, text: e.text });
+      continue;
+    }
     if (e.type === "model.response" && e.text.trim()) {
       items.push({ kind: "say", key: seq, text: e.text });
     } else if (e.type === "tool.result") {

@@ -36,6 +36,7 @@ import type {
 import {
   DEFAULT_CLAUDE_TOOLS,
   runClaudeCode,
+  type AgentControl,
   type PermissionDecision,
   type PermissionRequest,
 } from "../workers/claude-code";
@@ -192,8 +193,14 @@ export class RunManager {
     const { store } = this.opts;
     const run = store.getRun(runId);
     if (!run?.worktree) throw new Error("This run has no branch to continue on.");
-    if (this.active.has(runId))
-      throw new Error("This run is still working. Wait for it to finish.");
+    if (this.active.has(runId)) {
+      // Working: the agent reads it now, like typing into Claude Code mid-task. Between
+      // steps (e.g. while checks run), it's sent as a follow-up once the run finishes.
+      const text = withAttachments(message, attachments ?? []);
+      if (this.controls.get(runId)?.say(text)) return;
+      void this.settled(runId).then(() => this.followUp(runId, message, attachments));
+      return;
+    }
     const project = run.projectId ? store.getProject(run.projectId) : undefined;
     const actions = project ? await this.projectActions(project) : undefined;
     // A folder freed to save space comes back from the branch, installed again.
@@ -283,7 +290,7 @@ export class RunManager {
     return this.approvals.get(runId)?.request;
   }
 
-  private controls = new Map<string, { setAccess: (access: Access) => void }>();
+  private controls = new Map<string, AgentControl>();
 
   /** Changes how much a run may do without asking, now and for its next turns. */
   setRunAccess(runId: string, access: Access): void {

@@ -34,6 +34,12 @@ export interface ToolCall {
 /** Everything an agent does, in order. Traces, logs and the UI are built from these. */
 export type AgentEvent =
   | {
+      /** Something the user said while the agent was working; it reads it right away. */
+      type: "user.message";
+      at: number;
+      text: string;
+    }
+  | {
       /** Commands the agent left running in the background (e.g. a big download). */
       type: "agent.background";
       at: number;

@@ -1,6 +1,6 @@
 {
   "name": "@helloagents/desktop",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "private": true,
   "description": "helloagents desktop app",
   "main": "./out/main/index.js",

@@ -47,6 +47,11 @@ out({
   plugins: [],
 });
 out({ type: "system", subtype: "commands_changed", commands: [] });
+// "chat": the user says something while it works; Claude Code replays it once read.
+if (mode === "chat") {
+  const said = await nextMessage();
+  out({ type: "user", isReplay: true, message: { role: "user", content: said.message.content } });
+}
 // "early" plays a resumed session that reports a leftover, empty "done" first.
 if (mode === "early")
   out({
