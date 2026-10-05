@@ -3778,3 +3778,17 @@ button.pill.where {
 .run-facts-panel .btn {
   align-self: flex-start;
 }
+
+/* One centered column: the activity lines up with the chat box beneath it. */
+.feed {
+  padding: 28px 28px 36px;
+}
+.feed-inner {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  gap: 18px;
+}
+.feed-list {
+  gap: 16px;
+}
