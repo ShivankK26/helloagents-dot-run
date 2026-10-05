@@ -703,7 +703,9 @@
           class="eyebrow"
           href="https://github.com/ShivankK26/helloagents-dot-run/releases/latest"
           rel="noopener"
-          ><i></i> <b>New in 0.2</b> · checks, ship, many projects at once</a
+          id="latest"
+          ><i></i> <b>New in <span data-version>0.2.13</span></b>
+          <span data-headline>· approvals, push to GitHub, screenshots</span></a
         >
         <h1>Hand off the task. Merge the <em>result.</em></h1>
         <p class="lede">
@@ -917,6 +919,17 @@
           { rootMargin: "300px" },
         ).observe(frame);
       })();
+    </script>
+    <script>
+      // The release script keeps the badge current; this catches a release made without it.
+      fetch("https://api.github.com/repos/ShivankK26/helloagents-dot-run/releases/latest")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((release) => {
+          const version = release?.tag_name?.replace(/^v/, "");
+          const el = document.querySelector("#latest [data-version]");
+          if (version && el && el.textContent !== version) el.textContent = version;
+        })
+        .catch(() => {});
     </script>
   </body>
 </html>
