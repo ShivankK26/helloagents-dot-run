@@ -62,3 +62,7 @@ names are left out on purpose.
 
 - The ⌘K search should be movable and centered by default → draggable palette
   with a grip, centered on open, position kept for the session (v0.2.20).
+- A run should be able to start new sessions for a project, do a command typed
+  mid-task and then carry on, and commit locally. "Keep pushing to main" had been
+  silently ignored → `helloagents` command, mid-task note, git commit allowed,
+  sub-agents on (v0.2.21).

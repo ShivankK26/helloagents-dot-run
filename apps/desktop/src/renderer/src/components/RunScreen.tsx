@@ -30,12 +30,14 @@ export function RunScreen({
   initialTab = "activity",
   openers,
   onBack,
+  onOpenRun,
 }: {
   runId: string;
   project: ProjectRecord;
   initialTab?: RunTab;
   openers: Opener[];
   onBack: () => void;
+  onOpenRun: (runId: string) => void;
 }) {
   const api = window.helloagents;
   const [run, setRun] = useState<RunListItem | null>(null);
@@ -280,6 +282,7 @@ export function RunScreen({
                     root={worktree?.path}
                     {...(run.approval && { approval: run.approval })}
                     mode={run.settings.access ?? "auto"}
+                    onOpenRun={onOpenRun}
                     {...(connect && {
                       children: (
                         <ConnectCard

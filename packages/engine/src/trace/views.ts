@@ -69,6 +69,9 @@ export function describeToolCall(name: string, input: unknown): string {
     return `${name === "checks" ? "Checks" : "Setup"}: ${cmds.join(", ")}`;
   }
   if (name === "finish") return "finish";
+  // Claude Code's sub-agent tool.
+  if (name === "Task" || name === "Agent")
+    return `Sub-agent: ${String(i.description ?? i.subagent_type ?? "a side task")}`;
   // Claude Code names the target file_path or pattern; the harness uses path.
   const target = [i.path, i.file_path, i.pattern, i.url].find((v) => typeof v === "string");
   return `${name} ${typeof target === "string" ? target : ""}`.trim();

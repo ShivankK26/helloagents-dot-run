@@ -37,6 +37,8 @@ export interface ClaudeCodeOptions {
   onEvent?: (event: AgentEvent) => void;
   /** Path to the claude executable (tests point this at a fake). */
   claudePath?: string;
+  /** Extra environment, e.g. what the `helloagents` command needs. */
+  env?: Record<string, string>;
   now?: () => number;
 }
 
@@ -94,11 +96,17 @@ export const DEFAULT_CLAUDE_TOOLS = [
   "Bash(git status *)",
   "Bash(git diff *)",
   "Bash(git log *)",
+  "Bash(git add *)",
+  "Bash(git commit *)",
   "Bash(ls *)",
+  // Asks helloagents itself: new runs, push, PR, merge.
+  "Bash(helloagents *)",
+  // Sub-agents.
+  "Task",
 ] as const;
 
 /** Built-in tools a lean worker gets at all (allowedTools then limits Bash). */
-export const LEAN_CLAUDE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "Bash"] as const;
+export const LEAN_CLAUDE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "Bash", "Task"] as const;
 
 export function claudeArgs(
   opts: Pick<
@@ -164,18 +172,36 @@ export function claudeArgs(
 }
 
 /**
- * helloagents commits, pushes and opens pull requests itself (its Ship menu),
- * so the agent shouldn't try: in "edits" access those commands are blocked anyway.
+ * The agent commits on its own branch itself; pushing, pull requests, merging and
+ * new runs go through the `helloagents` command, so the app knows and shows them.
  */
 export const HELLOAGENTS_NOTE =
-  "You are running inside helloagents, on a branch of your own. Don't run git commit, git push, " +
-  "git remote, or gh pr commands: helloagents does that itself (including connecting the repo to " +
-  'GitHub). If the user asks you to commit or push, don\'t try; tell them to type "push" or use ' +
-  "the Ship button. Leave your changes uncommitted. " +
+  "You are running inside helloagents, on a branch of your own. You may commit your work on " +
+  "this branch with git add and git commit (when the user asks, or at good checkpoints). Don't " +
+  "run git push, git remote, git merge into other branches, or gh pr yourself; ask helloagents " +
+  "with its `helloagents` shell command, which does it properly (including connecting the repo " +
+  "to GitHub): `helloagents push` pushes this branch, `helloagents pr` opens a pull request, " +
+  "`helloagents merge` merges this branch into the base branch (e.g. main) and pushes it. Do " +
+  'these when the user asks ("push it", "merge into main", "keep pushing to main" means ' +
+  "run `helloagents merge` after each finished piece of work). " +
+  '`helloagents new "<task>"` starts a separate helloagents run (its own branch and session) ' +
+  "for this project, or another one with --project <name>; use it when the user asks for a new " +
+  "session or for work that should run in parallel, and give each run a complete, " +
+  "self-contained task. For smaller side work inside this task you can also use sub-agents " +
+  "(the Task tool). " +
   "To show the user what something looks like (an app in the iOS Simulator, a web page), take a " +
   "screenshot into .helloagents/screenshots/ (for example `xcrun simctl io booted screenshot " +
   ".helloagents/screenshots/home.png`) and open it with the Read tool: helloagents shows images " +
   "you read to the user.";
+
+/**
+ * Sent with a message typed while the agent works. Without it, a request that arrives
+ * between two steps tends to get lost in the task already under way.
+ */
+export const MID_TASK_NOTE =
+  "[Note from helloagents] The user sent this while you were working. Deal with it first: do " +
+  "what it asks (or answer it), say in a line that you did, then carry on with what you were " +
+  "doing before.";
 
 /** Added when helloagents answers permission prompts. */
 export const ASKING_NOTE =
@@ -273,6 +299,7 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
     let asking = 0;
     const child = spawn(opts.claudePath ?? "claude", claudeArgs({ ...opts, ask, streamed }), {
       cwd: opts.workspace,
+      env: { ...process.env, ...opts.env },
       stdio: ["pipe", "pipe", "pipe"],
       signal: opts.signal,
     });
@@ -282,14 +309,15 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
     // Unanswered prompts would keep the process alive; stdin errors after exit are harmless.
     child.stdin.on("error", () => undefined);
     if (streamed) send({ type: "user", message: { role: "user", content: opts.task } });
-    // Messages sent mid-task, not yet read by the agent.
-    const unread = new Set<string>();
+    // Messages sent mid-task, not yet read by the agent: what was sent → what the user typed.
+    const unread = new Map<string, string>();
     if (streamed)
       opts.onControl?.({
         say: (text) => {
           if (!child.stdin.writable || ended) return false;
-          unread.add(text);
-          send({ type: "user", message: { role: "user", content: text } });
+          const sent = `${text}\n\n${MID_TASK_NOTE}`;
+          unread.set(sent, text);
+          send({ type: "user", message: { role: "user", content: sent } });
           return true;
         },
         setAccess: (access) =>
@@ -407,8 +435,9 @@ function runOnce(opts: ClaudeCodeOptions): Promise<ClaudeCodeResult> {
         const content = (msg.message as { content?: unknown }).content;
         // The agent read a message sent while it was working.
         if (msg.isReplay) {
-          const text = typeof content === "string" ? content : "";
-          if (unread.delete(text)) emit({ type: "user.message", at, text });
+          const sent = typeof content === "string" ? content : "";
+          const text = unread.get(sent);
+          if (text !== undefined && unread.delete(sent)) emit({ type: "user.message", at, text });
           return;
         }
         if (!Array.isArray(content)) return;

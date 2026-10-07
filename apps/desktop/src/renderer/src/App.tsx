@@ -544,6 +544,7 @@ export function App() {
               initialTab={screen.tab}
               openers={openers}
               onBack={() => setScreen({ kind: "home" })}
+              onOpenRun={(id) => showRun(id)}
             />
           ) : project ? (
             <NewTask

@@ -74,3 +74,6 @@ each release maps to one change set.
   tool timings.
 - **0.2.19**: Activity feed centered and aligned with the chat box, more spacing.
 - **0.2.20**: ⌘K palette opens centered and can be dragged anywhere.
+- **0.2.21**: Agents can start new runs, commit, push, open PRs and merge
+  (`helloagents` command); messages typed mid-task are handled first, then the
+  agent carries on; sub-agents (Task) enabled in lean runs.

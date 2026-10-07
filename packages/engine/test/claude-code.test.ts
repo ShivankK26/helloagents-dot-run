@@ -57,7 +57,7 @@ describe("claudeArgs", () => {
     expect(args).toContain("--strict-mcp-config");
     expect(args).toContain("--disable-slash-commands");
     expect(args[args.indexOf("--setting-sources") + 1]).toBe("project,local");
-    expect(args[args.indexOf("--tools") + 1]).toBe("Read,Edit,Write,Glob,Grep,Bash");
+    expect(args[args.indexOf("--tools") + 1]).toBe("Read,Edit,Write,Glob,Grep,Bash,Task");
     expect(claudeArgs({ task: "Fix it", lean: false })).not.toContain("--strict-mcp-config");
   });
 

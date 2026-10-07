@@ -12,6 +12,7 @@ afterEach(() => {
   delete process.env.FAKE_CLAUDE_MODE;
   delete process.env.FAKE_CLAUDE_ARGS_FILE;
   delete process.env.FAKE_CLAUDE_ANSWER_FILE;
+  delete process.env.FAKE_CLAUDE_SAID_FILE;
 });
 
 async function setup(
@@ -221,6 +222,8 @@ describe("RunManager", () => {
 
   test("a message sent while it works reaches the running agent", async () => {
     process.env.FAKE_CLAUDE_MODE = "chat";
+    const saidFile = path.join(await tempDir(), "said.txt");
+    process.env.FAKE_CLAUDE_SAID_FILE = saidFile;
     const { store, manager, project } = await setup();
     const runId = await manager.start(project.id, "Fix add()");
     for (
@@ -233,7 +236,43 @@ describe("RunManager", () => {
     await manager.settled(runId);
     const said = store.events(runId).find((e) => e.event.type === "user.message")?.event;
     expect(said?.type === "user.message" && said.text).toBe("also add a comment");
+    // The agent is told to do it first, then carry on; the user sees only what they typed.
+    expect(await readFile(saidFile, "utf8")).toMatch(
+      /^also add a comment\n\n\[Note from helloagents\].*carry on/s,
+    );
     expect(store.events(runId).filter((e) => e.event.type === "agent.start")).toHaveLength(1);
+  });
+
+  test("the agent can start new runs and ship with the helloagents command", async () => {
+    process.env.FAKE_CLAUDE_MODE = "helper";
+    const out = path.join(await tempDir(), "helper.txt");
+    process.env.FAKE_CLAUDE_HELPER_OUT = out;
+    const { repo, store, manager, project } = await setup();
+    const runId = await manager.start(project.id, "Fix add()", { model: "opus", access: "full" });
+    await manager.settled(runId);
+
+    const said = await readFile(out, "utf8");
+    expect(said).toContain(`Started a new helloagents run in ${project.name}`);
+    expect(said).toMatch(/Committed [0-9a-f]+ on helloagents\//);
+    expect(said).toContain("Merged into main");
+    expect(said).toMatch(/failed: .*helloagents new/s); // unknown command shows the usage
+
+    // The new run belongs to the same project, with the same settings, on its own branch.
+    const child = store.listProjectRuns(project.id).find((r) => r.id !== runId);
+    expect(child).toMatchObject({
+      title: "Write the docs",
+      settings: { model: "opus", access: "full" },
+    });
+    await manager.settled(child?.id ?? "");
+    const started = store
+      .events(runId)
+      .find((e) => e.event.type === "tool.result" && e.event.name === "run")?.event;
+    expect(started?.type === "tool.result" && started.input).toMatchObject({ runId: child?.id });
+    // The merge happened in the user's checkout while the agent was still working.
+    expect(await git(repo, ["log", "--oneline", "main"])).toContain("Fix add()");
+    expect(store.getRun(runId)?.status).toBe("done");
+    delete process.env.FAKE_CLAUDE_HELPER_OUT;
+    await manager.stopAll(100);
   });
 
   test("can be cancelled mid-run", async () => {

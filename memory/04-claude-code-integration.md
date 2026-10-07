@@ -18,15 +18,16 @@ claude -p --output-format stream-json --verbose
 
 - **Lean flags** (default, saves tens of thousands of tokens per turn):
   `--strict-mcp-config --setting-sources project,local --disable-slash-commands
---tools Read,Edit,Write,Glob,Grep,Bash`. If an older CLI rejects a flag, the run
+--tools Read,Edit,Write,Glob,Grep,Bash,Task`. `Task` is the sub-agent tool (the CLI
+  also accepts `Agent` as an alias, probed on 2.1.291); sub-agent messages are ignored. If an older CLI rejects a flag, the run
   retries once without them. A task that starts with `/` (a slash command or
   skill) runs **without** lean flags so the user's skills load.
 - **Modes** map to `--permission-mode`: Auto → `auto` (Claude approves safe
   actions itself), Ask for commands → `acceptEdits`, Plan first → `plan`,
   Full access → `bypassPermissions` (no prompts at all).
-- **The appended system prompt** says: you're on your own branch; don't
-  `git commit/push/remote` or `gh pr` (helloagents ships); leave changes
-  uncommitted; take screenshots into `.helloagents/screenshots/` and Read them so
+- **The appended system prompt** says: you're on your own branch; you may
+  `git add`/`git commit` on it; don't `git push/remote/merge` or `gh pr` yourself,
+  use the `helloagents` command (below); take screenshots into `.helloagents/screenshots/` and Read them so
   the user sees them; when approvals are on, earlier automatic denials no longer apply.
 
 ## Stdin stays open (the key design)
@@ -48,9 +49,28 @@ run is really over. That enables:
    finishes, Claude Code starts a new turn by itself (a second `system/init`, which
    is ignored) and reports. The run ends at a `result` with nothing in the background.
 4. **Messages while it works.** Extra user messages written to stdin are folded
-   into the current turn. `--replay-user-messages` echoes them back (`isReplay`)
+   into the current turn, with a `[Note from helloagents]` (`MID_TASK_NOTE`): do this
+   first, say so in a line, then carry on. Without it, "keep pushing to main" was read
+   and silently ignored (7 Oct). The feed shows only what the user typed. `--replay-user-messages` echoes them back (`isReplay`)
    once read; the engine records them as `user.message`. If one arrives just as the
    turn ends, the run waits for its turn instead of closing.
+
+## The `helloagents` command (agent → app)
+
+`runs/agent-api.ts`. The engine writes a small sh+curl script to
+`<data dir>/bin/helloagents` and starts an HTTP endpoint on 127.0.0.1 (random
+port). Each Claude Code process gets `PATH` with that folder first,
+`HELLOAGENTS_API` and a per-run `HELLOAGENTS_TOKEN` (the token says which run asks).
+`Bash(helloagents *)` is pre-allowed.
+
+- `helloagents new [--project NAME] "<task>"`: starts a new run (same model, effort,
+  mode and base branch), records a `run` step in the asking run (feed row with
+  **Open**). At most 8 per run.
+- `helloagents commit | push | pr | merge`: the normal Ship actions, allowed while
+  that run is still working (`ship(runId, kind, byAgent=true)`); the folder isn't
+  freed mid-run. "Keep pushing to main" → the agent runs `helloagents merge`.
+
+Tested for real with Haiku: it committed with git and started a second run.
 
 ## Gotchas found (and fixed)
 

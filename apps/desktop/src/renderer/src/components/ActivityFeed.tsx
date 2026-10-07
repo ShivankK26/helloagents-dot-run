@@ -66,6 +66,7 @@ function build(events: StoredEvent[], active: boolean, hideAnswer: string, root?
     files: Set<string>;
     checks?: { ok: boolean; cantStart: boolean };
     done: boolean;
+    ended: boolean;
   } | null = null;
   const closeTurn = (key: number) => {
     if (turn?.done)
@@ -80,14 +81,21 @@ function build(events: StoredEvent[], active: boolean, hideAnswer: string, root?
   };
 
   for (const { seq, event: e } of events) {
-    // helloagents' own steps (shipping, freeing the folder) come after the turn's Done line.
-    const own = e.type === "tool.result" && (e.name === "ship" || e.name === "folder");
+    // helloagents' own steps (shipping, freeing the folder) come after the turn's Done line,
+    // unless the agent itself asked for them while working.
+    const own =
+      e.type === "tool.result" &&
+      (e.name === "ship" || e.name === "folder") &&
+      (!turn || turn.ended);
     if (turn && e.type !== "agent.start" && !own) turn.lastAt = e.at;
     if (e.type === "agent.start" || own) closeTurn(seq - 0.5);
     if (e.type === "agent.start") {
-      turn = { startAt: e.at, lastAt: e.at, files: new Set(), done: false };
+      turn = { startAt: e.at, lastAt: e.at, files: new Set(), done: false, ended: false };
       items.push({ kind: "you", key: seq, text: e.task });
-    } else if (e.type === "agent.end" && turn) turn.done = e.status === "done";
+    } else if (e.type === "agent.end" && turn) {
+      turn.done = e.status === "done";
+      turn.ended = true;
+    }
     if (turn && e.type === "tool.result") {
       if (toolKind(e.name) === "edit" && e.ok) turn.files.add(toolPath(e.input) ?? e.name);
       if (e.name === "checks")
@@ -155,8 +163,36 @@ function build(events: StoredEvent[], active: boolean, hideAnswer: string, root?
   return items;
 }
 
-function Step({ e, root }: { e: ToolResult; root?: string }) {
+function Step({
+  e,
+  root,
+  onOpenRun,
+}: {
+  e: ToolResult;
+  root?: string;
+  onOpenRun?: (runId: string) => void;
+}) {
   if (e.name === "ship") return <Shipped e={e} />;
+  if (e.name === "run") {
+    const { runId, task, project } = e.input as { runId?: string; task?: string; project?: string };
+    return (
+      <div className="step ok">
+        <span className="k">
+          <Icon name="plus" size={12} />
+        </span>
+        <span className="step-cmd">
+          New run in {project}: <code>{task?.split("\n")[0]}</code>
+        </span>
+        <span className="r">
+          {runId && onOpenRun ? (
+            <button className="link-btn" onClick={() => onOpenRun(runId)}>
+              Open
+            </button>
+          ) : null}
+        </span>
+      </div>
+    );
+  }
   if (e.name === "folder")
     return (
       <div className="step ok folder-step">
@@ -252,6 +288,7 @@ export function ActivityFeed({
   onAnswer,
   mode,
   children,
+  onOpenRun,
 }: {
   events: StoredEvent[];
   active: boolean;
@@ -270,6 +307,8 @@ export function ActivityFeed({
   mode?: string;
   /** Shown after everything else, e.g. "connect to GitHub". */
   children?: ReactNode;
+  /** Opens a run this one started. */
+  onOpenRun?: (runId: string) => void;
 }) {
   const background = active ? digestRun(events).background : null;
   const items = build(events, active && !approval && !background, hideAnswer, root);
@@ -352,7 +391,9 @@ export function ActivityFeed({
                   </div>
                 );
               }
-              return it.kind === "tool" ? <Step key={it.key} e={it.event} root={root} /> : null;
+              return it.kind === "tool" ? (
+                <Step key={it.key} e={it.event} root={root} onOpenRun={onOpenRun} />
+              ) : null;
             })}
           </div>
         ) : b.item?.kind === "you" ? (

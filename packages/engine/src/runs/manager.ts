@@ -41,6 +41,7 @@ import {
   type PermissionRequest,
 } from "../workers/claude-code";
 import { isSlashTask } from "../workers/slash";
+import { type AgentApi, type AgentRequest, startAgentApi, writeAgentHelper } from "./agent-api";
 import {
   declaredPackageManager,
   detectActions,
@@ -68,6 +69,8 @@ export interface RunManagerOptions {
   claudePath?: string;
   /** Builds the model for the built-in harness. Throws if no API key is set. */
   createModel?: () => ModelClient;
+  /** Where the `helloagents` command for agents is written. Default: next to worktreesRoot. */
+  binDir?: string;
 }
 
 /** What the project screen shows above the composer. */
@@ -87,6 +90,9 @@ export interface ShipResult {
 
 /** Failing checks go back to the agent at most this many times per request. */
 const MAX_SEND_BACKS = 2;
+
+/** How many runs one run's agent may start, so a confused agent can't fan out forever. */
+const MAX_STARTED_RUNS = 8;
 
 /** Starts, tracks and cancels runs: one agent, on its own branch, per run. */
 export class RunManager {
@@ -343,6 +349,9 @@ export class RunManager {
       Promise.all(runs.map((id) => this.settled(id))),
       new Promise((r) => setTimeout(r, timeoutMs)),
     ]);
+    const api = this.agentApi;
+    this.agentApi = undefined;
+    await (await api?.catch(() => undefined))?.close();
   }
 
   /** Resolves when the run's agent has stopped. */
@@ -479,8 +488,11 @@ export class RunManager {
 
   // ---- Ship ----
 
-  /** Commit, push, open a PR or merge, recorded in the run's activity either way. */
-  async ship(runId: string, kind: ShipKind): Promise<ShipResult> {
+  /**
+   * Commit, push, open a PR or merge, recorded in the run's activity either way.
+   * `byAgent`: the run's own agent asked (via `helloagents`), so it may be working.
+   */
+  async ship(runId: string, kind: ShipKind, byAgent = false): Promise<ShipResult> {
     const started = Date.now();
     const record = (ok: boolean, output: string, url?: string) => {
       this.opts.store.record(runId, "main", {
@@ -500,12 +512,12 @@ export class RunManager {
       await this.ensureFolder(runId);
       const result =
         kind === "commit"
-          ? await this.commit(runId)
+          ? await this.commit(runId, byAgent)
           : kind === "push"
-            ? await this.push(runId)
+            ? await this.push(runId, byAgent)
             : kind === "pr"
-              ? await this.openPullRequest(runId)
-              : await this.merge(runId);
+              ? await this.openPullRequest(runId, byAgent)
+              : await this.merge(runId, byAgent);
       record(true, result.message, result.url);
       // Pushed, in a PR or merged: the work is safe in git, so the run's folder can go.
       if (kind !== "commit") await this.freeFolder(runId).catch(() => null);
@@ -569,16 +581,16 @@ export class RunManager {
     };
   }
 
-  async commit(runId: string): Promise<ShipResult> {
-    const { run } = this.shippable(runId);
+  async commit(runId: string, byAgent = false): Promise<ShipResult> {
+    const { run } = this.shippable(runId, byAgent);
     const sha = await commitAll(run.worktree.path, commitMessage(run.title));
     return {
       message: sha ? `Committed ${sha} on ${run.worktree.branch}` : "Nothing new to commit.",
     };
   }
 
-  async push(runId: string): Promise<ShipResult> {
-    const { run } = this.shippable(runId);
+  async push(runId: string, byAgent = false): Promise<ShipResult> {
+    const { run } = this.shippable(runId, byAgent);
     if (!(await originUrl(run.worktree.path)))
       throw new Error("This project isn't on GitHub yet. Connect it first.");
     await commitAll(run.worktree.path, commitMessage(run.title));
@@ -586,8 +598,8 @@ export class RunManager {
     return { message: `Pushed ${run.worktree.branch}` };
   }
 
-  async openPullRequest(runId: string): Promise<ShipResult> {
-    const { run } = this.shippable(runId);
+  async openPullRequest(runId: string, byAgent = false): Promise<ShipResult> {
+    const { run } = this.shippable(runId, byAgent);
     if (run.settings.workspace === "checkout") {
       throw new Error(
         "This run worked on your current branch. Push it and open the pull request from there.",
@@ -611,8 +623,8 @@ export class RunManager {
     return { message: "Opened a pull request", url };
   }
 
-  async merge(runId: string): Promise<ShipResult> {
-    const { run, project } = this.shippable(runId);
+  async merge(runId: string, byAgent = false): Promise<ShipResult> {
+    const { run, project } = this.shippable(runId, byAgent);
     if (run.settings.workspace === "checkout") {
       throw new Error("This run already worked on your current branch. Commit it instead.");
     }
@@ -663,6 +675,90 @@ export class RunManager {
     return this.devServers.has(runId);
   }
 
+  // ---- The `helloagents` command, for agents ----
+
+  private agentApi?: Promise<AgentApi>;
+
+  /** The environment a run's agent needs to use the `helloagents` command. */
+  private async agentEnv(runId: string): Promise<Record<string, string>> {
+    this.agentApi ??= (async () => {
+      await writeAgentHelper(this.binDir);
+      return startAgentApi((id, request) => this.onAgentRequest(id, request));
+    })();
+    const api = await this.agentApi;
+    return {
+      PATH: `${this.binDir}${path.delimiter}${process.env.PATH ?? ""}`,
+      HELLOAGENTS_API: api.url,
+      HELLOAGENTS_TOKEN: api.tokenFor(runId),
+    };
+  }
+
+  private get binDir(): string {
+    return this.opts.binDir ?? path.join(path.dirname(this.opts.worktreesRoot), "bin");
+  }
+
+  /** A run's agent asked for something with the `helloagents` command. */
+  private async onAgentRequest(runId: string, request: AgentRequest): Promise<string> {
+    if (request.action !== "new") {
+      const kind: ShipKind = request.action;
+      const r = await this.ship(runId, kind, true);
+      return r.url ? `${r.message}: ${r.url}` : r.message;
+    }
+    return this.startFromRun(runId, request.text, request.project);
+  }
+
+  /** Starts a new run that a run's agent asked for, with the same settings. */
+  private async startFromRun(parentId: string, task: string, projectName?: string) {
+    const { store } = this.opts;
+    const parent = store.getRun(parentId);
+    if (!parent?.projectId) throw new Error("This run doesn't belong to a project.");
+    if (!task) throw new Error('Say what the new run should do: helloagents new "<task>"');
+    const started = store
+      .events(parentId)
+      .filter((e) => e.event.type === "tool.result" && e.event.name === "run").length;
+    if (started >= MAX_STARTED_RUNS)
+      throw new Error(`This run already started ${MAX_STARTED_RUNS} runs; that's the limit.`);
+    const project = projectName
+      ? store
+          .listProjects()
+          .find(
+            (p) =>
+              p.name.toLowerCase() === projectName.toLowerCase() ||
+              path.basename(p.path).toLowerCase() === projectName.toLowerCase(),
+          )
+      : store.getProject(parent.projectId);
+    if (!project) {
+      const names = store
+        .listProjects()
+        .map((p) => p.name)
+        .join(", ");
+      throw new Error(`No project called "${projectName}". Projects: ${names}.`);
+    }
+    const same = project.id === parent.projectId;
+    const { model, effort, access } = parent.settings;
+    const id = await this.start(project.id, task, {
+      ...(model && { model }),
+      ...(effort && { effort }),
+      ...(access && { access }),
+      workspace: "branch",
+      // From the same base as this run, so it starts where the user's work is.
+      ...(same && parent.settings.baseBranch && { base: parent.settings.baseBranch }),
+    });
+    store.record(parentId, "main", {
+      type: "tool.result",
+      at: Date.now(),
+      turn: 0,
+      id: randomUUID(),
+      name: "run",
+      input: { runId: id, task, project: project.name },
+      ok: true,
+      output: `Started a new run in ${project.name}`,
+      durationMs: 0,
+    });
+    this.opts.onChange?.(parentId);
+    return `Started a new helloagents run in ${project.name} (id ${id.slice(0, 8)}). It works on its own branch in its own session; the user can follow it in the sidebar.`;
+  }
+
   // ---- Internals ----
 
   private requireProject(projectId: string): ProjectRecord {
@@ -671,10 +767,10 @@ export class RunManager {
     return project;
   }
 
-  private shippable(runId: string) {
+  private shippable(runId: string, working = false) {
     const run = this.opts.store.getRun(runId);
     if (!run?.worktree || !run.projectId) throw new Error("This run has no branch to ship.");
-    if (this.active.has(runId))
+    if (this.active.has(runId) && !working)
       throw new Error("This run is still working. Wait for it to finish.");
     return { run: { ...run, worktree: run.worktree }, project: this.requireProject(run.projectId) };
   }
@@ -800,7 +896,9 @@ export class RunManager {
   ): Promise<string> {
     if (agent === "claude-code") {
       const attachments = t.settings.attachments ?? [];
+      const env = await this.agentEnv(t.runId);
       const r = await runClaudeCode({
+        env,
         task: withAttachments(t.task, attachments),
         // Slash commands and skills need the user's full Claude Code setup.
         lean: !isSlashTask(t.task),

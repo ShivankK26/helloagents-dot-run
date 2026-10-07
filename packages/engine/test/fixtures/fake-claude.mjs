@@ -2,6 +2,7 @@
 // Stands in for the `claude` CLI in tests. Replays the stream-json shapes
 // captured from a real `claude -p --output-format stream-json --verbose` run,
 // and performs a real file edit so the worktree has a diff.
+import { execFileSync } from "node:child_process";
 import { appendFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
@@ -50,6 +51,8 @@ out({ type: "system", subtype: "commands_changed", commands: [] });
 // "chat": the user says something while it works; Claude Code replays it once read.
 if (mode === "chat") {
   const said = await nextMessage();
+  if (process.env.FAKE_CLAUDE_SAID_FILE)
+    writeFileSync(process.env.FAKE_CLAUDE_SAID_FILE, said.message.content);
   out({ type: "user", isReplay: true, message: { role: "user", content: said.message.content } });
 }
 // "early" plays a resumed session that reports a leftover, empty "done" first.
@@ -292,6 +295,19 @@ if (mode === "background") {
     num_turns: 2,
   });
 } else {
+  // "helper": uses the `helloagents` command, like an agent asked to start a run and ship.
+  // The run it starts gets a different task, so it doesn't start runs itself.
+  if (mode === "helper" && !prompt.includes("Write the docs")) {
+    const said = [];
+    for (const args of [["new", "Write the docs"], ["commit"], ["merge"], ["fly"]]) {
+      try {
+        said.push(execFileSync("helloagents", args, { encoding: "utf8", stdio: "pipe" }));
+      } catch (e) {
+        said.push(`failed: ${e.stdout}`);
+      }
+    }
+    writeFileSync(process.env.FAKE_CLAUDE_HELPER_OUT, said.join(""));
+  }
   out({
     type: "result",
     subtype: "success",
