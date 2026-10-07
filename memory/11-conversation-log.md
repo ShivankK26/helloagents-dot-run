@@ -57,3 +57,8 @@ names are left out on purpose.
 ## 6 Oct
 
 - Asked for this `memory/` folder before closing the session.
+
+## 7 Oct
+
+- The ⌘K search should be movable and centered by default → draggable palette
+  with a grip, centered on open, position kept for the session (v0.2.20).

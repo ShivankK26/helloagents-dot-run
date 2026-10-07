@@ -73,3 +73,4 @@ each release maps to one change set.
   one column; run facts and time split moved under the Changes file list; real
   tool timings.
 - **0.2.19**: Activity feed centered and aligned with the chat box, more spacing.
+- **0.2.20**: ⌘K palette opens centered and can be dragged anywhere.

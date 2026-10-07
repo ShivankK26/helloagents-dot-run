@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import { Icon } from "./Icons";
 
 export interface Command {
@@ -11,12 +19,71 @@ export interface Command {
   run: () => void;
 }
 
+type Spot = { x: number; y: number };
+
+/** Where the palette was dragged to; kept while the app is open. */
+let moved: Spot | null = null;
+
+/** Keeps the whole box inside the window. */
+const fit = (s: Spot, el: HTMLElement): Spot => ({
+  x: Math.max(8, Math.min(s.x, window.innerWidth - el.offsetWidth - 8)),
+  y: Math.max(8, Math.min(s.y, window.innerHeight - el.offsetHeight - 8)),
+});
+
 /** ⌘K: everything in the app from the keyboard. */
 export function Palette({ commands, onClose }: { commands: Command[]; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
+  const [spot, setSpot] = useState<Spot | null>(moved);
+  const box = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus({ preventScroll: true }), []);
+
+  // Opens centered on screen. The top stays put as the list shrinks while typing.
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    setSpot((s) =>
+      fit(
+        s ?? {
+          x: (window.innerWidth - el.offsetWidth) / 2,
+          y: (window.innerHeight - el.offsetHeight) / 2,
+        },
+        el,
+      ),
+    );
+  }, []);
+
+  const drag = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || !spot || !box.current) return;
+    e.preventDefault();
+    const el = box.current;
+    const start = { x: e.clientX - spot.x, y: e.clientY - spot.y };
+    const move = (ev: globalThis.PointerEvent) => {
+      const next = fit({ x: ev.clientX - start.x, y: ev.clientY - start.y }, el);
+      moved = next;
+      setSpot(next);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      input.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  // Double-click the grip to put it back in the middle.
+  const recenter = () => {
+    const el = box.current;
+    if (!el) return;
+    moved = null;
+    setSpot({
+      x: (window.innerWidth - el.offsetWidth) / 2,
+      y: (window.innerHeight - el.offsetHeight) / 2,
+    });
+    input.current?.focus({ preventScroll: true });
+  };
 
   const shown = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -38,8 +105,20 @@ export function Palette({ commands, onClose }: { commands: Command[]; onClose: (
       className="scrim palette-scrim"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="palette" role="dialog" aria-label="Command menu">
-        <div className="pal-in">
+      <div
+        ref={box}
+        className="palette"
+        role="dialog"
+        aria-label="Command menu"
+        style={spot ? { left: spot.x, top: spot.y } : { visibility: "hidden" }}
+      >
+        <div
+          className="pal-grip"
+          title="Drag to move · double-click to center"
+          onPointerDown={drag}
+          onDoubleClick={recenter}
+        />
+        <div className="pal-in" onPointerDown={(e) => e.target === e.currentTarget && drag(e)}>
           <Icon name="search" size={17} />
           <input
             ref={input}
