@@ -66,3 +66,7 @@ names are left out on purpose.
   mid-task and then carry on, and commit locally. "Keep pushing to main" had been
   silently ignored → `helloagents` command, mid-task note, git commit allowed,
   sub-agents on (v0.2.21).
+- It still refused to `git pull`/`push` main and told the user to run them ("it should
+  be able to run all the commands itself, i told you this earlier too") → no git
+  rules in the prompt, user's folder via --add-dir, note for old runs. A blanket
+  git/gh allowlist was blocked as unsafe; the owner picked approvals instead (v0.2.22).

@@ -4,7 +4,7 @@ Notes for picking this project up in a new session (human or AI). They cover
 what helloagents is, how it's built, every decision made so far and why, how
 to build, test and release, and what's still open.
 
-Last updated: 7 Oct 2026, at **v0.2.21**.
+Last updated: 7 Oct 2026, at **v0.2.22**.
 
 ## Read in this order
 
@@ -18,7 +18,7 @@ Last updated: 7 Oct 2026, at **v0.2.21**.
 | [06-ui.md](06-ui.md)                                           | Screens, components and the design rules behind them                          |
 | [07-website-and-demo.md](07-website-and-demo.md)               | helloagents.run, the live demo, the version badge, deploys                    |
 | [08-dev-workflow.md](08-dev-workflow.md)                       | Commands, testing (fake Claude Code, screenshots), releasing, machine gotchas |
-| [09-changelog.md](09-changelog.md)                             | Every release, v0.1.0 to v0.2.21                                              |
+| [09-changelog.md](09-changelog.md)                             | Every release, v0.1.0 to v0.2.22                                              |
 | [10-decisions.md](10-decisions.md)                             | The choices made, with the reason for each                                    |
 | [11-conversation-log.md](11-conversation-log.md)               | What was asked, in order, and what came of it                                 |
 | [12-open-items.md](12-open-items.md)                           | Roadmap, known gaps, things not yet tested for real                           |

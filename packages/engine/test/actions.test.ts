@@ -268,7 +268,7 @@ describe("runs with actions", () => {
       ["push", false],
     ]);
     expect(claudeArgs({ task: "x" }).join(" ")).toMatch(
-      /--append-system-prompt .*You may commit your work on this branch/,
+      /--append-system-prompt .*git included \(commit, pull, push, merge\)/,
     );
   });
 

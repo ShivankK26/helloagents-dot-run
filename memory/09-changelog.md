@@ -77,3 +77,5 @@ each release maps to one change set.
 - **0.2.21**: Agents can start new runs, commit, push, open PRs and merge
   (`helloagents` command); messages typed mid-task are handled first, then the
   agent carries on; sub-agents (Task) enabled in lean runs.
+- **0.2.22**: Agents run git themselves (pull, push, merge, also in the user's
+  project folder) instead of handing commands back; older runs are told once.

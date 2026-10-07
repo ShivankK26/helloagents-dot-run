@@ -176,14 +176,13 @@ export function claudeArgs(
  * new runs go through the `helloagents` command, so the app knows and shows them.
  */
 export const HELLOAGENTS_NOTE =
-  "You are running inside helloagents, on a branch of your own. You may commit your work on " +
-  "this branch with git add and git commit (when the user asks, or at good checkpoints). Don't " +
-  "run git push, git remote, git merge into other branches, or gh pr yourself; ask helloagents " +
-  "with its `helloagents` shell command, which does it properly (including connecting the repo " +
-  "to GitHub): `helloagents push` pushes this branch, `helloagents pr` opens a pull request, " +
-  "`helloagents merge` merges this branch into the base branch (e.g. main) and pushes it. Do " +
-  'these when the user asks ("push it", "merge into main", "keep pushing to main" means ' +
-  "run `helloagents merge` after each finished piece of work). " +
+  "You are running inside helloagents, on a branch of your own. Run the commands the work " +
+  "needs yourself, git included (commit, pull, push, merge), in this folder or in the user's " +
+  "own project folder; don't hand commands back to the user to run. Commands that need the " +
+  "user's OK are asked of them by helloagents. Don't force-push or rewrite published history. " +
+  "Shortcuts: `helloagents push`, `helloagents pr` and `helloagents merge` (merge this branch " +
+  "into its base, e.g. main, and push it) do the usual shipping and show it in the app; " +
+  '"keep pushing to main" means merging into main after each finished piece of work. ' +
   '`helloagents new "<task>"` starts a separate helloagents run (its own branch and session) ' +
   "for this project, or another one with --project <name>; use it when the user asks for a new " +
   "session or for work that should run in parallel, and give each run a complete, " +

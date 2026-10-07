@@ -157,6 +157,8 @@ export interface RunSettings {
   baseBranch?: string;
   /** Images attached to the task (absolute paths the agent can read). */
   attachments?: string[];
+  /** Set by the app: the run began with today's rules (it may commit and push itself). */
+  agentRuns?: boolean;
 }
 
 /** A coding-agent CLI the user can connect, detected on this machine. */

@@ -87,8 +87,27 @@ describe("RunManager", () => {
     ]);
   });
 
+  test("runs from before agents could push are told once that they can now", async () => {
+    const { store, manager, project } = await setup();
+    const argsFile = path.join(await tempDir(), "args.json");
+    process.env.FAKE_CLAUDE_ARGS_FILE = argsFile;
+    const runId = await manager.start(project.id, "Fix add()");
+    await manager.settled(runId);
+    const { agentRuns: _, ...old } = store.getRun(runId)?.settings ?? {};
+    store.updateRunSettings(runId, old);
+    const sent = async (message: string) => {
+      await manager.followUp(runId, message);
+      await manager.settled(runId);
+      return (JSON.parse(await readFile(argsFile, "utf8")) as string[])[1];
+    };
+    expect(await sent("push it")).toMatch(
+      /^push it\n\n\[Note from helloagents\]\nhelloagents' rules/,
+    );
+    expect(await sent("and merge")).toBe("and merge");
+  });
+
   test("attached images reach the agent, and slash commands run with the full setup", async () => {
-    const { manager, project } = await setup();
+    const { repo, manager, project } = await setup();
     const argsFile = path.join(await tempDir(), "args.json");
     process.env.FAKE_CLAUDE_ARGS_FILE = argsFile;
     const shot = path.join(await tempDir(), "shot.png");
@@ -108,7 +127,9 @@ describe("RunManager", () => {
     await manager.settled(runId);
     const next = JSON.parse(await readFile(argsFile, "utf8")) as string[];
     expect(next[1]).toBe("Thanks");
-    expect(next).not.toContain("--add-dir");
+    // Only the user's own project folder, no image folder.
+    expect(next[next.indexOf("--add-dir") + 1]).toBe(repo);
+    expect(next).not.toContain(path.dirname(shot));
     expect(next).toContain("--disable-slash-commands");
   });
 

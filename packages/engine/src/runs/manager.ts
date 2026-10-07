@@ -129,7 +129,11 @@ export class RunManager {
     const notify = () => this.opts.onChange?.(runId);
     const inPlace = settings.workspace === "checkout";
     const baseBranch = (await currentBranch(project.path).catch(() => null)) ?? undefined;
-    const runSettings: RunSettings = { ...settings, baseBranch: settings.base ?? baseBranch };
+    const runSettings: RunSettings = {
+      ...settings,
+      baseBranch: settings.base ?? baseBranch,
+      agentRuns: true,
+    };
 
     let worktree: Worktree;
     try {
@@ -215,7 +219,9 @@ export class RunManager {
     this.opts.onChange?.(runId);
     this.work(runId, {
       agent: run.agent ?? "claude-code",
-      task: this.withApprovalNote(runId, message, run.settings.access),
+      task: run.settings.agentRuns
+        ? this.withApprovalNote(runId, message, run.settings.access)
+        : this.withRulesNote(runId, this.withApprovalNote(runId, message, run.settings.access)),
       workspace: run.worktree.path,
       ...(restored && actions?.setup && { setup: actions.setup }),
       // Images belong to the message they came with.
@@ -241,6 +247,17 @@ export class RunManager {
       .some((e) => e.type === "tool.result" && !e.ok && AUTO_DENIED.test(e.output));
     if (!deniedSince) return message;
     return `${message}\n\n${NOTE_HEADER}\nCommands that need permission are no longer denied automatically: helloagents now asks the user, who can approve them. Earlier messages saying approval-needing commands would be refused for the rest of this session no longer apply. Try the commands you need again (for example builds, simulators, screenshots).`;
+  }
+
+  /**
+   * Runs started before v0.2.22 were told never to commit or push, and said so many times;
+   * a resumed conversation keeps believing it. Say once that this changed.
+   */
+  private withRulesNote(runId: string, message: string): string {
+    const told = this.opts.store
+      .events(runId)
+      .some((e) => e.event.type === "agent.start" && e.event.task.includes(RULES_NOTE));
+    return told ? message : `${message}\n\n${NOTE_HEADER}\n${RULES_NOTE}`;
   }
 
   /** Continues a run that was stopped, in the same conversation. */
@@ -897,14 +914,19 @@ export class RunManager {
     if (agent === "claude-code") {
       const attachments = t.settings.attachments ?? [];
       const env = await this.agentEnv(t.runId);
+      const projectId = this.opts.store.getRun(t.runId)?.projectId;
+      const projectPath = projectId ? this.opts.store.getProject(projectId)?.path : undefined;
+      // The user's own checkout too, e.g. to pull and push main there.
+      const dirs = [
+        ...attachments.map((a) => path.dirname(a)),
+        ...(projectPath && projectPath !== t.workspace ? [projectPath] : []),
+      ];
       const r = await runClaudeCode({
         env,
         task: withAttachments(t.task, attachments),
         // Slash commands and skills need the user's full Claude Code setup.
         lean: !isSlashTask(t.task),
-        ...(attachments.length && {
-          addDirs: [...new Set(attachments.map((a) => path.dirname(a)))],
-        }),
+        ...(dirs.length && { addDirs: [...new Set(dirs)] }),
         workspace: t.workspace,
         signal: t.signal,
         onEvent: t.onEvent,
@@ -1085,6 +1107,13 @@ export class RunManager {
 
 /** Marks a note helloagents adds to a message for the agent; the app hides it. */
 export const NOTE_HEADER = "[Note from helloagents]";
+
+const RULES_NOTE =
+  "helloagents' rules have changed: run the commands the work needs yourself, git included " +
+  "(commit, pull, push, merge), here or in the user's project folder. Anything earlier in this " +
+  "conversation saying you can't commit or push, or that helloagents does it, no longer " +
+  "applies. Don't ask the user to run commands; run them (helloagents asks the user when " +
+  "approval is needed).";
 
 /**
  * Claude Code's own words when it auto-denies a prompt nobody could answer; it

@@ -25,9 +25,10 @@ claude -p --output-format stream-json --verbose
 - **Modes** map to `--permission-mode`: Auto → `auto` (Claude approves safe
   actions itself), Ask for commands → `acceptEdits`, Plan first → `plan`,
   Full access → `bypassPermissions` (no prompts at all).
-- **The appended system prompt** says: you're on your own branch; you may
-  `git add`/`git commit` on it; don't `git push/remote/merge` or `gh pr` yourself,
-  use the `helloagents` command (below); take screenshots into `.helloagents/screenshots/` and Read them so
+- **The appended system prompt** says: you're on your own branch; run the commands
+  the work needs yourself, git included (commit, pull, push, merge), here or in the
+  user's project folder (passed with `--add-dir`); never hand commands back to the
+  user; no force-push; `helloagents` shortcuts (below); take screenshots into `.helloagents/screenshots/` and Read them so
   the user sees them; when approvals are on, earlier automatic denials no longer apply.
 
 ## Stdin stays open (the key design)
@@ -54,6 +55,14 @@ run is really over. That enables:
    and silently ignored (7 Oct). The feed shows only what the user typed. `--replay-user-messages` echoes them back (`isReplay`)
    once read; the engine records them as `user.message`. If one arrives just as the
    turn ends, the run waits for its turn instead of closing.
+
+- **No blanket git allowlist.** Pre-approving every `git`/`gh` command was blocked
+  as unsafe (7 Oct); the owner chose: agents run git themselves, Auto mode's own
+  checks decide what needs an OK (fetch/merge/push ask; "Always allow" `Bash(git:*)`
+  per project stops that). Only status/diff/log/add/commit are pre-allowed.
+- **Old runs** (no `settings.agentRuns`) get a one-time `RULES_NOTE` on their next
+  follow-up: the "can't commit or push" rule is gone. Long resumed sessions kept
+  refusing without it.
 
 ## The `helloagents` command (agent → app)
 
