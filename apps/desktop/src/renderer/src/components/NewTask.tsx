@@ -12,6 +12,7 @@ import {
 } from "../composer";
 import { errorText } from "../toast";
 import { AttachButton, AttachmentStrip, DropOverlay, useAttachments } from "./Attachments";
+import { useGrowBox } from "./Grow";
 import { Icon } from "./Icons";
 import { Menu } from "./Menu";
 import { useSlashMenu } from "./SlashMenu";
@@ -55,6 +56,8 @@ export function NewTask({
     },
     onLocal: (cmd) => (cmd === "model" ? setOpenModel : setOpenEffort)((n) => n + 1),
   });
+
+  const grip = useGrowBox(box, task, "task", "bottom");
 
   useEffect(() => box.current?.focus({ preventScroll: true }), []);
 
@@ -128,6 +131,7 @@ export function NewTask({
       >
         {images.dragging ? <DropOverlay /> : null}
         {slash.menu}
+        {grip}
         <AttachmentStrip items={images.items} onRemove={images.remove} />
         <label htmlFor="task" className="sr">
           Task

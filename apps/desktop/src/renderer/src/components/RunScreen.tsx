@@ -15,6 +15,7 @@ import { elapsed } from "../time";
 import { ActivityFeed } from "./ActivityFeed";
 import { ChangesView } from "./ChangesView";
 import { AttachButton, AttachmentStrip, DropOverlay, useAttachments } from "./Attachments";
+import { useGrowBox } from "./Grow";
 import { Icon } from "./Icons";
 import { Markdown } from "./Markdown";
 import { errorText, showToast } from "../toast";
@@ -574,6 +575,8 @@ function Dock({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
   const images = useAttachments(setError);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const grip = useGrowBox(box, text, "follow-up", "top");
 
   // "push it", "open a PR": helloagents does that itself, since the agent can't.
   const intent = enabled && !active && !images.items.length ? shipIntent(text, inPlace) : null;
@@ -613,11 +616,13 @@ function Dock({
         {...images.handlers}
       >
         {images.dragging ? <DropOverlay /> : null}
+        {enabled ? grip : null}
         <label htmlFor={`follow-${runId}`} className="sr">
           Follow-up
         </label>
         <textarea
           id={`follow-${runId}`}
+          ref={box}
           value={text}
           disabled={!enabled}
           placeholder={

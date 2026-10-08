@@ -3817,3 +3817,48 @@ button.pill.where {
 .feed-list {
   gap: 16px;
 }
+
+/* Drag the task and follow-up boxes taller (grip on the edge). */
+.box-grip {
+  position: absolute;
+  left: 50%;
+  width: 72px;
+  height: 14px;
+  margin-left: -36px;
+  cursor: ns-resize;
+  z-index: 4;
+  touch-action: none;
+}
+.box-grip.bottom {
+  bottom: -3px;
+}
+.box-grip.top {
+  top: -7px;
+}
+.box-grip::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 5px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--line-2);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.home .composer:hover .box-grip::after,
+.home .composer:focus-within .box-grip::after,
+.dock-box:hover .box-grip::after,
+.dock-box:focus-within .box-grip::after {
+  opacity: 1;
+}
+.box-grip:hover::after,
+.resizing .box-grip::after {
+  background: var(--faint);
+}
+body.resizing,
+body.resizing * {
+  cursor: ns-resize !important;
+  user-select: none;
+}

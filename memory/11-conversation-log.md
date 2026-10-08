@@ -70,3 +70,6 @@ names are left out on purpose.
   be able to run all the commands itself, i told you this earlier too") → no git
   rules in the prompt, user's folder via --add-dir, note for old runs. A blanket
   git/gh allowlist was blocked as unsafe; the owner picked approvals instead (v0.2.22).
+- Long tasks were cut off in the composer ("the chat window should be draggable and
+  extendable") → the task and follow-up boxes grow with the text and have a drag
+  grip to resize, remembered per box (v0.2.23).
