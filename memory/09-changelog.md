@@ -88,3 +88,5 @@ each release maps to one change set.
   opens it in the browser.
 - **0.2.26**: The `/` menu works in the follow-up box too, and lists your MCP
   connectors (with their status) alongside commands and skills.
+- **0.2.27**: Runs open scrolled to the newest message and follow new ones while
+  you're at the bottom; scrolling up stops the follow.

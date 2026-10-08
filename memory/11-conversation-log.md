@@ -80,3 +80,5 @@ names are left out on purpose.
   Code setup; the Artifact tool is interactive-only, so the agent writes HTML and opens it (v0.2.25).
 - "/" did nothing in the follow-up box ("shouldnt it show me all skills available and mcp
   stuff and everything") → the follow-up box got the `/` menu, and MCP connectors are listed (v0.2.26).
+- Opening a run showed the top of the chat ("it should scroll to the bottom not the top")
+  → the feed opens at the bottom and sticks there while you're at the bottom (v0.2.27).

@@ -96,15 +96,44 @@ export function RunScreen({
     );
   }, [api, runId, tab, run?.status, run?.digest.filesChanged.length]);
 
+  // The feed opens at the newest step and follows new ones (and images loading) while
+  // you're at the bottom; scrolling up stops that until you scroll back down. It scrolls
+  // only the feed itself: scrollIntoView would also scroll every container around it,
+  // including a web page embedding the app.
+  const stick = useRef(true);
+  const hasRun = Boolean(run);
+  const approvalId = run?.approval?.id;
   useEffect(() => {
-    // Follow the newest step by scrolling only the feed itself. scrollIntoView would also
-    // scroll every container around it, including a web page embedding the app.
+    const feed = feedEnd.current?.closest<HTMLElement>(".feed");
+    const inner = feed?.querySelector(".feed-inner");
+    if (tab !== "activity" || !feed || !inner) return;
+    stick.current = true;
+    const toBottom = () => {
+      if (stick.current) feed.scrollTop = feed.scrollHeight;
+    };
+    const onScroll = () => {
+      stick.current = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80;
+    };
+    toBottom();
+    const grow = new ResizeObserver(toBottom);
+    grow.observe(inner);
+    feed.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      grow.disconnect();
+      feed.removeEventListener("scroll", onScroll);
+    };
+  }, [tab, hasRun]);
+
+  useEffect(() => {
+    // A ship step or an approval card always comes into view.
     const feed = feedEnd.current?.closest(".feed");
     const shipped = events.at(-1)?.event;
     const justShipped = shipped?.type === "tool.result" && shipped.name === "ship";
-    if (tab === "activity" && (run?.active || justShipped) && feed)
+    if (tab === "activity" && feed && (justShipped || approvalId)) {
+      stick.current = true;
       feed.scrollTop = feed.scrollHeight;
-  }, [events, tab, run?.active, run?.approval?.id]);
+    }
+  }, [events, tab, approvalId]);
 
   // A push or PR on a project that isn't on GitHub yet first asks which repo.
   const [connect, setConnect] = useState<{ kind: ShipKind; suggestion: string }>();
