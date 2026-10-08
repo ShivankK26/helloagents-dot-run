@@ -73,3 +73,5 @@ names are left out on purpose.
 - Long tasks were cut off in the composer ("the chat window should be draggable and
   extendable") → the task and follow-up boxes grow with the text and have a drag
   grip to resize, remembered per box (v0.2.23).
+- A half-written task was lost on switching projects ("this should be saved as a draft
+  in that project") → per-project drafts, per-run for follow-ups (v0.2.24).

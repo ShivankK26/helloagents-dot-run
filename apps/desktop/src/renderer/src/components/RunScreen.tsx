@@ -18,6 +18,7 @@ import { AttachButton, AttachmentStrip, DropOverlay, useAttachments } from "./At
 import { useGrowBox } from "./Grow";
 import { Icon } from "./Icons";
 import { Markdown } from "./Markdown";
+import { loadDraft, saveDraft } from "../drafts";
 import { errorText, showToast } from "../toast";
 import { Menu } from "./Menu";
 import { TraceView } from "./TraceView";
@@ -571,10 +572,16 @@ function Dock({
   onShip: (kind: ShipKind) => Promise<void>;
 }) {
   const api = window.helloagents;
-  const [text, setText] = useState("");
+  const [draft] = useState(() => loadDraft(`run.${runId}`));
+  const [text, setText] = useState(draft.text);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
-  const images = useAttachments(setError);
+  const images = useAttachments(setError, draft.images);
+  const savedImages = JSON.stringify(images.saved());
+
+  useEffect(() => {
+    saveDraft(`run.${runId}`, { text, images: JSON.parse(savedImages) });
+  }, [runId, text, savedImages]);
   const box = useRef<HTMLTextAreaElement>(null);
   const grip = useGrowBox(box, text, "follow-up", "top");
 

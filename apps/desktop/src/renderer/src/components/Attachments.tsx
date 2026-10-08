@@ -1,4 +1,4 @@
-import { useState, type ClipboardEvent, type DragEvent } from "react";
+import { useEffect, useState, type ClipboardEvent, type DragEvent } from "react";
 import { errorText } from "../toast";
 import { Icon } from "./Icons";
 
@@ -24,10 +24,33 @@ const readAsDataUrl = (file: File) =>
   });
 
 /** Images attached to a message: drop, paste or pick them; each is saved for the agent at once. */
-export function useAttachments(onError: (message: string) => void) {
+export function useAttachments(
+  onError: (message: string) => void,
+  initial: Array<{ name: string; path: string }> = [],
+) {
   const api = window.helloagents;
-  const [items, setItems] = useState<Attachment[]>([]);
+  const [items, setItems] = useState<Attachment[]>(() =>
+    initial.map((a) => ({ ...a, id: crypto.randomUUID(), preview: "" })),
+  );
   const [dragging, setDragging] = useState(false);
+
+  // Images from a saved draft: load their thumbnails, and drop any that are gone.
+  useEffect(() => {
+    for (const a of items) {
+      if (a.preview || !a.path) continue;
+      void api
+        .readImage(a.path)
+        .then((preview) =>
+          setItems((list) =>
+            preview
+              ? list.map((b) => (b.id === a.id ? { ...b, preview } : b))
+              : list.filter((b) => b.id !== a.id),
+          ),
+        );
+    }
+    // Only once, for the images the draft brought back.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function add(files: Iterable<File>) {
     const images = [...files].filter((f) => TYPES.includes(f.type));
@@ -71,6 +94,8 @@ export function useAttachments(onError: (message: string) => void) {
     dragging,
     saving: items.some((a) => !a.path),
     paths: () => items.flatMap((a) => (a.path ? [a.path] : [])),
+    /** The saved images, for keeping in a draft. */
+    saved: () => items.flatMap((a) => (a.path ? [{ name: a.name, path: a.path }] : [])),
     add: (files: Iterable<File>) => void add(files),
     remove: (id: string) => setItems((list) => list.filter((a) => a.id !== id)),
     clear: () => setItems([]),
@@ -113,7 +138,7 @@ export function AttachmentStrip({
     <div className="attachments">
       {items.map((a) => (
         <figure key={a.id} className={`thumb ${a.path ? "" : "saving"}`} title={a.name}>
-          <img src={a.preview} alt={a.name} />
+          {a.preview ? <img src={a.preview} alt={a.name} /> : null}
           <button
             type="button"
             className="thumb-x"

@@ -81,3 +81,5 @@ each release maps to one change set.
   project folder) instead of handing commands back; older runs are told once.
 - **0.2.23**: Task and follow-up boxes grow with the text and can be dragged taller
   or shorter by a grip on the edge (remembered; double-click resets).
+- **0.2.24**: Unsent tasks and images are kept as a draft per project (and per run
+  for follow-ups), even across restarts.

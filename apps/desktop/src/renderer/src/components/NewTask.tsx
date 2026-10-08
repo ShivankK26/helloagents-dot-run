@@ -10,6 +10,7 @@ import {
   modelName,
   saveSettings,
 } from "../composer";
+import { loadDraft, saveDraft } from "../drafts";
 import { errorText } from "../toast";
 import { AttachButton, AttachmentStrip, DropOverlay, useAttachments } from "./Attachments";
 import { useGrowBox } from "./Grow";
@@ -34,7 +35,9 @@ export function NewTask({
   onEditActions: () => void;
 }) {
   const api = window.helloagents;
-  const [task, setTask] = useState("");
+  // What you typed stays with the project when you switch away.
+  const [draft] = useState(() => loadDraft(project.id));
+  const [task, setTask] = useState(draft.text);
   const [settings, setSettings] = useState<RunSettings>(() => loadSettings(project.id));
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string>();
@@ -42,7 +45,12 @@ export function NewTask({
   const worker = options.find((o) => o.id === project.workerAgent);
   const isClaude = project.workerAgent === "claude-code";
   const branchMode = settings.workspace !== "checkout";
-  const images = useAttachments(setError);
+  const images = useAttachments(setError, draft.images);
+  const savedImages = JSON.stringify(images.saved());
+
+  useEffect(() => {
+    saveDraft(project.id, { text: task, images: JSON.parse(savedImages) });
+  }, [project.id, task, savedImages]);
   // Bumped to open the model or effort picker from "/model" or "/effort".
   const [openModel, setOpenModel] = useState(0);
   const [openEffort, setOpenEffort] = useState(0);
@@ -59,7 +67,12 @@ export function NewTask({
 
   const grip = useGrowBox(box, task, "task", "bottom");
 
-  useEffect(() => box.current?.focus({ preventScroll: true }), []);
+  // Focus the box, with the cursor after any draft.
+  useEffect(() => {
+    const el = box.current;
+    el?.focus({ preventScroll: true });
+    el?.setSelectionRange(el.value.length, el.value.length);
+  }, []);
 
   const update = (patch: Partial<RunSettings>) => {
     const next = { ...settings, ...patch };
