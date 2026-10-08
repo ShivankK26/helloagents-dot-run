@@ -22,6 +22,10 @@ claude -p --output-format stream-json --verbose
 --tools Read,Edit,Write,Glob,Grep,Bash,Task`. `Task` is the sub-agent tool (the CLI
   also accepts `Agent` as an alias, probed on 2.1.291); sub-agent messages are ignored. If an older CLI rejects a flag, the run
   retries once without them.
+- **Slash commands in follow-ups** work over stdin stream-json (probed: a project
+  command in a user message ran). helloagents' notes are appended after the text, so
+  the `/command` stays first. The `/` menu also lists `mcp_servers` from the init line
+  (name without `plugin:x:`, status: connected / needs-auth / failed).
 - **No Artifact tool headless.** Probed on 2.1.294: `claude -p` with the full setup
   lists skills (57), MCP connectors (claude.ai Docs) and WebFetch/WebSearch, but no
   `Artifact` tool; it exists only in interactive Claude Code. The system prompt tells

@@ -18,6 +18,7 @@ import { AttachButton, AttachmentStrip, DropOverlay, useAttachments } from "./At
 import { useGrowBox } from "./Grow";
 import { Icon } from "./Icons";
 import { Markdown } from "./Markdown";
+import { useSlashMenu } from "./SlashMenu";
 import { loadDraft, saveDraft } from "../drafts";
 import { errorText, showToast } from "../toast";
 import { Menu } from "./Menu";
@@ -336,6 +337,8 @@ export function RunScreen({
       {worktree && !run.branchGone ? (
         <Dock
           runId={runId}
+          projectId={project.id}
+          isClaude={(run.agent ?? "claude-code") === "claude-code"}
           enabled={canFollowUp}
           active={run.active}
           inPlace={inPlace}
@@ -558,6 +561,8 @@ function RunFacts({
 /** The follow-up box: one line until you click it. */
 function Dock({
   runId,
+  projectId,
+  isClaude,
   enabled,
   active,
   inPlace,
@@ -565,6 +570,8 @@ function Dock({
   onShip,
 }: {
   runId: string;
+  projectId: string;
+  isClaude: boolean;
   enabled: boolean;
   active: boolean;
   inPlace: boolean;
@@ -584,6 +591,15 @@ function Dock({
   }, [runId, text, savedImages]);
   const box = useRef<HTMLTextAreaElement>(null);
   const grip = useGrowBox(box, text, "follow-up", "top");
+  const slash = useSlashMenu({
+    projectId,
+    text,
+    enabled: enabled && isClaude,
+    onInsert: (next) => {
+      setText(next);
+      box.current?.focus();
+    },
+  });
 
   // "push it", "open a PR": helloagents does that itself, since the agent can't.
   const intent = enabled && !active && !images.items.length ? shipIntent(text, inPlace) : null;
@@ -624,6 +640,7 @@ function Dock({
       >
         {images.dragging ? <DropOverlay /> : null}
         {enabled ? grip : null}
+        {slash.menu}
         <label htmlFor={`follow-${runId}`} className="sr">
           Follow-up
         </label>
@@ -635,10 +652,11 @@ function Dock({
           placeholder={
             active
               ? "Add to what it's doing: it reads this right away…"
-              : "Ask a follow-up, or ask for a change…"
+              : "Ask a follow-up, or type / for commands, skills and connectors…"
           }
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
+            if (slash.onKeyDown(e)) return;
             // Enter sends; Shift+Enter adds a line.
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();

@@ -9,6 +9,8 @@ interface Entry {
   description: string;
   tag: string;
   local?: LocalCommand;
+  /** An MCP connector: picking it starts a sentence instead of a command. */
+  mcp?: boolean;
 }
 
 const LOCAL: Entry[] = [
@@ -17,8 +19,9 @@ const LOCAL: Entry[] = [
 ];
 
 /**
- * The "/" menu: Claude Code's commands and skills for this project, filtered as
- * you type. Loaded the first time "/" is typed; the main process caches them.
+ * The "/" menu: Claude Code's commands, skills and MCP connectors for this project,
+ * filtered as you type. Loaded the first time "/" is typed; the main process caches them.
+ * Without `onLocal` (the follow-up box) there are no /model and /effort pickers.
  */
 export function useSlashMenu({
   projectId,
@@ -31,7 +34,7 @@ export function useSlashMenu({
   text: string;
   enabled: boolean;
   onInsert: (text: string) => void;
-  onLocal: (command: LocalCommand) => void;
+  onLocal?: (command: LocalCommand) => void;
 }) {
   const api = window.helloagents;
   // Keyed by project, so switching projects loads that project's list.
@@ -63,8 +66,13 @@ export function useSlashMenu({
     if (query === undefined) return [];
     const q = query.toLowerCase();
     const all: Entry[] = [
-      ...LOCAL,
-      ...(commands ?? []).map((c) => ({ name: c.name, description: c.description, tag: c.kind })),
+      ...(onLocal ? LOCAL : []),
+      ...(commands ?? []).map((c) => ({
+        name: c.name,
+        description: c.description,
+        tag: c.kind === "mcp" ? "connector" : c.kind,
+        mcp: c.kind === "mcp",
+      })),
     ];
     if (!q) return all;
     // Names that start with the query first, then any that contain it (or, from three
@@ -77,7 +85,7 @@ export function useSlashMenu({
           (q.length >= 3 && e.description.toLowerCase().includes(q))),
     );
     return [...starts, ...rest];
-  }, [query, commands]);
+  }, [query, commands, onLocal]);
 
   // The highlighted row, back to the top whenever the query changes.
   const [highlight, setHighlight] = useState({ query, index: 0 });
@@ -87,8 +95,9 @@ export function useSlashMenu({
   const pick = (entry: Entry) => {
     if (entry.local) {
       onInsert("");
-      onLocal(entry.local);
-    } else onInsert(`/${entry.name} `);
+      onLocal?.(entry.local);
+    } else if (entry.mcp) onInsert(`Using the ${entry.name} connector, `);
+    else onInsert(`/${entry.name} `);
   };
 
   return {
@@ -143,10 +152,10 @@ function SlashList({
   }, [active]);
 
   return (
-    <div className="slash" role="listbox" aria-label="Commands and skills" ref={list}>
+    <div className="slash" role="listbox" aria-label="Commands, skills and connectors" ref={list}>
       {entries.map((e, i) => (
         <button
-          key={e.name}
+          key={`${e.tag}:${e.name}`}
           type="button"
           role="option"
           aria-selected={i === active}
@@ -156,12 +165,17 @@ function SlashList({
           onMouseDown={(ev) => ev.preventDefault()}
           onClick={() => onPick(e)}
         >
-          <span className="slash-name">/{e.name}</span>
+          <span className="slash-name">
+            {e.mcp ? "" : "/"}
+            {e.name}
+          </span>
           <span className="slash-desc">{e.description}</span>
           <span className="slash-tag">{e.tag}</span>
         </button>
       ))}
-      {loading ? <div className="slash-note">Loading your commands and skills…</div> : null}
+      {loading ? (
+        <div className="slash-note">Loading your commands, skills and connectors…</div>
+      ) : null}
       {failed ? <div className="slash-note">Couldn't read Claude Code's commands.</div> : null}
       {!loading && !entries.length ? (
         <div className="slash-note">No matching command or skill.</div>

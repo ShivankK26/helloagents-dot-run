@@ -871,6 +871,8 @@ export const demoApi: HelloagentsApi = {
           description: "Work with Supabase: database, auth, storage",
           kind: "skill",
         },
+        { name: "figma", description: "MCP connector", kind: "mcp" },
+        { name: "linear", description: "MCP connector", kind: "mcp" },
       ],
       400,
     ),

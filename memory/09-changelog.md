@@ -86,3 +86,5 @@ each release maps to one change set.
 - **0.2.25**: Runs get the full Claude Code (skills, plugins, MCP connectors, web
   tools), not the lean setup; asked for an artifact, the agent builds an HTML page and
   opens it in the browser.
+- **0.2.26**: The `/` menu works in the follow-up box too, and lists your MCP
+  connectors (with their status) alongside commands and skills.

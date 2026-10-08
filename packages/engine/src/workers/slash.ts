@@ -3,13 +3,20 @@ import { readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
-/** A slash command or skill the user can run in a project. */
+/** A slash command, skill or MCP connector the user can use in a project. */
 export interface SlashCommand {
   /** Without the leading slash, e.g. "security-review" or "supabase:supabase". */
   name: string;
   description: string;
-  kind: "skill" | "command";
+  kind: "skill" | "command" | "mcp";
 }
+
+const MCP_STATUS: Record<string, string> = {
+  connected: "MCP connector",
+  "needs-auth": "MCP connector · needs sign-in in Claude Code",
+  failed: "MCP connector · failed to connect",
+  pending: "MCP connector · connecting",
+};
 
 /**
  * Commands that change Claude Code's own interactive session (model, context,
@@ -48,6 +55,7 @@ interface InitInfo {
   terminal_slash_commands?: string[];
   skills?: string[];
   plugins?: Array<{ name: string; path: string }>;
+  mcp_servers?: Array<{ name: string; status: string }>;
 }
 
 /**
@@ -181,9 +189,20 @@ export async function listSlashCommands(
       description: notes.get(name) ?? BUILT_IN[name] ?? "",
     });
   }
-  // Built-ins first, then the rest alphabetically.
+  // Built-ins first, then the rest alphabetically, then the MCP connectors.
   const core = (c: SlashCommand) => Number(CORE.includes(c.name));
-  return out.sort((a, b) => core(b) - core(a) || a.name.localeCompare(b.name));
+  out.sort((a, b) => core(b) - core(a) || a.name.localeCompare(b.name));
+  for (const server of init.mcp_servers ?? []) {
+    const name = server.name.replace(/^plugin:[^:]+:/, "");
+    if (seen.has(`mcp:${name}`)) continue;
+    seen.add(`mcp:${name}`);
+    out.push({
+      name,
+      kind: "mcp",
+      description: MCP_STATUS[server.status] ?? `MCP connector · ${server.status}`,
+    });
+  }
+  return out;
 }
 
 /** True when a task is a slash command, like "/security-review the upload code". */

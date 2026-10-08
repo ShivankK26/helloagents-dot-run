@@ -78,3 +78,5 @@ names are left out on purpose.
 - Asked a run to explain something "in an artifact file"; it couldn't load the skill
   ("it SHOULD BE ABLE TO DO ALL THE CLAUDE CODE OPERATIONS") → runs use the full Claude
   Code setup; the Artifact tool is interactive-only, so the agent writes HTML and opens it (v0.2.25).
+- "/" did nothing in the follow-up box ("shouldnt it show me all skills available and mcp
+  stuff and everything") → the follow-up box got the `/` menu, and MCP connectors are listed (v0.2.26).

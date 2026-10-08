@@ -63,11 +63,11 @@ export interface Opener {
   name: string;
 }
 
-/** A Claude Code slash command or skill, for the composer's "/" menu. */
+/** A Claude Code slash command, skill or MCP connector, for the composer's "/" menu. */
 export interface SlashCommand {
   name: string;
   description: string;
-  kind: "skill" | "command";
+  kind: "skill" | "command" | "mcp";
 }
 
 export type ThemeMode = "light" | "dark" | "system";

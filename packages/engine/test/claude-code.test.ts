@@ -169,9 +169,20 @@ describe("runClaudeCode", () => {
 describe("slash commands", () => {
   test("lists what Claude Code offers, minus session-only commands, without running a turn", async () => {
     const commands = await listSlashCommands(await tempDir(), FAKE);
-    expect(commands.map((c) => c.name)).toEqual(["init", "security-review", "my-skill"]);
+    expect(commands.map((c) => c.name)).toEqual([
+      "init",
+      "security-review",
+      "my-skill",
+      "figma-remote",
+      "supabase",
+    ]);
     expect(commands.find((c) => c.name === "my-skill")?.kind).toBe("skill");
     expect(commands[0]?.description).toMatch(/CLAUDE\.md/);
+    // MCP connectors come last, with their status.
+    expect(commands.at(-1)).toMatchObject({
+      kind: "mcp",
+      description: expect.stringMatching(/sign-in/),
+    });
   });
 
   test("spots a slash task", () => {

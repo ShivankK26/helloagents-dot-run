@@ -46,6 +46,10 @@ out({
   terminal_slash_commands: ["doctor"],
   skills: ["my-skill"],
   plugins: [],
+  mcp_servers: [
+    { name: "figma-remote", status: "connected" },
+    { name: "plugin:supabase:supabase", status: "needs-auth" },
+  ],
 });
 out({ type: "system", subtype: "commands_changed", commands: [] });
 // "chat": the user says something while it works; Claude Code replays it once read.
