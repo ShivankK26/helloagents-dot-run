@@ -83,3 +83,6 @@ each release maps to one change set.
   or shorter by a grip on the edge (remembered; double-click resets).
 - **0.2.24**: Unsent tasks and images are kept as a draft per project (and per run
   for follow-ups), even across restarts.
+- **0.2.25**: Runs get the full Claude Code (skills, plugins, MCP connectors, web
+  tools), not the lean setup; asked for an artifact, the agent builds an HTML page and
+  opens it in the browser.

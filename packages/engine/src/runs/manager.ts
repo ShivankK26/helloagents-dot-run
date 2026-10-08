@@ -40,7 +40,6 @@ import {
   type PermissionDecision,
   type PermissionRequest,
 } from "../workers/claude-code";
-import { isSlashTask } from "../workers/slash";
 import { type AgentApi, type AgentRequest, startAgentApi, writeAgentHelper } from "./agent-api";
 import {
   declaredPackageManager,
@@ -924,8 +923,8 @@ export class RunManager {
       const r = await runClaudeCode({
         env,
         task: withAttachments(t.task, attachments),
-        // Slash commands and skills need the user's full Claude Code setup.
-        lean: !isSlashTask(t.task),
+        // The user's full Claude Code: skills, plugins, MCP connectors, every tool.
+        lean: false,
         ...(dirs.length && { addDirs: [...new Set(dirs)] }),
         workspace: t.workspace,
         signal: t.signal,

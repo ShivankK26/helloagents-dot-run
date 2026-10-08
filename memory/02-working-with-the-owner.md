@@ -22,6 +22,8 @@ say otherwise.
   failing; background commands keep running. **Agents must never hand commands
   back** ("run these in Terminal"): they run git and everything else themselves,
   asking for approval when needed (said twice, 7 Oct).
+- **Agents get the full Claude Code**: skills, plugins, MCP connectors, every tool. No
+  stripped-down workers (lean mode was dropped on 8 Oct for this).
 - **Auto mode by default, every time.** They want to automate their tasks.
 - **Keep it simple.** When offered a nuanced design, they often pick the simpler
   one ("no keep it simple: once pushed or a PR is raised, remove the worktree").

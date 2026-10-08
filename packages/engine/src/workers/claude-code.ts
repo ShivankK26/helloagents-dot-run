@@ -191,7 +191,10 @@ export const HELLOAGENTS_NOTE =
   "To show the user what something looks like (an app in the iOS Simulator, a web page), take a " +
   "screenshot into .helloagents/screenshots/ (for example `xcrun simctl io booted screenshot " +
   ".helloagents/screenshots/home.png`) and open it with the Read tool: helloagents shows images " +
-  "you read to the user.";
+  "you read to the user. The user's skills, plugins and MCP connectors are available; use them " +
+  "when they fit. The Artifact tool only exists in interactive Claude Code, so when the user asks " +
+  "for an artifact, a page or a visual explainer, write a self-contained HTML file, open it in " +
+  "their browser with `open <file>`, and say where it is.";
 
 /**
  * Sent with a message typed while the agent works. Without it, a request that arrives

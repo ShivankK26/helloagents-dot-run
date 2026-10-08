@@ -23,3 +23,7 @@
 | Non-git folders added directly (git set up locally)                                                                                                    | The owner wanted no extra step; worktrees need git                                                                                                  |
 | Mac only, ad-hoc signed, not notarized                                                                                                                 | Notarization needs a paid Apple developer account; later                                                                                            |
 | One release command that also updates the website                                                                                                      | The owner wants the landing page always on the newest version                                                                                       |
+
+Reversed (8 Oct, v0.2.25): runs no longer start lean. The owner wants every Claude Code
+capability ("it SHOULD BE ABLE TO DO ALL THE CLAUDE CODE OPERATIONS"), which outweighs
+the token savings.

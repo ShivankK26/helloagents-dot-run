@@ -16,12 +16,16 @@ claude -p --output-format stream-json --verbose
   [lean flags] [--add-dir <attachments>] [--model] [--effort] [--resume <session>]
 ```
 
-- **Lean flags** (default, saves tens of thousands of tokens per turn):
+- **Lean flags** (no longer used by runs since v0.2.25: the owner wants the full
+  Claude Code, skills, plugins and MCP included; the worker option and fallback remain):
   `--strict-mcp-config --setting-sources project,local --disable-slash-commands
 --tools Read,Edit,Write,Glob,Grep,Bash,Task`. `Task` is the sub-agent tool (the CLI
   also accepts `Agent` as an alias, probed on 2.1.291); sub-agent messages are ignored. If an older CLI rejects a flag, the run
-  retries once without them. A task that starts with `/` (a slash command or
-  skill) runs **without** lean flags so the user's skills load.
+  retries once without them.
+- **No Artifact tool headless.** Probed on 2.1.294: `claude -p` with the full setup
+  lists skills (57), MCP connectors (claude.ai Docs) and WebFetch/WebSearch, but no
+  `Artifact` tool; it exists only in interactive Claude Code. The system prompt tells
+  the agent to write a self-contained HTML file and `open` it instead.
 - **Modes** map to `--permission-mode`: Auto → `auto` (Claude approves safe
   actions itself), Ask for commands → `acceptEdits`, Plan first → `plan`,
   Full access → `bypassPermissions` (no prompts at all).

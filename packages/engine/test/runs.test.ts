@@ -122,7 +122,7 @@ describe("RunManager", () => {
     expect(args[args.indexOf("--add-dir") + 1]).toBe(path.dirname(shot));
     expect(args).not.toContain("--disable-slash-commands");
 
-    // A follow-up without images is a plain, lean turn.
+    // A follow-up without images; still the full Claude Code setup.
     await manager.followUp(runId, "Thanks");
     await manager.settled(runId);
     const next = JSON.parse(await readFile(argsFile, "utf8")) as string[];
@@ -130,7 +130,7 @@ describe("RunManager", () => {
     // Only the user's own project folder, no image folder.
     expect(next[next.indexOf("--add-dir") + 1]).toBe(repo);
     expect(next).not.toContain(path.dirname(shot));
-    expect(next).toContain("--disable-slash-commands");
+    expect(next).not.toContain("--disable-slash-commands");
   });
 
   test("asks before a command that isn't allowed, and remembers 'always'", async () => {

@@ -75,3 +75,6 @@ names are left out on purpose.
   grip to resize, remembered per box (v0.2.23).
 - A half-written task was lost on switching projects ("this should be saved as a draft
   in that project") → per-project drafts, per-run for follow-ups (v0.2.24).
+- Asked a run to explain something "in an artifact file"; it couldn't load the skill
+  ("it SHOULD BE ABLE TO DO ALL THE CLAUDE CODE OPERATIONS") → runs use the full Claude
+  Code setup; the Artifact tool is interactive-only, so the agent writes HTML and opens it (v0.2.25).
