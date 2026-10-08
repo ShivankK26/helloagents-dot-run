@@ -82,3 +82,5 @@ names are left out on purpose.
   stuff and everything") → the follow-up box got the `/` menu, and MCP connectors are listed (v0.2.26).
 - Opening a run showed the top of the chat ("it should scroll to the bottom not the top")
   → the feed opens at the bottom and sticks there while you're at the bottom (v0.2.27).
+- "at a time user should be able to open multiple chat screens here at the top bar" →
+  mocked three tab designs (artifact), owner picked browser tabs → built (v0.2.28).

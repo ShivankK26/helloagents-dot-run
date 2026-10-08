@@ -56,6 +56,11 @@ const api: HelloagentsApi = {
     ipcRenderer.on(IPC.openRun, handler);
     return () => ipcRenderer.removeListener(IPC.openRun, handler);
   },
+  onCloseTab: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on(IPC.closeTab, handler);
+    return () => ipcRenderer.removeListener(IPC.closeTab, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld("helloagents", api);

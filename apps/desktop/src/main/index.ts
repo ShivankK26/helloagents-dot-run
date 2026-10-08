@@ -93,6 +93,19 @@ function createWindow(): BrowserWindow {
     if (url.startsWith("https://")) void shell.openExternal(url);
     return { action: "deny" };
   });
+  // ⌘W closes a tab, not the window; the app closes the window after the last tab.
+  w.webContents.on("before-input-event", (event, input) => {
+    if (
+      input.type === "keyDown" &&
+      input.meta &&
+      !input.shift &&
+      !input.alt &&
+      input.key.toLowerCase() === "w"
+    ) {
+      event.preventDefault();
+      w.webContents.send(IPC.closeTab);
+    }
+  });
   w.webContents.on("will-navigate", (event, url) => {
     if (url !== w.webContents.getURL()) event.preventDefault();
   });

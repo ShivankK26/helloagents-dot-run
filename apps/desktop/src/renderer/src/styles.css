@@ -3862,3 +3862,130 @@ body.resizing * {
   cursor: ns-resize !important;
   user-select: none;
 }
+
+/* Tabs: open chats in the title bar, like a browser. The current one joins the page. */
+.ctabs {
+  display: flex;
+  align-items: flex-end;
+  align-self: stretch;
+  gap: 2px;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ctabs::-webkit-scrollbar {
+  display: none;
+}
+.ctab {
+  -webkit-app-region: no-drag;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 1 200px;
+  min-width: 72px;
+  height: 35px;
+  padding: 0 5px 0 11px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 9px 9px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.2;
+  cursor: default;
+  user-select: none;
+}
+.ctab:hover:not(.on) {
+  background: color-mix(in srgb, var(--sunk) 70%, transparent);
+  color: var(--ink);
+}
+.ctab.on {
+  background: var(--bg);
+  border-color: var(--line);
+  color: var(--ink);
+  margin-bottom: -1px;
+  height: 36px;
+  z-index: 1;
+}
+.ctab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* Hairline between two tabs that aren't current or hovered. */
+.ctab:not(.on, :hover) + .ctab:not(.on, :hover)::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: 10px;
+  height: 16px;
+  width: 1px;
+  background: var(--line-2);
+}
+.ctab .dot {
+  flex-shrink: 0;
+}
+.ctab-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.ctab-title,
+.ctab-sub {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ctab.on .ctab-title {
+  font-weight: 500;
+}
+.ctab-sub {
+  font-size: 11px;
+  color: var(--faint);
+}
+.titlebar .ctab-x {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--faint);
+  opacity: 0;
+}
+.ctab:hover .ctab-x,
+.ctab.on .ctab-x,
+.ctab-x:focus-visible {
+  opacity: 1;
+}
+.titlebar .ctab-x:hover {
+  background: var(--sunk);
+  color: var(--ink);
+}
+.titlebar .ctab-new {
+  flex-shrink: 0;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 4px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+}
+.titlebar .ctab-new:hover {
+  background: var(--sunk);
+  color: var(--ink);
+}
+.tb-search.icon {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}

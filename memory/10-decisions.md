@@ -27,3 +27,7 @@
 Reversed (8 Oct, v0.2.25): runs no longer start lean. The owner wants every Claude Code
 capability ("it SHOULD BE ABLE TO DO ALL THE CLAUDE CODE OPERATIONS"), which outweighs
 the token savings.
+
+Tabs (8 Oct, v0.2.28): open chats as browser-style tabs in the title bar (option A of three
+mocked: browser tabs, pills, tab strip). One window, tabs swap the main screen; a run
+opens in its existing tab rather than a duplicate.

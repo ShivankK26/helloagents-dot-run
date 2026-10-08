@@ -90,3 +90,5 @@ each release maps to one change set.
   connectors (with their status) alongside commands and skills.
 - **0.2.27**: Runs open scrolled to the newest message and follow new ones while
   you're at the bottom; scrolling up stops the follow.
+- **0.2.28**: Tabs in the title bar: keep several chats open, ⌘-click / ⌘T / + for a new
+  tab, ⌘W closes one, ⌃Tab switches; status dot per tab; tabs come back after a restart.

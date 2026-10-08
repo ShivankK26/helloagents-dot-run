@@ -17,7 +17,6 @@ import { AddProject } from "./components/AddProject";
 import { ErrorsPage } from "./components/ErrorsPage";
 import { EvalsPage } from "./components/EvalsPage";
 import { Icon } from "./components/Icons";
-import { Menu } from "./components/Menu";
 import { NewTask } from "./components/NewTask";
 import { Overview } from "./components/Overview";
 import { Palette, type Command } from "./components/Palette";
@@ -29,13 +28,20 @@ import { TracesPage } from "./components/TracesPage";
 import { Welcome } from "./components/Welcome";
 import { Logo } from "./Logo";
 import { outcomeOf } from "./outcome";
+import { closeTab, loadTabs, newTab, saveTabs, type Screen, type Tab, type Tabs } from "./tabs";
 import { applyTheme, savedTheme, watchSystemTheme } from "./theme";
 import { errorText, showToast } from "./toast";
 
-type Screen =
-  | { kind: "home" }
-  | { kind: "run"; runId: string; tab: RunTab }
-  | { kind: "section"; section: Section };
+// ⌘-click opens in a new tab: remember whether the click being handled had ⌘ held.
+let lastClick = { meta: false, at: 0 };
+window.addEventListener(
+  "click",
+  (e) => {
+    lastClick = { meta: e.metaKey, at: e.timeStamp };
+  },
+  true,
+);
+const wantsNewTab = () => lastClick.meta && performance.now() - lastClick.at < 100;
 
 const PIN_KEY = "helloagents.sidebarPinned";
 const readPinned = () => {
@@ -55,9 +61,22 @@ export function App() {
   const [projects, setProjects] = useState<ProjectRecord[]>();
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [errorCount, setErrorCount] = useState(0);
-  const [projectId, setProjectId] = useState<string>();
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>();
-  const [screen, setScreen] = useState<Screen>({ kind: "home" });
+  // Open chats are tabs in the title bar; the current one decides what the window shows.
+  const [tabState, setTabState] = useState<Tabs>(loadTabs);
+  useEffect(() => saveTabs(tabState), [tabState]);
+  const activeTab =
+    tabState.tabs.find((t) => t.id === tabState.active) ?? (tabState.tabs[0] as Tab);
+  const screen = activeTab.screen;
+  const projectId = activeTab.projectId;
+  const setScreen = useCallback(
+    (next: Screen) =>
+      setTabState((s) => ({
+        ...s,
+        tabs: s.tabs.map((t) => (t.id === s.active ? { ...t, screen: next } : t)),
+      })),
+    [],
+  );
   const [pinned, setPinned] = useState(readPinned);
   const [peek, setPeek] = useState(false);
   const [palette, setPalette] = useState(false);
@@ -73,7 +92,14 @@ export function App() {
     () =>
       api.listProjects().then((list) => {
         setProjects(list);
-        setProjectId((id) => (id && list.some((p) => p.id === id) ? id : list[0]?.id));
+        // Tabs on a project that's gone (or none yet) move to the first project.
+        setTabState((s) => {
+          const fix = (t: Tab) =>
+            t.projectId && list.some((p) => p.id === t.projectId)
+              ? t
+              : { ...t, projectId: list[0]?.id };
+          return s.tabs.every((t) => fix(t) === t) ? s : { ...s, tabs: s.tabs.map(fix) };
+        });
         return list;
       }),
     [api],
@@ -138,16 +164,61 @@ export function App() {
 
   // ---- Navigation ----
   const project = projects?.find((p) => p.id === projectId);
-  const openProject = useCallback((id: string) => {
-    setProjectId(id);
-    setScreen({ kind: "home" });
-  }, []);
-  function showRun(runId: string, tab: RunTab = "activity") {
-    void api.getRun(runId).then((run) => {
-      if (run?.projectId) setProjectId(run.projectId);
-      setScreen({ kind: "run", runId, tab });
+
+  /** Shows a screen: in its own tab if it's open, a new tab on ⌘-click, else in this tab. */
+  const go = useCallback((next: Screen, pid?: string, fresh = false) => {
+    setTabState((s) => {
+      const open =
+        next.kind === "run"
+          ? s.tabs.find((t) => t.screen.kind === "run" && t.screen.runId === next.runId)
+          : undefined;
+      if (open)
+        return {
+          tabs: s.tabs.map((t) => (t.id === open.id ? { ...t, screen: next } : t)),
+          active: open.id,
+        };
+      const at = Math.max(
+        0,
+        s.tabs.findIndex((t) => t.id === s.active),
+      );
+      const current = s.tabs[at] as Tab;
+      const tab = { ...newTab(next, pid ?? current.projectId), ...(!fresh && { id: current.id }) };
+      if (!fresh) return { ...s, tabs: s.tabs.map((t) => (t.id === current.id ? tab : t)) };
+      return { tabs: [...s.tabs.slice(0, at + 1), tab, ...s.tabs.slice(at + 1)], active: tab.id };
     });
+  }, []);
+  const openProject = useCallback(
+    (id: string, fresh = wantsNewTab()) => go({ kind: "home" }, id, fresh),
+    [go],
+  );
+  function showRun(runId: string, tab: RunTab = "activity") {
+    const fresh = wantsNewTab();
+    const known = runs.find((r) => r.id === runId)?.projectId;
+    if (known) return go({ kind: "run", runId, tab }, known, fresh);
+    void api
+      .getRun(runId)
+      .then((run) => go({ kind: "run", runId, tab }, run?.projectId ?? undefined, fresh));
   }
+  const openTab = useCallback(() => go({ kind: "home" }, undefined, true), [go]);
+  const shutTab = useCallback((id: string) => {
+    setTabState((s) => {
+      // Closing the last New task tab closes the window, like a browser.
+      const only = s.tabs.length === 1 ? s.tabs[0] : undefined;
+      if (only?.id === id && only.screen.kind === "home") {
+        window.close();
+        return s;
+      }
+      return closeTab(s, id);
+    });
+  }, []);
+  const cycleTab = useCallback((step: number) => {
+    setTabState((s) => {
+      const at = s.tabs.findIndex((t) => t.id === s.active);
+      const n = s.tabs.length;
+      return { ...s, active: (s.tabs[(at + step + n) % n] as Tab).id };
+    });
+  }, []);
+  useEffect(() => api.onCloseTab(() => shutTab(tabState.active)), [api, shutTab, tabState.active]);
   // Peeking: open on the left edge, close a moment after the mouse leaves (no flicker).
   const peekTimer = useRef<number>(undefined);
   const openPeek = useCallback(() => {
@@ -173,6 +244,20 @@ export function App() {
   // ---- Keyboard ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "Tab") {
+        e.preventDefault();
+        cycleTab(e.shiftKey ? -1 : 1);
+        return;
+      }
+      if (
+        e.metaKey &&
+        e.shiftKey &&
+        (e.key === "[" || e.key === "]" || e.key === "{" || e.key === "}")
+      ) {
+        e.preventDefault();
+        cycleTab(e.key === "[" || e.key === "{" ? -1 : 1);
+        return;
+      }
       const mod = e.metaKey || e.ctrlKey;
       if (!mod || e.altKey) return;
       const k = e.key.toLowerCase();
@@ -191,17 +276,20 @@ export function App() {
       } else if (k === "n" && !e.shiftKey) {
         e.preventDefault();
         setScreen({ kind: "home" });
+      } else if (k === "t" && !e.shiftKey) {
+        e.preventDefault();
+        openTab();
       } else if (/^[1-9]$/.test(k) && projects) {
         const p = projects[Number(k) - 1];
         if (p) {
           e.preventDefault();
-          openProject(p.id);
+          openProject(p.id, false);
         }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [togglePin, toggleTheme, projects, openProject]);
+  }, [togglePin, toggleTheme, projects, openProject, setScreen, openTab, cycleTab]);
 
   const options = agentOptions(agents, info);
   const projectRuns = runs.filter((r) => r.projectId);
@@ -397,12 +485,23 @@ export function App() {
   ]);
 
   // ---- Render ----
-  const pageLabel =
-    screen.kind === "section"
-      ? { overview: "Overview", traces: "Traces", errors: "Errors", evals: "Evals" }[screen.section]
-      : screen.kind === "run"
-        ? (currentRun?.title ?? "Run")
-        : "New task";
+  const projectName = (id?: string) => projects?.find((p) => p.id === id)?.name;
+  const tabLabel = (t: Tab): { title: string; sub?: string; tone?: string } => {
+    const sc = t.screen;
+    if (sc.kind === "section")
+      return {
+        title: { overview: "Overview", traces: "Traces", errors: "Errors", evals: "Evals" }[
+          sc.section
+        ],
+      };
+    if (sc.kind === "home") return { title: "New task", sub: projectName(t.projectId) };
+    const run = runs.find((r) => r.id === sc.runId);
+    return {
+      title: run?.title ?? "Run",
+      sub: projectName(run?.projectId ?? t.projectId),
+      tone: run ? outcomeOf(run).tone : undefined,
+    };
+  };
 
   const sidebar =
     projects && projects.length > 0 ? (
@@ -441,47 +540,67 @@ export function App() {
     <div className="app">
       <header className="titlebar">
         <span className="tb-divider" aria-hidden="true" />
-        <div className="brand">
-          <Logo size={18} /> helloagents
+        <div className="brand" title="helloagents">
+          <Logo size={18} />
         </div>
-        {project && projects ? (
-          <nav className="tb-crumb" aria-label="Location">
-            <Menu
-              className="crumb-btn"
-              width={260}
-              trigger={
-                <>
-                  {project.name}{" "}
-                  <span className="caret">
-                    <Icon name="chevronDown" size={14} />
+        {projects?.length ? (
+          <nav className="ctabs" aria-label="Open tabs">
+            {tabState.tabs.map((t) => {
+              const label = tabLabel(t);
+              const on = t.id === activeTab.id;
+              return (
+                <div
+                  key={t.id}
+                  className={`ctab ${on ? "on" : ""}`}
+                  role="tab"
+                  aria-selected={on}
+                  tabIndex={0}
+                  title={label.sub ? `${label.title} · ${label.sub}` : label.title}
+                  onClick={() => setTabState((st) => ({ ...st, active: t.id }))}
+                  onAuxClick={(e) => e.button === 1 && shutTab(t.id)}
+                  onKeyDown={(e) =>
+                    (e.key === "Enter" || e.key === " ") &&
+                    setTabState((st) => ({ ...st, active: t.id }))
+                  }
+                >
+                  {label.tone ? <i className={`dot ${label.tone}`} /> : null}
+                  <span className="ctab-text">
+                    <span className="ctab-title">{label.title}</span>
+                    {label.sub ? <span className="ctab-sub">{label.sub}</span> : null}
                   </span>
-                </>
-              }
-              items={[
-                { header: "Projects" },
-                ...projects.map((p, i) => ({
-                  id: p.id,
-                  label: p.name,
-                  checked: p.id === project.id,
-                  right: i < 9 ? `⌘${i + 1}` : undefined,
-                  onSelect: () => openProject(p.id),
-                })),
-                {
-                  id: "add",
-                  label: "Add a project…",
-                  icon: <Icon name="plus" size={13} />,
-                  onSelect: () => setAdding(true),
-                },
-              ]}
-            />
-            <span className="crumb-sep">/</span>
-            <span className="crumb-page">{pageLabel}</span>
+                  <button
+                    className="ctab-x"
+                    aria-label={`Close ${label.title}`}
+                    title="Close (⌘W)"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      shutTab(t.id);
+                    }}
+                  >
+                    <Icon name="close" size={11} />
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              className="ctab-new"
+              onClick={openTab}
+              title="New tab (⌘T)"
+              aria-label="New tab"
+            >
+              <Icon name="plus" size={14} />
+            </button>
           </nav>
         ) : null}
         <span className="grow" />
         {projects?.length ? (
-          <button className="tb-search" onClick={() => setPalette(true)}>
-            <Icon name="search" size={13} /> Search or run a command <span className="kbd">⌘K</span>
+          <button
+            className="tb-search icon"
+            onClick={() => setPalette(true)}
+            title="Search or run a command (⌘K)"
+            aria-label="Search or run a command"
+          >
+            <Icon name="search" size={14} />
           </button>
         ) : null}
         <button
@@ -598,8 +717,12 @@ export function App() {
           onRemoved={() => {
             const name = projects.find((p) => p.id === removing)?.name ?? "project";
             setRemoving(undefined);
-            if (screen.kind === "run" && currentRun?.projectId === removing)
-              setScreen({ kind: "home" });
+            // Its tabs go too.
+            setTabState((s) =>
+              s.tabs
+                .filter((t) => t.projectId === removing)
+                .reduce((acc, t) => closeTab(acc, t.id), s),
+            );
             void loadProjects().then(() => loadRuns());
             showToast(`Removed ${name}`, { tone: "ok" });
           }}

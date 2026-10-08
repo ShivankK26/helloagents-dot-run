@@ -956,6 +956,7 @@ export const demoApi: HelloagentsApi = {
     opened.add(l);
     return () => opened.delete(l);
   },
+  onCloseTab: () => () => undefined,
 };
 
 /** Fills in the history, then starts two runs so the demo opens on live work. */

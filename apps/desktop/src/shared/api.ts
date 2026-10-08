@@ -173,6 +173,8 @@ export interface HelloagentsApi {
   onRunChanged(listener: (runId: string) => void): () => void;
   /** Called when a notification is clicked: show this run. */
   onOpenRun(listener: (runId: string) => void): () => void;
+  /** Called on ⌘W: close the current tab (the window closes only with the last one). */
+  onCloseTab(listener: () => void): () => void;
 }
 
 /** IPC channel names, shared so main and preload can't drift apart. */
@@ -218,4 +220,5 @@ export const IPC = {
   openExternal: "shell:open-external",
   runChanged: "runs:changed",
   openRun: "runs:open",
+  closeTab: "tabs:close",
 } as const;
