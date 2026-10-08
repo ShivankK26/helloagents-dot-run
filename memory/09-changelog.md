@@ -79,3 +79,5 @@ each release maps to one change set.
   agent carries on; sub-agents (Task) enabled in lean runs.
 - **0.2.22**: Agents run git themselves (pull, push, merge, also in the user's
   project folder) instead of handing commands back; older runs are told once.
+- **0.2.23**: Task and follow-up boxes grow with the text and can be dragged taller
+  or shorter by a grip on the edge (remembered; double-click resets).
