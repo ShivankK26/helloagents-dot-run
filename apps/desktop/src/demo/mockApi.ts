@@ -591,7 +591,7 @@ function startLive(project: ProjectRecord, task: string, settings: RunSettings =
 /** The note the engine adds to a prompt for attached images (the feed shows it as chips). */
 const withImages = (task: string, images: string[] = []) =>
   images.length
-    ? `${task}\n\n[Attached images]\nThe user attached these images for reference.\n${images.map((p) => `- ${p}`).join("\n")}`
+    ? `${task}\n\n[Attached files]\nThe user attached these files for reference.\n${images.map((p) => `- ${p}`).join("\n")}`
     : task;
 
 function continueLive(run: DemoRun, message: string, images?: string[]): void {

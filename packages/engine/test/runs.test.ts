@@ -117,7 +117,7 @@ describe("RunManager", () => {
     await manager.settled(runId);
 
     const args = JSON.parse(await readFile(argsFile, "utf8")) as string[];
-    expect(args[1]).toContain("/security-review the upload code\n\n[Attached images]");
+    expect(args[1]).toContain("/security-review the upload code\n\n[Attached files]");
     expect(args[1]).toContain(`- ${shot}`);
     expect(args[args.indexOf("--add-dir") + 1]).toBe(path.dirname(shot));
     expect(args).not.toContain("--disable-slash-commands");

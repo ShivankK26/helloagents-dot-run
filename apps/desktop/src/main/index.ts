@@ -310,10 +310,12 @@ app.whenReady().then(async () => {
   });
   const attachmentsDir = path.join(dataDir, "attachments");
   ipcMain.handle(IPC.saveAttachment, async (_e, name: string, bytes: Uint8Array) => {
-    const ext = path.extname(name).toLowerCase();
-    if (![".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext))
-      throw new Error("Only images can be attached.");
-    if (bytes.byteLength > 10 * 1024 * 1024) throw new Error("Images must be under 10 MB.");
+    // Any file; images are capped lower since the model reads them whole.
+    const image = [".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(
+      path.extname(name).toLowerCase(),
+    );
+    if (bytes.byteLength > (image ? 10 : 30) * 1024 * 1024)
+      throw new Error(image ? "Images must be under 10 MB." : "Files must be under 30 MB.");
     await mkdir(attachmentsDir, { recursive: true });
     const safe = path
       .basename(name)

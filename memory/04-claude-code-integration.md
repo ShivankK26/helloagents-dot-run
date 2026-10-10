@@ -132,3 +132,9 @@ feed hides that note and shows chips.
 assignments and output helpers (`head`, `grep`, `sort`...), so
 `cd x && xcodebuild ... | head` becomes `Bash(xcodebuild:*)`. Saved per project
 (`ProjectActions.alwaysAllow`) and passed in `--allowedTools` next time.
+
+## Attachments
+
+Saved to `<app data>/attachments` (`--add-dir`), listed after the task under
+`[Attached files]` with "Read them with the Read tool" (Read handles text, code, images,
+PDFs, notebooks). Runs before 0.2.30 used `[Attached images]`; the feed parses both.

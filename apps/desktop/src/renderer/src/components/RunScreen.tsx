@@ -705,7 +705,7 @@ function Dock({
       </div>
       <p className="dock-hint">
         {error ??
-          "Follow-ups continue this conversation on the same branch · drop images to attach · ↵ to send, ⇧↵ for a new line"}
+          "Follow-ups continue this conversation on the same branch · drop files to attach · ↵ to send, ⇧↵ for a new line"}
       </p>
     </form>
   );

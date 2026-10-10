@@ -4056,3 +4056,31 @@ body.resizing * {
 :root[data-theme="dark"] {
   --term-bg: #0a0a0a;
 }
+
+/* An attached file that isn't an image: a small card with its name. */
+.thumb.file {
+  width: auto;
+  max-width: 200px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 26px 0 10px;
+  color: var(--muted);
+}
+.thumb.file .thumb-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.thumb.file.saving {
+  opacity: 0.6;
+}
+.thumb.file .thumb-x {
+  top: 50%;
+  margin-top: -9px;
+  background: var(--line-2);
+  color: var(--ink);
+}

@@ -86,3 +86,5 @@ names are left out on purpose.
   mocked three tab designs (artifact), owner picked browser tabs → built (v0.2.28).
 - "there should be an option to open terminal at any point in the screen" → asked: drawer,
   floating or tab; owner picked the bottom drawer → real shell via node-pty (v0.2.29).
+- Dropping a Markdown file said "Only PNG, JPEG, GIF and WebP images can be attached"
+  ("it should be able to upload any file like md, pdf, etc") → any file attaches (v0.2.30).

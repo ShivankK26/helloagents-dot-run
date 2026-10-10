@@ -94,3 +94,5 @@ each release maps to one change set.
   tab, ⌘W closes one, ⌃Tab switches; status dot per tab; tabs come back after a restart.
 - **0.2.29**: Terminal drawer: ⌃` (or the >_ button) opens a real shell in the current
   run's or project's folder from any screen; resizable, stays alive across tabs.
+- **0.2.30**: Attach any file (Markdown, PDFs, code, images…) to tasks and follow-ups;
+  non-images show as file cards and the agent reads them with its Read tool.

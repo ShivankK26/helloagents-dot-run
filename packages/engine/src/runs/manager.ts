@@ -1121,13 +1121,13 @@ const RULES_NOTE =
 const AUTO_DENIED = /no approval surface|denied automatically|requires approval/i;
 
 /** Marks where attached images are listed in a prompt; the app hides this part. */
-export const ATTACHMENTS_HEADER = "[Attached images]";
+export const ATTACHMENTS_HEADER = "[Attached files]";
 
 /** Adds attached images to the prompt so the agent knows to look at them. */
 export function withAttachments(task: string, attachments: readonly string[]): string {
   if (!attachments.length) return task;
   const list = attachments.map((a) => `- ${a}`).join("\n");
-  return `${task}\n\n${ATTACHMENTS_HEADER}\nThe user attached these images for reference. Read them with the Read tool:\n${list}`;
+  return `${task}\n\n${ATTACHMENTS_HEADER}\nThe user attached these files for reference. Read them with the Read tool (it reads text, code, images, PDFs and notebooks):\n${list}`;
 }
 
 function commitMessage(title: string): string {

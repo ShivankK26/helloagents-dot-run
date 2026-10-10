@@ -4,12 +4,16 @@ import { Icon } from "./Icons";
 
 const TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 const MAX_FILES = 10;
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_MB = 10;
+const MAX_FILE_MB = 30;
+const isImage = (name: string) => /\.(png|jpe?g|gif|webp)$/i.test(name);
+const tooBig = (f: File) =>
+  f.size > (TYPES.includes(f.type) ? MAX_IMAGE_MB : MAX_FILE_MB) * 1024 * 1024;
 
 export interface Attachment {
   id: string;
   name: string;
-  /** Data URL for the thumbnail. */
+  /** Data URL for an image's thumbnail; empty for other files. */
   preview: string;
   /** Where it was saved for the agent; missing while saving. */
   path?: string;
@@ -37,7 +41,7 @@ export function useAttachments(
   // Images from a saved draft: load their thumbnails, and drop any that are gone.
   useEffect(() => {
     for (const a of items) {
-      if (a.preview || !a.path) continue;
+      if (a.preview || !a.path || !isImage(a.name)) continue;
       void api
         .readImage(a.path)
         .then((preview) =>
@@ -53,10 +57,14 @@ export function useAttachments(
   }, []);
 
   async function add(files: Iterable<File>) {
-    const images = [...files].filter((f) => TYPES.includes(f.type));
-    if (!images.length) return onError("Only PNG, JPEG, GIF and WebP images can be attached.");
-    const fits = images.filter((f) => f.size <= MAX_BYTES).slice(0, MAX_FILES - items.length);
-    if (fits.length < images.length) onError(`Up to ${MAX_FILES} images, each under 10 MB.`);
+    // Any file: images get a thumbnail, the rest (Markdown, PDFs, code…) a file card.
+    const picked = [...files];
+    if (!picked.length) return;
+    const fits = picked.filter((f) => !tooBig(f)).slice(0, MAX_FILES - items.length);
+    if (fits.length < picked.length)
+      onError(
+        `Up to ${MAX_FILES} files; images under ${MAX_IMAGE_MB} MB, other files under ${MAX_FILE_MB} MB.`,
+      );
     // Show them all at once, so sending waits until every one is saved.
     const added = await Promise.all(
       fits.map(async (file, i) => ({
@@ -67,7 +75,7 @@ export function useAttachments(
           file.name && file.name !== "image.png"
             ? file.name
             : `screenshot-${items.length + i + 1}.png`,
-        preview: await readAsDataUrl(file),
+        preview: TYPES.includes(file.type) ? await readAsDataUrl(file) : "",
       })),
     ).catch((e: unknown) => {
       onError(errorText(e));
@@ -94,7 +102,7 @@ export function useAttachments(
     dragging,
     saving: items.some((a) => !a.path),
     paths: () => items.flatMap((a) => (a.path ? [a.path] : [])),
-    /** The saved images, for keeping in a draft. */
+    /** The saved files, for keeping in a draft. */
     saved: () => items.flatMap((a) => (a.path ? [{ name: a.name, path: a.path }] : [])),
     add: (files: Iterable<File>) => void add(files),
     remove: (id: string) => setItems((list) => list.filter((a) => a.id !== id)),
@@ -117,7 +125,7 @@ export function useAttachments(
       },
       onPaste: (e: ClipboardEvent) => {
         const files = [...e.clipboardData.files];
-        if (!files.some((f) => TYPES.includes(f.type))) return;
+        if (!files.length) return;
         e.preventDefault();
         void add(files);
       },
@@ -125,7 +133,7 @@ export function useAttachments(
   };
 }
 
-/** Thumbnails of attached images, each with a remove button. */
+/** Attached files: thumbnails for images, a card with the name for the rest. */
 export function AttachmentStrip({
   items,
   onRemove,
@@ -137,8 +145,21 @@ export function AttachmentStrip({
   return (
     <div className="attachments">
       {items.map((a) => (
-        <figure key={a.id} className={`thumb ${a.path ? "" : "saving"}`} title={a.name}>
-          {a.preview ? <img src={a.preview} alt={a.name} /> : null}
+        <figure
+          key={a.id}
+          className={`thumb ${a.path ? "" : "saving"} ${isImage(a.name) ? "" : "file"}`}
+          title={a.name}
+        >
+          {isImage(a.name) ? (
+            a.preview ? (
+              <img src={a.preview} alt={a.name} />
+            ) : null
+          ) : (
+            <>
+              <Icon name="file" size={15} />
+              <span className="thumb-name">{a.name}</span>
+            </>
+          )}
           <button
             type="button"
             className="thumb-x"
@@ -153,14 +174,16 @@ export function AttachmentStrip({
   );
 }
 
-/** The paperclip button: opens the file picker for images. */
+/** The attach button: opens the file picker for any files. */
 export function AttachButton({ onFiles }: { onFiles: (files: FileList) => void }) {
   return (
-    <label className="chip attach" title="Attach images (or drop / paste them)">
-      <Icon name="image" size={14} />
+    <label
+      className="chip attach"
+      title="Attach files: images, PDFs, Markdown… (or drop / paste them)"
+    >
+      <Icon name="clip" size={14} />
       <input
         type="file"
-        accept={TYPES.join(",")}
         multiple
         className="sr"
         onChange={(e) => {
@@ -172,11 +195,11 @@ export function AttachButton({ onFiles }: { onFiles: (files: FileList) => void }
   );
 }
 
-/** Shown over the box while images are dragged onto it. */
+/** Shown over the box while files are dragged onto it. */
 export function DropOverlay() {
   return (
     <div className="drop-overlay" aria-hidden="true">
-      <Icon name="image" size={18} /> Drop images to attach
+      <Icon name="file" size={18} /> Drop files to attach
     </div>
   );
 }
