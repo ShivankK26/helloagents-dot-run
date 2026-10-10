@@ -96,3 +96,5 @@ each release maps to one change set.
   run's or project's folder from any screen; resizable, stays alive across tabs.
 - **0.2.30**: Attach any file (Markdown, PDFs, code, images…) to tasks and follow-ups;
   non-images show as file cards and the agent reads them with its Read tool.
+- **0.2.31**: A finished run's answer shows in full in the chat right away, instead of a
+  clipped summary with "Read the full answer".

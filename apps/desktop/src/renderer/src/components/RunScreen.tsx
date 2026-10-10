@@ -1,4 +1,4 @@
-import { firstParagraph, toErrors, toolKind, isCommandTool } from "@helloagents/engine/views";
+import { toErrors, toolKind, isCommandTool } from "@helloagents/engine/views";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Opener,
@@ -17,7 +17,6 @@ import { ChangesView } from "./ChangesView";
 import { AttachButton, AttachmentStrip, DropOverlay, useAttachments } from "./Attachments";
 import { useGrowBox } from "./Grow";
 import { Icon } from "./Icons";
-import { Markdown } from "./Markdown";
 import { useSlashMenu } from "./SlashMenu";
 import { loadDraft, saveDraft } from "../drafts";
 import { errorText, showToast } from "../toast";
@@ -176,7 +175,6 @@ export function RunScreen({
   // You can type while it works; the agent reads it right away.
   const canFollowUp = Boolean(worktree);
   const inPlace = run.settings.workspace === "checkout";
-  const turns = events.filter((e) => e.event.type === "agent.start").length;
   const base = run.settings.baseBranch ?? "main";
   const where = worktree ? whereIsCode(events, base, d.filesChanged.length > 0) : null;
   const prOpen = where?.label === "PR open";
@@ -293,54 +291,39 @@ export function RunScreen({
                     onSendBack={(message) => void api.followUp(runId, message)}
                   />
                 ) : null}
-                {!run.active && !d.filesChanged.length && d.answer && turns === 1 ? (
-                  <details className="folded">
-                    <summary>
-                      <Icon name="chevron" size={12} /> How the agent got there
-                    </summary>
-                    <ActivityFeed
-                      events={events}
-                      active={false}
-                      hideAnswer={d.answer}
-                      root={worktree?.path}
-                    />
-                  </details>
-                ) : (
-                  <ActivityFeed
-                    events={events}
-                    active={run.active}
-                    // With follow-ups, the answer belongs under the question it answers.
-                    hideAnswer={run.active || turns > 1 ? "" : d.answer}
-                    root={worktree?.path}
-                    {...(run.approval && { approval: run.approval })}
-                    mode={run.settings.access ?? "auto"}
-                    onOpenRun={onOpenRun}
-                    {...(connect && {
-                      children: (
-                        <ConnectCard
-                          suggestion={connect.suggestion}
-                          kind={connect.kind}
-                          onCancel={() => setConnect(undefined)}
-                          onConnect={async (repo) => {
-                            await api.connectRemote(runId, repo);
-                            const kind = connect.kind;
-                            setConnect(undefined);
-                            await ship(kind);
-                          }}
-                        />
-                      ),
-                    })}
-                    onAnswer={(a) =>
-                      run.approval &&
-                      void api
-                        .answerApproval(runId, run.approval.id, a)
-                        .catch((e: unknown) => showToast(errorText(e), { tone: "bad" }))
-                    }
-                    shipKinds={shipKinds}
-                    shipping={shipping}
-                    onShip={(k) => void ship(k)}
-                  />
-                )}
+                {/* The answer shows in full, in the chat, as soon as it's written. */}
+                <ActivityFeed
+                  events={events}
+                  active={run.active}
+                  root={worktree?.path}
+                  {...(run.approval && { approval: run.approval })}
+                  mode={run.settings.access ?? "auto"}
+                  onOpenRun={onOpenRun}
+                  {...(connect && {
+                    children: (
+                      <ConnectCard
+                        suggestion={connect.suggestion}
+                        kind={connect.kind}
+                        onCancel={() => setConnect(undefined)}
+                        onConnect={async (repo) => {
+                          await api.connectRemote(runId, repo);
+                          const kind = connect.kind;
+                          setConnect(undefined);
+                          await ship(kind);
+                        }}
+                      />
+                    ),
+                  })}
+                  onAnswer={(a) =>
+                    run.approval &&
+                    void api
+                      .answerApproval(runId, run.approval.id, a)
+                      .catch((e: unknown) => showToast(errorText(e), { tone: "bad" }))
+                  }
+                  shipKinds={shipKinds}
+                  shipping={shipping}
+                  onShip={(k) => void ship(k)}
+                />
                 <div ref={feedEnd} />
               </div>
             </div>
@@ -379,7 +362,7 @@ export function RunScreen({
   );
 }
 
-/** A short summary: how it went, a few facts, the first lines of the answer. */
+/** A short summary: how it went and a few facts. The answer itself is in the chat below. */
 function SummaryCard({
   run,
   events,
@@ -393,7 +376,6 @@ function SummaryCard({
   onReview: () => void;
   onSendBack: (message: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const o = outcomeOf(run);
   const d = run.digest;
   const cantStart = d.tests?.cantStart;
@@ -411,8 +393,6 @@ function SummaryCard({
         : files
           ? `Done in ${took}${d.tests ? " · checks pass" : ""}`
           : `Answered in ${took}`;
-  const gist = d.answer ? firstParagraph(d.answer) : (run.summary ?? "");
-  const hasMore = Boolean(d.answer) && d.answer.trim() !== gist.trim();
 
   return (
     <section className={`summary-card ${o.tone}`} aria-label="Summary">
@@ -462,12 +442,6 @@ function SummaryCard({
         <pre className="excerpt">{run.error}</pre>
       ) : null}
 
-      {gist ? (
-        <div className={`gist ${open ? "" : "clamp"}`}>
-          <Markdown text={open && hasMore ? d.answer : gist} />
-        </div>
-      ) : null}
-
       <div className="sum-actions">
         {failure && run.worktree ? (
           <button
@@ -484,11 +458,6 @@ function SummaryCard({
         {files && o.tone !== "bad" ? (
           <button className="btn" onClick={onReview}>
             Review changes
-          </button>
-        ) : null}
-        {hasMore ? (
-          <button className="link-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
-            {open ? "Show less" : "Read the full answer"}
           </button>
         ) : null}
       </div>

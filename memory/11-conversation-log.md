@@ -88,3 +88,5 @@ names are left out on purpose.
   floating or tab; owner picked the bottom drawer → real shell via node-pty (v0.2.29).
 - Dropping a Markdown file said "Only PNG, JPEG, GIF and WebP images can be attached"
   ("it should be able to upload any file like md, pdf, etc") → any file attaches (v0.2.30).
+- The finished answer only appeared after sending another message ("show it to me pls
+  before hand only once generated") → the answer always shows in full in the chat (v0.2.31).
