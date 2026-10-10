@@ -92,3 +92,5 @@ each release maps to one change set.
   you're at the bottom; scrolling up stops the follow.
 - **0.2.28**: Tabs in the title bar: keep several chats open, ⌘-click / ⌘T / + for a new
   tab, ⌘W closes one, ⌃Tab switches; status dot per tab; tabs come back after a restart.
+- **0.2.29**: Terminal drawer: ⌃` (or the >_ button) opens a real shell in the current
+  run's or project's folder from any screen; resizable, stays alive across tabs.

@@ -118,6 +118,8 @@ const projects: ProjectRecord[] = [ORBIT, HYDRA, ACME];
 const runs = new Map<string, DemoRun>();
 const changed = new Set<(id: string) => void>();
 const opened = new Set<(id: string) => void>();
+const termListeners = new Set<(id: string, data: string) => void>();
+const termOut = (data: string) => termListeners.forEach((l) => l("demo", data));
 const notify = (id: string) => changed.forEach((l) => l(id));
 
 // ---- Scripts: what the pretend agent does ----
@@ -957,6 +959,31 @@ export const demoApi: HelloagentsApi = {
     return () => opened.delete(l);
   },
   onCloseTab: () => () => undefined,
+  // A pretend shell for the website: echoes what you type.
+  termStart: async () => {
+    setTimeout(
+      () =>
+        termOut(
+          "\x1b[2mThis is the website demo. In the app this is your real shell.\x1b[0m\r\n\r\norbit-app $ ",
+        ),
+      50,
+    );
+    return "demo";
+  },
+  termWrite: (_id, data) => {
+    for (const ch of data) {
+      if (ch === "\r") termOut("\r\norbit-app $ ");
+      else if (ch === "\x7f") termOut("\b \b");
+      else termOut(ch);
+    }
+  },
+  termResize: () => undefined,
+  termKill: () => undefined,
+  onTermData: (l) => {
+    termListeners.add(l);
+    return () => termListeners.delete(l);
+  },
+  onTermExit: () => () => undefined,
 };
 
 /** Fills in the history, then starts two runs so the demo opens on live work. */

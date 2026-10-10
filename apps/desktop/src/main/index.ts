@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { access, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { killAllShells, killShell, resizeShell, startShell, writeShell } from "./terminal";
 import {
   AnthropicModel,
   cloneRepo,
@@ -112,6 +113,8 @@ function createWindow(): BrowserWindow {
   const devUrl = process.env.ELECTRON_RENDERER_URL;
   if (devUrl) void w.loadURL(devUrl);
   else void w.loadFile(path.join(__dirname, "../renderer/index.html"));
+  // The drawer's shells belong to this window.
+  w.on("closed", killAllShells);
   return w;
 }
 
@@ -349,6 +352,21 @@ app.whenReady().then(async () => {
     ".gif": "image/gif",
     ".webp": "image/webp",
   };
+  // The terminal drawer: real shells, output streamed to the window that started them.
+  ipcMain.handle(IPC.termStart, (e, cwds: string[], cols: number, rows: number) =>
+    startShell(
+      cwds,
+      cols,
+      rows,
+      (id, data) => !e.sender.isDestroyed() && e.sender.send(IPC.termData, id, data),
+      (id, code) => !e.sender.isDestroyed() && e.sender.send(IPC.termExit, id, code),
+    ),
+  );
+  ipcMain.on(IPC.termWrite, (_e, id: string, data: string) => writeShell(id, data));
+  ipcMain.on(IPC.termResize, (_e, id: string, cols: number, rows: number) =>
+    resizeShell(id, cols, rows),
+  );
+  ipcMain.on(IPC.termKill, (_e, id: string) => killShell(id));
   ipcMain.handle(IPC.readImage, async (_e, file: string) => {
     const type = IMAGE_TYPES[path.extname(file).toLowerCase()];
     if (!type || !path.isAbsolute(file)) return null;
@@ -501,6 +519,7 @@ app.whenReady().then(async () => {
     }
     event.preventDefault();
     quitting = true;
+    killAllShells();
     void manager.stopAll().finally(() => {
       store.close();
       app.quit();

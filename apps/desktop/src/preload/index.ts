@@ -61,6 +61,20 @@ const api: HelloagentsApi = {
     ipcRenderer.on(IPC.closeTab, handler);
     return () => ipcRenderer.removeListener(IPC.closeTab, handler);
   },
+  termStart: (cwds, cols, rows) => invoke(IPC.termStart, cwds, cols, rows),
+  termWrite: (id, data) => ipcRenderer.send(IPC.termWrite, id, data),
+  termResize: (id, cols, rows) => ipcRenderer.send(IPC.termResize, id, cols, rows),
+  termKill: (id) => ipcRenderer.send(IPC.termKill, id),
+  onTermData: (listener) => {
+    const handler = (_event: IpcRendererEvent, id: string, data: string) => listener(id, data);
+    ipcRenderer.on(IPC.termData, handler);
+    return () => ipcRenderer.removeListener(IPC.termData, handler);
+  },
+  onTermExit: (listener) => {
+    const handler = (_event: IpcRendererEvent, id: string, code: number) => listener(id, code);
+    ipcRenderer.on(IPC.termExit, handler);
+    return () => ipcRenderer.removeListener(IPC.termExit, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld("helloagents", api);

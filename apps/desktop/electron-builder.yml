@@ -1,5 +1,5 @@
 # Packages the built app (out/) into a .dmg. Everything the app needs is
-# bundled by electron-vite, so no node_modules ship inside it.
+# bundled by electron-vite, except node-pty (the terminal's native module).
 appId: run.helloagents.app
 productName: helloagents
 copyright: Copyright © 2026 Shivank Kapur
@@ -9,8 +9,15 @@ directories:
 files:
   - out/**
   - package.json
-  - "!node_modules/**"
+  # Only node-pty's macOS binaries; not its sources or Windows builds.
+  - "!node_modules/node-pty/{src,deps,third_party,scripts,typings,binding.gyp}/**"
+  - "!node_modules/node-pty/prebuilds/win32-*/**"
 asar: true
+# Native code can't load from inside the archive.
+asarUnpack:
+  - node_modules/node-pty/**
+# node-pty ships prebuilt binaries for both chips; never compile it.
+npmRebuild: false
 mac:
   category: public.app-category.developer-tools
   icon: resources/icon.png
@@ -22,6 +29,8 @@ mac:
   hardenedRuntime: false
   gatekeeperAssess: false
   notarize: false
+  # node-pty carries a binary per chip in both halves of the universal app.
+  x64ArchFiles: "Contents/Resources/app.asar.unpacked/node_modules/node-pty/prebuilds/**"
 dmg:
   title: helloagents
   # A stable name, so /releases/latest/download/helloagents-mac.dmg always works.

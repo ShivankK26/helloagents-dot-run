@@ -23,6 +23,7 @@ import { Palette, type Command } from "./components/Palette";
 import { RemoveProject } from "./components/RemoveProject";
 import { RunScreen, type RunTab } from "./components/RunScreen";
 import { Sidebar, type Section } from "./components/Sidebar";
+import { TerminalDrawer } from "./components/TerminalDrawer";
 import { Toasts } from "./components/Toasts";
 import { TracesPage } from "./components/TracesPage";
 import { Welcome } from "./components/Welcome";
@@ -44,6 +45,18 @@ window.addEventListener(
 const wantsNewTab = () => lastClick.meta && performance.now() - lastClick.at < 100;
 
 const PIN_KEY = "helloagents.sidebarPinned";
+const TERM_KEY = "helloagents.terminal";
+const readTerm = (): { open: boolean; height: number } => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(TERM_KEY) ?? "null") as {
+      open?: boolean;
+      height?: number;
+    } | null;
+    return { open: Boolean(saved?.open), height: saved?.height ?? 280 };
+  } catch {
+    return { open: false, height: 280 };
+  }
+};
 const readPinned = () => {
   try {
     return localStorage.getItem(PIN_KEY) !== "0";
@@ -78,6 +91,15 @@ export function App() {
     [],
   );
   const [pinned, setPinned] = useState(readPinned);
+  const [term, setTerm] = useState(readTerm);
+  useEffect(() => {
+    try {
+      localStorage.setItem(TERM_KEY, JSON.stringify(term));
+    } catch {
+      // not remembered
+    }
+  }, [term]);
+  const toggleTerm = useCallback(() => setTerm((t) => ({ ...t, open: !t.open })), []);
   const [peek, setPeek] = useState(false);
   const [palette, setPalette] = useState(false);
   const [editingActions, setEditingActions] = useState(false);
@@ -244,6 +266,11 @@ export function App() {
   // ---- Keyboard ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.metaKey && (e.key === "`" || e.code === "Backquote")) {
+        e.preventDefault();
+        toggleTerm();
+        return;
+      }
       if (e.ctrlKey && e.key === "Tab") {
         e.preventDefault();
         cycleTab(e.shiftKey ? -1 : 1);
@@ -289,7 +316,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [togglePin, toggleTheme, projects, openProject, setScreen, openTab, cycleTab]);
+  }, [togglePin, toggleTheme, projects, openProject, setScreen, openTab, cycleTab, toggleTerm]);
 
   const options = agentOptions(agents, info);
   const projectRuns = runs.filter((r) => r.projectId);
@@ -485,6 +512,11 @@ export function App() {
   ]);
 
   // ---- Render ----
+  // The terminal opens where the current tab's work is: the run's folder, else the project.
+  const termCwd = currentRun?.worktree?.path ?? project?.path;
+  const termLabel = currentRun?.worktree?.path
+    ? `${project?.name ?? ""} · this run's folder`
+    : (project?.name ?? "");
   const projectName = (id?: string) => projects?.find((p) => p.id === id)?.name;
   const tabLabel = (t: Tab): { title: string; sub?: string; tone?: string } => {
     const sc = t.screen;
@@ -593,6 +625,16 @@ export function App() {
           </nav>
         ) : null}
         <span className="grow" />
+        {project ? (
+          <button
+            className={`tb-search icon ${term.open ? "on" : ""}`}
+            onClick={toggleTerm}
+            title="Terminal (⌃`)"
+            aria-label={term.open ? "Hide the terminal" : "Open a terminal"}
+          >
+            <Icon name="term" size={15} />
+          </button>
+        ) : null}
         {projects?.length ? (
           <button
             className="tb-search icon"
@@ -636,47 +678,60 @@ export function App() {
           </>
         ) : null}
 
-        <main className="main">
-          {projects && projects.length === 0 ? (
-            <Welcome agents={agents} info={info} onAdd={() => setAdding(true)} />
-          ) : screen.kind === "section" && projects ? (
-            screen.section === "overview" ? (
-              <Overview
-                projects={projects}
-                runs={projectRuns}
+        <div className="main-col">
+          <main className="main">
+            {projects && projects.length === 0 ? (
+              <Welcome agents={agents} info={info} onAdd={() => setAdding(true)} />
+            ) : screen.kind === "section" && projects ? (
+              screen.section === "overview" ? (
+                <Overview
+                  projects={projects}
+                  runs={projectRuns}
+                  onOpenRun={(id) => showRun(id)}
+                  onNewTask={openProject}
+                  onAddProject={() => setAdding(true)}
+                />
+              ) : screen.section === "traces" ? (
+                <TracesPage projects={projects} />
+              ) : screen.section === "errors" ? (
+                <ErrorsPage projects={projects} onOpenTrace={(id) => showRun(id, "trace")} />
+              ) : (
+                <EvalsPage />
+              )
+            ) : screen.kind === "run" && project ? (
+              <RunScreen
+                key={screen.runId}
+                runId={screen.runId}
+                project={project}
+                initialTab={screen.tab}
+                openers={openers}
+                onBack={() => setScreen({ kind: "home" })}
                 onOpenRun={(id) => showRun(id)}
-                onNewTask={openProject}
-                onAddProject={() => setAdding(true)}
               />
-            ) : screen.section === "traces" ? (
-              <TracesPage projects={projects} />
-            ) : screen.section === "errors" ? (
-              <ErrorsPage projects={projects} onOpenTrace={(id) => showRun(id, "trace")} />
-            ) : (
-              <EvalsPage />
-            )
-          ) : screen.kind === "run" && project ? (
-            <RunScreen
-              key={screen.runId}
-              runId={screen.runId}
-              project={project}
-              initialTab={screen.tab}
-              openers={openers}
-              onBack={() => setScreen({ kind: "home" })}
-              onOpenRun={(id) => showRun(id)}
-            />
-          ) : project ? (
-            <NewTask
-              key={project.id}
-              project={project}
-              info={projectInfo}
-              options={options}
-              onStarted={(id) => showRun(id)}
-              onAgentChange={(a) => void changeAgent(a)}
-              onEditActions={() => setEditingActions(true)}
+            ) : project ? (
+              <NewTask
+                key={project.id}
+                project={project}
+                info={projectInfo}
+                options={options}
+                onStarted={(id) => showRun(id)}
+                onAgentChange={(a) => void changeAgent(a)}
+                onEditActions={() => setEditingActions(true)}
+              />
+            ) : null}
+          </main>
+          {term.open && project ? (
+            <TerminalDrawer
+              cwd={termCwd ?? project.path}
+              fallback={project.path}
+              label={termLabel}
+              dark={resolved === "dark"}
+              height={term.height}
+              onHeight={(height) => setTerm((t) => ({ ...t, height }))}
+              onClose={() => setTerm((t) => ({ ...t, open: false }))}
             />
           ) : null}
-        </main>
+        </div>
       </div>
 
       {palette ? <Palette commands={commands} onClose={() => setPalette(false)} /> : null}

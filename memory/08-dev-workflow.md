@@ -67,3 +67,14 @@ not notarized (first launch needs "Open Anyway").
 - Commit messages: a short title, a body that explains the why, and the
   `Co-Authored-By` line.
 - After shipping a feature, update the build guide artifact and these notes.
+
+## Native module: node-pty (the terminal)
+
+- The only runtime dependency shipped in the app (`dependencies` in apps/desktop);
+  everything else is bundled. Uses node-pty's prebuilt binaries (N-API, both chips):
+  `allowBuilds: node-pty: false`, `npmRebuild: false`, `asarUnpack` node-pty, and
+  `mac.x64ArchFiles` covering its prebuilds so the universal merge accepts them.
+- Its `spawn-helper` ships without the executable bit ("posix_spawnp failed"):
+  `scripts/pty-helper.mjs` (run by `dist`) sets it, and main also sets it at runtime.
+- Testing the packaged app while the real one runs: pass `--user-data-dir=<tmp>` too,
+  or the single-instance lock quits it immediately.

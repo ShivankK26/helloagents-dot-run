@@ -9,3 +9,5 @@ allowBuilds:
   # Only used to build Windows installers.
   electron-winstaller: false
   esbuild: true
+  # The terminal uses node-pty's prebuilt binaries; nothing to compile.
+  node-pty: false

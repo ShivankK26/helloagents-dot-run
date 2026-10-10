@@ -3989,3 +3989,70 @@ body.resizing * {
   padding: 0;
   justify-content: center;
 }
+
+/* Terminal drawer: under the main area, drag its top edge to resize. */
+.main-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.main-col > .main {
+  min-height: 0;
+}
+.term-drawer {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line-2);
+  background: var(--term-bg);
+}
+.term-drawer .box-grip::after {
+  opacity: 1;
+}
+.term-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12.5px;
+  flex-shrink: 0;
+}
+.term-title {
+  color: var(--ink);
+  font-weight: 500;
+}
+.term-where {
+  color: var(--faint);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.term-body {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 0 4px 14px;
+}
+.term-host,
+.term-host .xterm {
+  height: 100%;
+}
+.term-host .xterm-viewport {
+  background: transparent !important;
+}
+.tb-search.icon.on {
+  color: var(--ink);
+  border-color: var(--line-2);
+  background: var(--raised);
+}
+:root {
+  --term-bg: #ffffff;
+}
+:root[data-theme="dark"] {
+  --term-bg: #0a0a0a;
+}

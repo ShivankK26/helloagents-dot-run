@@ -175,6 +175,15 @@ export interface HelloagentsApi {
   onOpenRun(listener: (runId: string) => void): () => void;
   /** Called on ⌘W: close the current tab (the window closes only with the last one). */
   onCloseTab(listener: () => void): () => void;
+  /** Starts a login shell for the terminal drawer in the first of these folders that exists. */
+  termStart(cwds: string[], cols: number, rows: number): Promise<string>;
+  /** Keystrokes for a shell. */
+  termWrite(id: string, data: string): void;
+  termResize(id: string, cols: number, rows: number): void;
+  termKill(id: string): void;
+  /** Output from any shell. Returns an unsubscribe function. */
+  onTermData(listener: (id: string, data: string) => void): () => void;
+  onTermExit(listener: (id: string, code: number) => void): () => void;
 }
 
 /** IPC channel names, shared so main and preload can't drift apart. */
@@ -221,4 +230,10 @@ export const IPC = {
   runChanged: "runs:changed",
   openRun: "runs:open",
   closeTab: "tabs:close",
+  termStart: "term:start",
+  termWrite: "term:write",
+  termResize: "term:resize",
+  termKill: "term:kill",
+  termData: "term:data",
+  termExit: "term:exit",
 } as const;

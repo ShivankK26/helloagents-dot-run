@@ -84,3 +84,5 @@ names are left out on purpose.
   → the feed opens at the bottom and sticks there while you're at the bottom (v0.2.27).
 - "at a time user should be able to open multiple chat screens here at the top bar" →
   mocked three tab designs (artifact), owner picked browser tabs → built (v0.2.28).
+- "there should be an option to open terminal at any point in the screen" → asked: drawer,
+  floating or tab; owner picked the bottom drawer → real shell via node-pty (v0.2.29).
